@@ -112,7 +112,7 @@ export function ChartTickerSelector({
         {selectedTickers.length > 0 && (
           <div className="flex flex-wrap gap-1 items-center">
             {selectedTickers.map((tickerId) => {
-              const ticker = tickers.find(t => t.id === Number(tickerId))
+              const ticker = tickers.find(t => t.id.toString() === tickerId)
               return ticker ? (
                 <Badge 
                   key={ticker.id}

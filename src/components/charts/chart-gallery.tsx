@@ -8,8 +8,9 @@ import { parseISO } from 'date-fns'
 import { Timeframe } from './chart-timeframe-selector'
 import apiClient from '@/lib/api/client'
 
-// Define the Ticker interface according to your backend structure
+// Define the Tag interface according to your backend structure
 export interface Tag {
+  id: number | string;
   name: string;
   color: string;
   description?: string | null;
@@ -28,6 +29,25 @@ export interface Ticker {
   tags: Tag[];
   createdAt: string; // ISO date string
   updatedAt?: string; // ISO date string
+}
+
+export interface TagObject {
+  id: string | number;
+  name: string;
+  color: string;
+}
+
+// Define a type for the annotated image
+interface AnnotatedImage {
+  url: string;
+  filename?: string;
+  sizes?: {
+    [key: string]: {
+      url: string | null;
+      width: number | null;
+      height: number | null;
+    };
+  };
 }
 
 // Define the API Chart interface based on the data structure we received
@@ -49,8 +69,8 @@ interface ApiChart {
   timeframe: Timeframe;
   timestamp: string;
   notes?: string;
-  tags?: Tag[]; // We'll map this to string[] for ChartImage
-  annotatedImage?: string | null;
+  tags?: Tag[]; // Array of tags
+  annotatedImage?: string | AnnotatedImage; // This could be a string or object
 }
 
 export function ChartGallery() {
@@ -60,12 +80,22 @@ export function ChartGallery() {
   const initialTickers = searchParams.get('tickers')?.split(',') || []
   const fromDate = searchParams.get('from') ? parseISO(searchParams.get('from')!) : undefined
   const toDate = searchParams.get('to') ? parseISO(searchParams.get('to')!) : undefined
-  const initialTimeframes = (searchParams.get('timeframes')?.split(',') || []) as Timeframe[]
+  
+  // Parse timeframes from URL, ensuring they're valid Timeframe values
+  const timeframesParam = searchParams.get('timeframes')?.split(',') || []
+  const validTimeframes: Timeframe[] = ['daily', 'weekly', 'monthly', 'intraday', 'other']
+  const initialTimeframes = timeframesParam.filter(t => 
+    validTimeframes.includes(t as Timeframe)
+  ) as Timeframe[]
+  
+  // Add initial tags from URL params
+  const initialTags = searchParams.get('tags')?.split(',') || []
   
   const [filters, setFilters] = useState<ChartFilters>({
     tickers: initialTickers,
     dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : undefined,
     timeframes: initialTimeframes.length > 0 ? initialTimeframes : ['daily', 'weekly'],
+    tags: initialTags, // Initialize tags from URL
   })
   
   const [tickers, setTickers] = useState<Ticker[]>([])
@@ -107,10 +137,23 @@ export function ChartGallery() {
         if (response.data && response.data.docs) {
           // Map API charts to ChartImage format
           const mappedCharts: ChartImage[] = response.data.docs.map((chart: ApiChart) => {
-            // Get tag names from chart.tags (if available)
-            const tagNames = Array.isArray(chart.tags) 
-              ? chart.tags.map(tag => typeof tag === 'object' && tag.name ? tag.name : String(tag))
-              : [];
+            // Get tag data from chart.tags (if available)
+            let tagData: TagObject[] = [];
+            
+            if (Array.isArray(chart.tags)) {
+              tagData = chart.tags
+                .filter((tag): tag is Tag => 
+                  tag !== null && 
+                  typeof tag === 'object' && 
+                  tag.id !== undefined && 
+                  tag.name !== undefined
+                )
+                .map(tag => ({
+                  id: String(tag.id),
+                  name: tag.name,
+                  color: tag.color || '#9E9E9E'
+                }));
+            }
             
             // Get proper image URL - we need to make sure we use the correct base URL
             // If the URL is absolute (starts with http), use it as is
@@ -118,6 +161,21 @@ export function ChartGallery() {
             const imageUrl = chart.image.url.startsWith('http') 
               ? chart.image.url 
               : `${apiClient.defaults.baseURL?.split('/api')[0]}${chart.image.url}`;
+            
+            // Handle annotated image if present
+            let annotatedImageUrl: string | null = null;
+            if (chart.annotatedImage) {
+              if (typeof chart.annotatedImage === 'string') {
+                annotatedImageUrl = chart.annotatedImage.startsWith('http')
+                  ? chart.annotatedImage
+                  : `${apiClient.defaults.baseURL?.split('/api')[0]}${chart.annotatedImage}`;
+              } else if (typeof chart.annotatedImage === 'object' && 'url' in chart.annotatedImage) {
+                const imgUrl = chart.annotatedImage.url;
+                annotatedImageUrl = imgUrl.startsWith('http')
+                  ? imgUrl
+                  : `${apiClient.defaults.baseURL?.split('/api')[0]}${imgUrl}`;
+              }
+            }
             
             return {
               id: String(chart.id),
@@ -127,16 +185,11 @@ export function ChartGallery() {
               ticker: chart.ticker.symbol,
               timestamp: chart.timestamp,
               timeframe: chart.timeframe,
-              tags: tagNames,
+              tags: tagData, // Store full tag data instead of just names
               // Include additional properties if they're used in your component
               tickerId: chart.ticker.id,
               notes: chart.notes,
-              // If annotatedImage exists and has a URL, process it the same way as the main image URL
-              annotatedImageUrl: chart.annotatedImage 
-                ? (chart.annotatedImage.startsWith('http') 
-                  ? chart.annotatedImage 
-                  : `${apiClient.defaults.baseURL?.split('/api')[0]}${chart.annotatedImage}`)
-                : null,
+              annotatedImageUrl: annotatedImageUrl,
             };
           });
           
@@ -190,7 +243,23 @@ export function ChartGallery() {
     
     // Filter by timeframes
     if (filters.timeframes.length > 0) {
-      filtered = filtered.filter(chart => filters.timeframes.includes(chart.timeframe))
+      filtered = filtered.filter(chart => filters.timeframes.includes(chart.timeframe as Timeframe))
+    }
+    
+    // Filter by tags (new)
+    if (filters.tags && filters.tags.length > 0) {
+      filtered = filtered.filter(chart => {
+        // If chart doesn't have tags or tags is not an array, it doesn't match
+        if (!chart.tags || !Array.isArray(chart.tags)) return false;
+        
+        // Check if chart has at least one of the selected tags
+        return filters.tags.some(tagId => 
+          chart.tags?.some((tag) => 
+            // Convert both to strings for comparison
+            String(tag.id) === String(tagId)
+          )
+        );
+      });
     }
     
     setFilteredCharts(filtered)
@@ -214,6 +283,11 @@ export function ChartGallery() {
       params.set('timeframes', filters.timeframes.join(','))
     }
     
+    // Add tags to URL params (new)
+    if (filters.tags.length > 0) {
+      params.set('tags', filters.tags.join(','))
+    }
+    
     // Replace the URL with the new search params
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
     window.history.replaceState({}, '', newUrl)
@@ -229,6 +303,7 @@ export function ChartGallery() {
       tickers: [],
       dateRange: undefined,
       timeframes: ['daily', 'weekly'],
+      tags: [], // Reset tags too
     })
   }
   
