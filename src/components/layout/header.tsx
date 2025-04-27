@@ -26,15 +26,14 @@ export default function Header() {
           <NavigationMenu>
             <NavigationMenuList>
               <NavigationMenuItem>
-                <Link href="/charts" legacyBehavior passHref>
-                  <NavigationMenuLink 
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      pathname === "/charts" && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    Charts
-                  </NavigationMenuLink>
+                <Link 
+                  href="/charts" 
+                  className={cn(
+                    navigationMenuTriggerStyle(), 
+                    pathname === "/charts" && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  Charts
                 </Link>
               </NavigationMenuItem>
               <NavigationMenuItem>

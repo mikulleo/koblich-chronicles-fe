@@ -230,10 +230,10 @@ export function TradeExitDetails({
                         size="sm"
                         className="h-8 px-2 py-0 flex items-center gap-1"
                         onClick={() => navigateToCharts(exit.date)}
-                      >
+                        >
                         <ChartLine className="h-4 w-4" />
                         <span className="text-xs">View Charts</span>
-                      </Button>
+                        </Button>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-2">

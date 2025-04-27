@@ -141,7 +141,7 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
                     mode="range"
                     defaultMonth={dateRange.from}
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={(range) => setDateRange(range)}
                     numberOfMonths={2}
                   />
                 </PopoverContent>
@@ -159,22 +159,22 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
             <Select
               value={filters.tickerId || ""}
               onValueChange={(value) =>
-                onFilterChange({ tickerId: value || undefined })
+                onFilterChange({ tickerId: value === "all" ? undefined : value })
               }
             >
               <SelectTrigger id="ticker-filter">
                 <SelectValue placeholder="All Tickers" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Tickers</SelectItem>
+                <SelectItem value="all">All Tickers</SelectItem>
                 {tickers
-                  .sort((a, b) => a.symbol.localeCompare(b.symbol))
-                  .map((ticker) => (
+                    .sort((a, b) => a.symbol.localeCompare(b.symbol))
+                    .map((ticker) => (
                     <SelectItem key={ticker.id} value={ticker.id.toString()}>
-                      {ticker.symbol}
+                        {ticker.symbol}
                     </SelectItem>
-                  ))}
-              </SelectContent>
+                    ))}
+                </SelectContent>
             </Select>
           </div>
 

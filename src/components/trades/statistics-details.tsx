@@ -140,7 +140,7 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
                   <TableBody>
                     <TableRow>
                       <TableCell className="font-medium">Win Rate</TableCell>
-                      <TableCell className={getColorClass(stats.battingAverage, 50)}>
+                      <TableCell className={getColorClass(stats.battingAverage, 50, "percent")}>
                         {stats.battingAverage.toFixed(2)}%
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -158,7 +158,7 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Average Loss</TableCell>
-                      <TableCell className="text-red-600 font-medium">
+                      <TableCell className={getColorClass(isNormalized ? stats.normalized.averageLossPercent : stats.averageLossPercent, 0, "loss")}>
                         {formatPercent(isNormalized ? stats.normalized.averageLossPercent : stats.averageLossPercent)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -182,7 +182,7 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
                           </TooltipProvider>
                         </div>
                       </TableCell>
-                      <TableCell className={getColorClass(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio, 1)}>
+                      <TableCell className={getColorClass(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio, 1, "ratio")}>
                         {formatRatio(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -341,11 +341,38 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
 }
 
 // Helper function to determine text color class based on value
-function getColorClass(value: number, threshold: number): string {
-  if (value > threshold) {
-    return "text-green-600 font-medium";
-  } else if (value < threshold) {
-    return "text-red-600 font-medium";
+function getColorClass(value: number, threshold: number, metric: string = ""): string {
+    // Special handling for different metric types
+    if (metric === "loss") {
+      // For loss metrics, we expect negative values, so use neutral or muted colors
+      return value < -5 ? "text-red-600 font-medium" : // Only truly bad losses are bright red
+             value < 0 ? "text-red-400 font-medium" :   // Normal losses are muted red
+             "text-gray-600 font-medium";               // Positive values (unusual for losses)
+    }
+    
+    // For ratio metrics (typically good when > 1)
+    if (metric === "ratio") {
+      return value >= 1.5 ? "text-green-600 font-medium" : // Strong performance
+             value >= 1.0 ? "text-green-500 font-medium" : // Good performance
+             value >= 0.8 ? "text-amber-500 font-medium" : // Close to good
+             value >= 0.5 ? "text-amber-600 font-medium" : // Need improvement
+             "text-red-500 font-medium";                   // Poor performance
+    }
+    
+    // For percentage metrics (typically good when > 0)
+    if (metric === "percent") {
+      return value >= 1.0 ? "text-green-600 font-medium" : // Good positive value
+             value > 0 ? "text-green-500 font-medium" :    // Any positive is good
+             value === 0 ? "text-gray-600 font-medium" :   // Neutral
+             value > -1.0 ? "text-amber-600 font-medium" : // Small negative
+             "text-red-500 font-medium";                   // Significant negative
+    }
+    
+    // Default behavior with more nuance
+    if (value > threshold * 1.5) return "text-green-600 font-medium"; // Significantly above threshold
+    if (value > threshold) return "text-green-500 font-medium";       // Above threshold
+    if (value === threshold) return "";                               // At threshold
+    if (value > threshold * 0.8) return "text-amber-500 font-medium"; // Slightly below threshold
+    if (value > threshold * 0.5) return "text-amber-600 font-medium"; // Below threshold but not terrible
+    return "text-red-500 font-medium";                                // Significantly below threshold
   }
-  return "";
-}

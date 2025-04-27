@@ -22,40 +22,73 @@ interface StatisticsCardProps {
 }
 
 function StatisticsCard({ 
-  title, 
-  value, 
-  info, 
-  className = "",
-  positive = false,
-  negative = false,
-}: StatisticsCardProps) {
-  return (
-    <Card className={className}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-            {title}
-            {info && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <InfoIcon className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>{info}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </h3>
-        </div>
-        <div className={`text-2xl font-bold ${positive ? 'text-green-600' : ''} ${negative ? 'text-red-600' : ''}`}>
-          {value}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+    title, 
+    value, 
+    info, 
+    className = "",
+    positive = false,
+    negative = false,
+    metricType = "", // Add new parameter for metric type
+  }: StatisticsCardProps) {
+    // Function to determine text color class based on value and type
+    const getColorClass = () => {
+      if (metricType === "batting") {
+        // For batting average
+        const numValue = parseFloat(value.toString());
+        return numValue >= 60 ? "text-green-600" : 
+               numValue >= 50 ? "text-green-500" : 
+               numValue >= 40 ? "text-amber-500" : 
+               "text-red-500";
+      }
+      
+      if (metricType === "ratio") {
+        // For ratio values
+        const numValue = parseFloat(value.toString());
+        return numValue >= 1.5 ? "text-green-600" : 
+               numValue >= 1.0 ? "text-green-500" : 
+               numValue >= 0.7 ? "text-amber-500" : 
+               "text-red-500";
+      }
+      
+      if (metricType === "loss") {
+        // Always muted red for losses
+        return "text-red-400";
+      }
+      
+      // Use provided positive/negative flags if no specific type
+      if (positive) return "text-green-600";
+      if (negative) return "text-red-500";
+      
+      return "";
+    };
+  
+    return (
+      <Card className={className}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+              {title}
+              {info && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>{info}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </h3>
+          </div>
+          <div className={`text-2xl font-bold ${getColorClass()}`}>
+            {value}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
 interface StatisticsSummaryProps {
   stats: TradeStats;
@@ -106,20 +139,18 @@ export function StatisticsSummary({ stats, metadata, viewMode }: StatisticsSumma
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Batting Average */}
         <StatisticsCard
-          title="Batting Average"
-          value={`${stats.battingAverage.toFixed(1)}%`}
-          info="Percentage of winning trades out of all trades."
-          positive={stats.battingAverage > 50}
-          negative={stats.battingAverage < 50}
+        title="Batting Average"
+        value={`${stats.battingAverage.toFixed(1)}%`}
+        info="Percentage of winning trades out of all trades."
+        metricType="batting"
         />
         
         {/* Win/Loss Ratio */}
         <StatisticsCard
-          title="Win/Loss Ratio"
-          value={formatRatio(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio)}
-          info="Ratio between average winning percentage and average losing percentage. Formula: AverageWin% ÷ |AverageLoss%|"
-          positive={(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio) > 1}
-          negative={(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio) < 1}
+        title="Win/Loss Ratio"
+        value={formatRatio(isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio)}
+        info="Ratio between average winning percentage and average losing percentage. Formula: AverageWin% ÷ |AverageLoss%|"
+        metricType="ratio"
         />
         
         {/* Adjusted Win/Loss Ratio */}

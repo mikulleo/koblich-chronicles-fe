@@ -284,74 +284,72 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
                     <>
                       {monthlyStats[yearData.period].map((monthData) => (
                         // Only show months with trades
-                        monthData.metadata.totalTrades > 0 && (
-                          <TableRow 
-                            key={monthData.period} 
-                            className="bg-muted/20 hover:bg-muted/30"
-                          >
-                            <TableCell className="pl-8 font-normal">
-                              {monthData.periodLabel}
-                            </TableCell>
-                            <TableCell>
-                              {monthData.metadata.totalTrades}
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({monthData.stats.winningTrades}/{monthData.stats.losingTrades})
-                              </span>
-                            </TableCell>
-                            <TableCell className={getColorClass(monthData.stats.battingAverage, 50)}>
-                              {monthData.stats.battingAverage.toFixed(1)}%
-                            </TableCell>
-                            <TableCell className={getColorClass(
-                              viewMode === "normalized" 
-                                ? monthData.stats.normalized.winLossRatio 
-                                : monthData.stats.winLossRatio, 
-                              1
-                            )}>
-                              {formatRatio(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.winLossRatio
-                                  : monthData.stats.winLossRatio
-                              )}
-                            </TableCell>
-                            <TableCell className="text-green-600">
-                              {formatPercent(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.averageWinPercent
-                                  : monthData.stats.averageWinPercent
-                              )}
-                            </TableCell>
-                            <TableCell className="text-red-600">
-                              {formatPercent(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.averageLossPercent
-                                  : monthData.stats.averageLossPercent
-                              )}
-                            </TableCell>
-                            <TableCell className={getColorClass(
+                        (monthData.metadata.totalTrades > 0 && (<TableRow 
+                          key={monthData.period} 
+                          className="bg-muted/20 hover:bg-muted/30"
+                        >
+                          <TableCell className="pl-8 font-normal">
+                            {monthData.periodLabel}
+                          </TableCell>
+                          <TableCell>
+                            {monthData.metadata.totalTrades}
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({monthData.stats.winningTrades}/{monthData.stats.losingTrades})
+                            </span>
+                          </TableCell>
+                          <TableCell className={getColorClass(monthData.stats.battingAverage, 50)}>
+                            {monthData.stats.battingAverage.toFixed(1)}%
+                          </TableCell>
+                          <TableCell className={getColorClass(
+                            viewMode === "normalized" 
+                              ? monthData.stats.normalized.winLossRatio 
+                              : monthData.stats.winLossRatio, 
+                            1
+                          )}>
+                            {formatRatio(
+                              viewMode === "normalized"
+                                ? monthData.stats.normalized.winLossRatio
+                                : monthData.stats.winLossRatio
+                            )}
+                          </TableCell>
+                          <TableCell className="text-green-600">
+                            {formatPercent(
+                              viewMode === "normalized"
+                                ? monthData.stats.normalized.averageWinPercent
+                                : monthData.stats.averageWinPercent
+                            )}
+                          </TableCell>
+                          <TableCell className="text-red-600">
+                            {formatPercent(
+                              viewMode === "normalized"
+                                ? monthData.stats.normalized.averageLossPercent
+                                : monthData.stats.averageLossPercent
+                            )}
+                          </TableCell>
+                          <TableCell className={getColorClass(
+                            viewMode === "normalized"
+                              ? monthData.stats.normalized.averageRRatio
+                              : monthData.stats.averageRRatio,
+                            1
+                          )}>
+                            {formatRatio(
                               viewMode === "normalized"
                                 ? monthData.stats.normalized.averageRRatio
-                                : monthData.stats.averageRRatio,
-                              1
-                            )}>
-                              {formatRatio(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.averageRRatio
-                                  : monthData.stats.averageRRatio
-                              )}
-                            </TableCell>
-                            <TableCell className={getColorClass(
+                                : monthData.stats.averageRRatio
+                            )}
+                          </TableCell>
+                          <TableCell className={getColorClass(
+                            viewMode === "normalized"
+                              ? monthData.stats.normalized.totalProfitLossPercent
+                              : monthData.stats.totalProfitLossPercent
+                          )}>
+                            {formatPercent(
                               viewMode === "normalized"
                                 ? monthData.stats.normalized.totalProfitLossPercent
                                 : monthData.stats.totalProfitLossPercent
-                            )}>
-                              {formatPercent(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.totalProfitLossPercent
-                                  : monthData.stats.totalProfitLossPercent
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        )
+                            )}
+                          </TableCell>
+                        </TableRow>))
                       ))}
                       
                       {/* Show "No trades" message if no trades in any month */}

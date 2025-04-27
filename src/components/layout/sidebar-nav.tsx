@@ -69,11 +69,13 @@ export default function SidebarNav() {
               pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
           >
-            {item.icon}
-            <span>{item.title}</span>
+            <div className="flex items-center gap-3">
+              {item.icon}
+              <span>{item.title}</span>
+            </div>
           </Link>
         ))}
       </nav>
     </div>
-  )
+  );
 }
