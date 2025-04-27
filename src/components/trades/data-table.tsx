@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ChartLine } from "lucide-react"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -105,6 +106,9 @@ export function DataTable<TData, TValue>({
                     </TableHead>
                   )
                 })}
+                {onRowClickAction && (
+                  <TableHead className="w-14 text-right">Charts</TableHead>
+                )}
               </TableRow>
             ))}
           </TableHeader>
@@ -114,19 +118,31 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onClick={() => onRowClickAction && onRowClickAction(row.original)}
-                  className={onRowClickAction ? "cursor-pointer hover:bg-muted" : ""}
+                  // Removed the onClick handler for the entire row
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
+                  {onRowClickAction && (
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-8 px-2 py-0 flex items-center gap-1"
+                        onClick={() => onRowClickAction(row.original)}
+                      >
+                        <ChartLine className="h-4 w-4" />
+                        <span className="text-xs">View</span>
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length + (onRowClickAction ? 1 : 0)} className="h-24 text-center">
                   No results.
                 </TableCell>
               </TableRow>

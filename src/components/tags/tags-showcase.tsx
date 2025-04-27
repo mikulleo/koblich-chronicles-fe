@@ -204,7 +204,7 @@ export function TagsShowcase() {
         <TagIcon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-medium mb-2">No Tags Found</h3>
         <p className="text-muted-foreground mb-6">
-          You haven't created any tags yet. Tags help you organize your charts.
+          You haven&apos;t created any tags yet. Tags help you organize your charts.
         </p>
         <Button 
           onClick={() => router.push('/admin/collections/tags/create')}
