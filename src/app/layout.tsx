@@ -7,8 +7,8 @@ import MainLayout from "@/components/layout/main-layout"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Koblich Chronicles - Stock Trading Tracker",
-  description: "Track your stock trades and chart patterns",
+  title: "Koblich Chronicles - Interactive Stock Trading Model Book",
+  description: "Track and analyze real-time trades, chart patterns, and performance insights with an interactive trading model book.",
 }
 
 export default function RootLayout({

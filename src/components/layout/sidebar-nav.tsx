@@ -11,71 +11,87 @@ import {
   ListFilter, 
   Hash 
 } from "lucide-react"
-
-interface NavItem {
-  title: string
-  href: string
-  icon: React.ReactNode
-}
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub
+} from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
 
 export default function SidebarNav() {
   const pathname = usePathname()
 
-  const navItems: NavItem[] = [
-    {
-      title: "Dashboard",
-      href: "/",
-      icon: <Home className="h-5 w-5" />,
-    },
-    {
-      title: "Charts",
-      href: "/charts",
-      icon: <LineChart className="h-5 w-5" />,
-    },
-    {
-      title: "Tags",
-      href: "/tags",
-      icon: <TagIcon className="h-5 w-5" />,
-    },
-    {
-      title: "Trades",
-      href: "/trades",
-      icon: <ListFilter className="h-5 w-5" />,
-    },
-    {
-      title: "Statistics",
-      href: "/statistics",
-      icon: <BarChart3 className="h-5 w-5" />,
-    },
-    {
-      title: "Tickers",
-      href: "/tickers",
-      icon: <Hash className="h-5 w-5" />,
-    }
-  ]
+  // Visual indicator to show that Trades and Statistics are related
+  const isTradeSection = pathname === "/trades" || pathname === "/statistics"
 
   return (
-    <div className="flex h-full flex-col gap-2 p-4">
-      <div className="py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Navigation
-      </div>
-      <nav className="grid gap-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              {item.icon}
-              <span>{item.title}</span>
-            </div>
+    <div className="h-full py-4">
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <Link href="/" passHref>
+            <SidebarMenuButton isActive={pathname === "/"} tooltip="Dashboard">
+              <Home className="h-5 w-5" />
+              <span>Dashboard</span>
+            </SidebarMenuButton>
           </Link>
-        ))}
-      </nav>
+        </SidebarMenuItem>
+        
+        <SidebarMenuItem>
+          <Link href="/charts" passHref>
+            <SidebarMenuButton isActive={pathname === "/charts"} tooltip="Charts">
+              <LineChart className="h-5 w-5" />
+              <span>Charts</span>
+            </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
+        
+        <SidebarMenuItem>
+          <Link href="/tags" passHref>
+            <SidebarMenuButton isActive={pathname === "/tags"} tooltip="Tags">
+              <TagIcon className="h-5 w-5" />
+              <span>Tags</span>
+            </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
+        
+        {/* Trading section with visual grouping */}
+        <div className={cn(
+          "relative mt-2 mb-2 rounded-md",
+          isTradeSection && "bg-accent/20 py-1"
+        )}>
+          {isTradeSection && (
+            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary ml-2"></div>
+          )}
+          
+          <SidebarMenuItem>
+            <Link href="/trades" passHref>
+              <SidebarMenuButton isActive={pathname === "/trades"} tooltip="Trades">
+                <ListFilter className="h-5 w-5" />
+                <span>Trades</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <Link href="/statistics" passHref>
+              <SidebarMenuButton isActive={pathname === "/statistics"} tooltip="Statistics">
+                <BarChart3 className="h-5 w-5" />
+                <span>Statistics</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        </div>
+        
+        <SidebarMenuItem>
+          <Link href="/tickers" passHref>
+            <SidebarMenuButton isActive={pathname === "/tickers"} tooltip="Tickers">
+              <Hash className="h-5 w-5" />
+              <span>Tickers</span>
+            </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
+      </SidebarMenu>
     </div>
-  );
+  )
 }

@@ -20,7 +20,12 @@ export interface ChartImage {
   timestamp: string
   timeframe: string
   tags?: TagType[] // Use TagType from chart-gallery
-  notes?: string
+  notes?: {
+    setupEntry?: string | null;
+    trend?: string | null;
+    fundamentals?: string | null;
+    other?: string | null;
+  } | string; // Allow string for backward compatibility
   annotatedImageUrl?: string | null
 }
 
@@ -269,6 +274,67 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   
   // Determine cursor style based on zoom and panning state
   const imageCursorStyle = zoomLevel > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default';
+
+  // Helper function to check if a notes section has content
+  const hasNoteContent = (content: string | null | undefined): boolean => {
+    return !!content && content.trim() !== '';
+  }
+  
+  // Helper function to render notes based on the structure
+  const renderNotes = () => {
+    if (!currentChart) return null;
+    
+    // Handle string notes (backward compatibility)
+    if (typeof currentChart.notes === 'string') {
+      return currentChart.notes ? (
+        <p className="text-sm mt-2 text-muted-foreground">{currentChart.notes}</p>
+      ) : null;
+    }
+    
+    // Handle structured notes
+    if (!currentChart.notes) return null;
+    
+    const { setupEntry, trend, fundamentals, other } = currentChart.notes;
+    const hasAnyNotes = 
+      hasNoteContent(setupEntry) || 
+      hasNoteContent(trend) || 
+      hasNoteContent(fundamentals) || 
+      hasNoteContent(other);
+    
+    if (!hasAnyNotes) return null;
+    
+    return (
+      <div className="mt-2 space-y-2">
+        {hasNoteContent(setupEntry) && (
+          <div>
+            <span className="text-sm font-medium">Setup / Entry:</span>
+            <p className="text-sm text-muted-foreground">{setupEntry}</p>
+          </div>
+        )}
+        
+        {hasNoteContent(trend) && (
+          <div>
+            <span className="text-sm font-medium">Trend:</span>
+            <p className="text-sm text-muted-foreground">{trend}</p>
+          </div>
+        )}
+        
+        {hasNoteContent(fundamentals) && (
+          <div>
+            <span className="text-sm font-medium">Fundamentals:</span>
+            <p className="text-sm text-muted-foreground">{fundamentals}</p>
+          </div>
+        )}
+        
+        {hasNoteContent(other) && (
+          <div>
+            <span className="text-sm font-medium">Other:</span>
+            <p className="text-sm text-muted-foreground">{other}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   return (
     <div ref={containerRef} className={fullscreenContainerClass}>
@@ -408,7 +474,7 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
             </div>
           </div>
           
-          {/* Chart Info Panel - Simplified UI */}
+          {/* Chart Info Panel - Updated for structured notes */}
           <div className="p-3 bg-card border-t">
             <div className="flex items-center justify-between">
               {/* Symbol */}
@@ -447,10 +513,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
               </div>
             )}
             
-            {/* Notes (if any) */}
-            {currentChart?.notes && (
-              <p className="text-sm mt-2 text-muted-foreground">{currentChart.notes}</p>
-            )}
+            {/* Structured Notes */}
+            {renderNotes()}
             
             {/* Keyboard Shortcuts - only in fullscreen */}
             {fullscreen && (

@@ -19,6 +19,7 @@ interface StatisticsCardProps {
   className?: string;
   positive?: boolean;
   negative?: boolean;
+  metricType?: string;
 }
 
 function StatisticsCard({ 
@@ -195,10 +196,10 @@ export function StatisticsSummary({ stats, metadata, viewMode }: StatisticsSumma
         
         {/* Average Loss % */}
         <StatisticsCard
-          title="Average Loss %"
-          value={formatPercent(isNormalized ? stats.normalized.averageLossPercent : stats.averageLossPercent)}
-          info="Average percentage loss on losing trades."
-          negative={true}
+        title="Average Loss %"
+        value={formatPercent(isNormalized ? stats.normalized.averageLossPercent : stats.averageLossPercent)}
+        info="Average percentage loss on losing trades."
+        metricType="loss"
         />
       </div>
     </div>

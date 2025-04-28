@@ -4,12 +4,35 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import { Tag, Chart, PaginatedResponse } from '@/lib/types';
 import apiClient from '@/lib/api/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  Legend
+} from 'recharts';
+import { parseISO, format } from 'date-fns';
 
 interface TagWithChartCount extends Tag {
   actualChartCount: number;
+  // Track counts per month
+  monthlyUsage: {
+    [key: string]: number; // Format: "YYYY-MM"
+  };
+  // Track best 3-month window
+  bestWindow?: {
+    startMonth: string;
+    endMonth: string;
+    count: number;
+  };
 }
 
 export function TagsStats() {
@@ -38,32 +61,86 @@ export function TagsStats() {
         
         const charts: PaginatedResponse<Chart> = chartsResponse.data;
         
-        // Count charts per tag
+        // Count charts per tag and track usage by month
         const tagCounts: Record<string, number> = {};
+        const tagMonthlyUsage: Record<string, Record<string, number>> = {};
         
-        // Initialize counts for all tags to zero
+        // Initialize counts and monthly usage for all tags to zero
         tags.forEach(tag => {
           tagCounts[tag.id] = 0;
+          tagMonthlyUsage[tag.id] = {};
         });
         
-        // Count charts for each tag
+        // Count charts for each tag by month
         charts.docs.forEach(chart => {
           if (chart.tags && Array.isArray(chart.tags)) {
+            const chartMonth = format(parseISO(chart.timestamp), 'yyyy-MM');
+            
             chart.tags.forEach(tag => {
               // Handle both populated and non-populated tags
               const tagId = typeof tag === 'object' ? tag.id : tag;
               if (tagId && tagCounts[tagId] !== undefined) {
+                // Increment total count
                 tagCounts[tagId]++;
+                
+                // Increment monthly count
+                if (!tagMonthlyUsage[tagId][chartMonth]) {
+                  tagMonthlyUsage[tagId][chartMonth] = 0;
+                }
+                tagMonthlyUsage[tagId][chartMonth]++;
               }
             });
           }
         });
         
-        // Combine tags with their actual chart counts and sort by counts
+        // Calculate best 3-month window for each tag
+        const tagBestWindows: Record<string, { startMonth: string, endMonth: string, count: number }> = {};
+        
+        Object.entries(tagMonthlyUsage).forEach(([tagId, monthlyData]) => {
+          // Get all months with usage, sorted chronologically
+          const months = Object.keys(monthlyData).sort();
+          
+          if (months.length < 3) {
+            // Not enough data for a 3-month window
+            return;
+          }
+          
+          let bestWindow = {
+            startMonth: months[0],
+            endMonth: months[0],
+            count: 0
+          };
+          
+          // Check each possible 3-month window
+          for (let i = 0; i < months.length - 2; i++) {
+            const startMonth = months[i];
+            const endMonth = months[i + 2]; // 3-month window
+            
+            // Calculate total count in this window
+            let windowCount = 0;
+            for (let j = i; j <= i + 2; j++) {
+              windowCount += monthlyData[months[j]] || 0;
+            }
+            
+            if (windowCount > bestWindow.count) {
+              bestWindow = {
+                startMonth,
+                endMonth,
+                count: windowCount
+              };
+            }
+          }
+          
+          tagBestWindows[tagId] = bestWindow;
+        });
+        
+        // Combine tags with their actual chart counts, monthly usage, and best windows
         const tagsWithActualCounts: TagWithChartCount[] = tags
           .map(tag => ({
             ...tag,
-            actualChartCount: tagCounts[tag.id] || 0
+            actualChartCount: tagCounts[tag.id] || 0,
+            monthlyUsage: tagMonthlyUsage[tag.id] || {},
+            bestWindow: tagBestWindows[tag.id]
           }))
           .sort((a, b) => b.actualChartCount - a.actualChartCount);
         
@@ -93,16 +170,21 @@ export function TagsStats() {
     .filter(tag => tag.actualChartCount > 0)
     .map(tag => ({
       name: tag.name,
-      value: tag.actualChartCount
+      value: tag.actualChartCount,
+      fill: tag.color
     }));
 
-  // Calculate tag statistics
-  const totalTags = tagsWithCounts.length;
-  const totalCharts = tagsWithCounts.reduce((sum, tag) => sum + tag.actualChartCount, 0);
-  const avgChartsPerTag = totalTags ? Math.round(totalCharts / totalTags * 10) / 10 : 0;
-  const maxChartsInTag = tagsWithCounts.length ? tagsWithCounts[0].actualChartCount : 0;
-  const tagsWithCharts = tagsWithCounts.filter(tag => tag.actualChartCount > 0).length;
-  const tagsWithoutCharts = totalTags - tagsWithCharts;
+  // Prepare data for best 3-month windows
+  const bestWindowsData = tagsWithCounts
+    .filter(tag => tag.bestWindow && tag.bestWindow.count > 0)
+    .sort((a, b) => (b.bestWindow?.count || 0) - (a.bestWindow?.count || 0))
+    .slice(0, 10) // Top 10 tags with best windows
+    .map(tag => ({
+      name: tag.name,
+      count: tag.bestWindow?.count || 0,
+      window: `${format(parseISO(tag.bestWindow?.startMonth + '-01'), 'MMM yyyy')} - ${format(parseISO(tag.bestWindow?.endMonth + '-01'), 'MMM yyyy')}`,
+      fill: tag.color
+    }));
 
   if (loading) {
     return (
@@ -134,40 +216,10 @@ export function TagsStats() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl">{totalTags}</CardTitle>
-            <CardDescription>Total Tags</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl">{totalCharts}</CardTitle>
-            <CardDescription>Total Tagged Charts</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl">{avgChartsPerTag}</CardTitle>
-            <CardDescription>Avg Charts per Tag</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-2xl">{maxChartsInTag}</CardTitle>
-            <CardDescription>Most Used Tag Count</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Top Tags by Usage</CardTitle>
-            <CardDescription>
-              Most frequently used tags in your chart library
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -212,9 +264,6 @@ export function TagsStats() {
         <Card>
           <CardHeader>
             <CardTitle>Tag Distribution</CardTitle>
-            <CardDescription>
-              Distribution of charts across different tags
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] flex items-center justify-center">
@@ -228,19 +277,16 @@ export function TagsStats() {
                       labelLine={false}
                       label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       outerRadius={100}
-                      fill="#8884d8"
                       dataKey="value"
                     >
-                      {pieChartData.map((entry, index) => {
-                        const tag = tagsWithCounts.find(t => t.name === entry.name);
-                        return (
-                          <Cell key={`cell-${index}`} fill={tag ? tag.color : '#999'} />
-                        );
-                      })}
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
                     </Pie>
                     <Tooltip 
                       formatter={(value, name, props) => [value, 'Charts']}
                     />
+                    <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -252,6 +298,54 @@ export function TagsStats() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* New section for best 3-month windows */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Best 3-Month Windows for Tags</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            {bestWindowsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={bestWindowsData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => value.length > 8 ? `${value.substring(0, 8)}...` : value}
+                  />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value, name, props) => [value, 'Charts']}
+                    labelFormatter={(label) => {
+                      const dataItem = bestWindowsData.find(item => item.name === label);
+                      return `${label}\nBest Window: ${dataItem?.window}`;
+                    }}
+                  />
+                  <Bar dataKey="count" name="Charts in window">
+                    {bestWindowsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <p className="text-muted-foreground">Not enough data for 3-month window analysis</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

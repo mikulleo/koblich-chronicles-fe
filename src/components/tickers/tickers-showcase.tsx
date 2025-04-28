@@ -11,10 +11,8 @@ import {
   Search, 
   SlidersHorizontal, 
   BarChart, 
-  LineChart, 
   ChevronDown, 
-  ChevronUp,
-  ListFilter 
+  ChevronUp
 } from 'lucide-react';
 import {
   Select,
@@ -34,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTable } from '@/components/trades/data-table';
 import { columns, Trade as ColumnsTrade } from '@/components/trades/columns';
+import TickerCard from './ticker-card';
 
 interface TickerWithData extends Ticker {
   tradesCount: number;
@@ -46,73 +45,6 @@ interface GroupedTickers {
 }
 
 type GroupingMethod = 'alphabetical' | 'sector';
-
-const TickerCard: React.FC<{ 
-  ticker: TickerWithData; 
-  onShowCharts: (tickerId: string) => void;
-  onShowTrades: (ticker: TickerWithData) => void;
-}> = ({ ticker, onShowCharts, onShowTrades }) => {
-  return (
-    <div className="bg-card border rounded-lg p-4 flex flex-col h-full transition-shadow hover:shadow-md">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold">{ticker.symbol}</h3>
-          <p className="text-sm text-muted-foreground line-clamp-1" title={ticker.name}>
-            {ticker.name}
-          </p>
-        </div>
-        {ticker.sector && (
-          <Badge variant="outline" className="ml-2 text-xs">
-            {ticker.sector}
-          </Badge>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-        <div className="flex items-center gap-1">
-          <LineChart className="h-3 w-3 text-muted-foreground" /> 
-          <span>{ticker.chartsCount} chart{ticker.chartsCount !== 1 ? 's' : ''}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <BarChart className="h-3 w-3 text-muted-foreground" /> 
-          <span>{ticker.tradesCount} trade{ticker.tradesCount !== 1 ? 's' : ''}</span>
-        </div>
-      </div>
-      
-      <div className="mt-auto flex gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="flex-1"
-          onClick={() => onShowCharts(ticker.id.toString())}
-        >
-          Show Charts
-        </Button>
-        
-        {ticker.tradesCount > 0 ? (
-          <Button 
-            variant="default" 
-            size="sm" 
-            className="flex-1"
-            onClick={() => onShowTrades(ticker)}
-          >
-            <ListFilter className="h-3 w-3 mr-1" />
-            Show Trades
-          </Button>
-        ) : (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1"
-            disabled
-          >
-            No Trades
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export function TickersShowcase() {
   const router = useRouter();
@@ -243,19 +175,13 @@ export function TickersShowcase() {
     
     try {
       setLoadingTrades(true);
-      console.log(`Fetching trades for ticker ID: ${ticker.id}`);
       
       // Fetch trades for this ticker
       const endpoint = `/trades?where[ticker][equals]=${ticker.id}`;
-      console.log(`Using endpoint: ${endpoint}`);
       
       const response = await apiClient.get(endpoint);
-      console.log('API response:', response);
       
       if (response.data && response.data.docs) {
-        // Log the raw data for debugging
-        console.log(`Received ${response.data.docs.length} trades for ticker ${ticker.symbol}`);
-        
         // Transform the data to match the columns Trade type
         const transformedTrades = response.data.docs.map((trade: any) => ({
           ...trade,
@@ -268,10 +194,8 @@ export function TickersShowcase() {
           }
         }));
         
-        console.log('Transformed trades:', transformedTrades);
         setTickerTrades(transformedTrades);
       } else {
-        console.warn('Unexpected response format:', response.data);
         setTickerTrades([]);
       }
     } catch (error) {
@@ -392,7 +316,7 @@ export function TickersShowcase() {
                   
                   {/* Group content */}
                   {isExpanded && (
-                    <div className="p-4 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="p-4 grid gap-4 grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {tickers.map(ticker => (
                         <TickerCard 
                           key={ticker.id} 
