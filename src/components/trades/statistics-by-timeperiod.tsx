@@ -10,12 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
@@ -42,7 +36,8 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
   const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
   const [monthlyStats, setMonthlyStats] = useState<Record<string, TimeperiodStats[]>>({});
   
-  const year = selectedYear || new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+  const year = selectedYear || currentYear;
   
   // Format percentage values
   const formatPercent = (value: number): string => {
@@ -68,8 +63,10 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
         setLoading(true);
         
         // Get current year and previous 2 years
-        const currentYear = year;
-        const years = [currentYear, currentYear - 1, currentYear - 2];
+        const thisYear = year;
+        
+        // Temporarily exclude 2023 as requested
+        const years = [thisYear, thisYear - 1].filter(y => y !== 2023);
         
         const yearlyStatsPromises = years.map(async (year) => {
           const startDate = `${year}-01-01`;
@@ -89,7 +86,13 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
         setYearlyStats(results);
         
         // Set the current year as expanded by default
-        setExpandedYears(new Set([currentYear.toString()]));
+        if (results.length > 0) {
+          const defaultExpandedYear = results[0].period;
+          setExpandedYears(new Set([defaultExpandedYear]));
+          
+          // Proactively fetch monthly data for the initially expanded year
+          fetchMonthlyDataForYear(defaultExpandedYear);
+        }
         
       } catch (error) {
         console.error("Error fetching yearly statistics:", error);
@@ -102,24 +105,11 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
     fetchYearlyStats();
   }, [year]);
 
-  // Toggle expanded year and fetch monthly data
-  const toggleYearExpansion = async (year: string) => {
-    const newExpanded = new Set(expandedYears);
-    
-    if (expandedYears.has(year)) {
-      newExpanded.delete(year);
-      setExpandedYears(newExpanded);
-      return;
-    }
-    
-    // Add to expanded set
-    newExpanded.add(year);
-    setExpandedYears(newExpanded);
-    
-    // Check if we already have monthly data for this year
+  // Function to fetch monthly data for a year
+  const fetchMonthlyDataForYear = async (year: string) => {
+    // Skip if we already have the data
     if (monthlyStats[year]) return;
     
-    // Fetch monthly data for this year
     try {
       const months = Array.from({ length: 12 }, (_, i) => i);
       
@@ -154,6 +144,24 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
     } catch (error) {
       console.error(`Error fetching monthly statistics for ${year}:`, error);
     }
+  };
+
+  // Toggle expanded year and fetch monthly data
+  const toggleYearExpansion = async (year: string) => {
+    const newExpanded = new Set(expandedYears);
+    
+    if (expandedYears.has(year)) {
+      newExpanded.delete(year);
+      setExpandedYears(newExpanded);
+      return;
+    }
+    
+    // Add to expanded set
+    newExpanded.add(year);
+    setExpandedYears(newExpanded);
+    
+    // Fetch monthly data if needed
+    fetchMonthlyDataForYear(year);
   };
 
   if (loading) {
@@ -280,99 +288,96 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
                   </TableRow>
                   
                   {/* Monthly Rows (when expanded) */}
-                  {expandedYears.has(yearData.period) && monthlyStats[yearData.period] && (
+                  {expandedYears.has(yearData.period) && (
                     <>
-                      {monthlyStats[yearData.period].map((monthData) => (
-                        // Only show months with trades
-                        (monthData.metadata.totalTrades > 0 && (<TableRow 
-                          key={monthData.period} 
-                          className="bg-muted/20 hover:bg-muted/30"
-                        >
-                          <TableCell className="pl-8 font-normal">
-                            {monthData.periodLabel}
+                      {!monthlyStats[yearData.period] ? (
+                        <TableRow className="bg-muted/20">
+                          <TableCell colSpan={8} className="text-center py-4">
+                            <div className="flex items-center justify-center">
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              <span className="text-muted-foreground">Loading monthly data...</span>
+                            </div>
                           </TableCell>
-                          <TableCell>
-                            {monthData.metadata.totalTrades}
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({monthData.stats.winningTrades}/{monthData.stats.losingTrades})
-                            </span>
-                          </TableCell>
-                          <TableCell className={getColorClass(monthData.stats.battingAverage, 50)}>
-                            {monthData.stats.battingAverage.toFixed(1)}%
-                          </TableCell>
-                          <TableCell className={getColorClass(
-                            viewMode === "normalized" 
-                              ? monthData.stats.normalized.winLossRatio 
-                              : monthData.stats.winLossRatio, 
-                            1
-                          )}>
-                            {formatRatio(
-                              viewMode === "normalized"
-                                ? monthData.stats.normalized.winLossRatio
-                                : monthData.stats.winLossRatio
-                            )}
-                          </TableCell>
-                          <TableCell className="text-green-600">
-                            {formatPercent(
-                              viewMode === "normalized"
-                                ? monthData.stats.normalized.averageWinPercent
-                                : monthData.stats.averageWinPercent
-                            )}
-                          </TableCell>
-                          <TableCell className="text-red-600">
-                            {formatPercent(
-                              viewMode === "normalized"
-                                ? monthData.stats.normalized.averageLossPercent
-                                : monthData.stats.averageLossPercent
-                            )}
-                          </TableCell>
-                          <TableCell className={getColorClass(
-                            viewMode === "normalized"
-                              ? monthData.stats.normalized.averageRRatio
-                              : monthData.stats.averageRRatio,
-                            1
-                          )}>
-                            {formatRatio(
-                              viewMode === "normalized"
-                                ? monthData.stats.normalized.averageRRatio
-                                : monthData.stats.averageRRatio
-                            )}
-                          </TableCell>
-                          <TableCell className={getColorClass(
-                            viewMode === "normalized"
-                              ? monthData.stats.normalized.totalProfitLossPercent
-                              : monthData.stats.totalProfitLossPercent
-                          )}>
-                            {formatPercent(
-                              viewMode === "normalized"
-                                ? monthData.stats.normalized.totalProfitLossPercent
-                                : monthData.stats.totalProfitLossPercent
-                            )}
-                          </TableCell>
-                        </TableRow>))
-                      ))}
-                      
-                      {/* Show "No trades" message if no trades in any month */}
-                      {monthlyStats[yearData.period].every(m => m.metadata.totalTrades === 0) && (
+                        </TableRow>
+                      ) : monthlyStats[yearData.period].every(m => m.metadata.totalTrades === 0) ? (
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="text-center text-muted-foreground py-4">
                             No trades recorded for this year
                           </TableCell>
                         </TableRow>
+                      ) : (
+                        monthlyStats[yearData.period]
+                          .filter(monthData => monthData.metadata.totalTrades > 0)
+                          .map(monthData => (
+                            <TableRow 
+                              key={monthData.period} 
+                              className="bg-muted/20 hover:bg-muted/30"
+                            >
+                              <TableCell className="pl-8 font-normal">
+                                {monthData.periodLabel}
+                              </TableCell>
+                              <TableCell>
+                                {monthData.metadata.totalTrades}
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  ({monthData.stats.winningTrades}/{monthData.stats.losingTrades})
+                                </span>
+                              </TableCell>
+                              <TableCell className={getColorClass(monthData.stats.battingAverage, 50)}>
+                                {monthData.stats.battingAverage.toFixed(1)}%
+                              </TableCell>
+                              <TableCell className={getColorClass(
+                                viewMode === "normalized" 
+                                  ? monthData.stats.normalized.winLossRatio 
+                                  : monthData.stats.winLossRatio, 
+                                1
+                              )}>
+                                {formatRatio(
+                                  viewMode === "normalized"
+                                    ? monthData.stats.normalized.winLossRatio
+                                    : monthData.stats.winLossRatio
+                                )}
+                              </TableCell>
+                              <TableCell className="text-green-600">
+                                {formatPercent(
+                                  viewMode === "normalized"
+                                    ? monthData.stats.normalized.averageWinPercent
+                                    : monthData.stats.averageWinPercent
+                                )}
+                              </TableCell>
+                              <TableCell className="text-red-600">
+                                {formatPercent(
+                                  viewMode === "normalized"
+                                    ? monthData.stats.normalized.averageLossPercent
+                                    : monthData.stats.averageLossPercent
+                                )}
+                              </TableCell>
+                              <TableCell className={getColorClass(
+                                viewMode === "normalized"
+                                  ? monthData.stats.normalized.averageRRatio
+                                  : monthData.stats.averageRRatio,
+                                1
+                              )}>
+                                {formatRatio(
+                                  viewMode === "normalized"
+                                    ? monthData.stats.normalized.averageRRatio
+                                    : monthData.stats.averageRRatio
+                                )}
+                              </TableCell>
+                              <TableCell className={getColorClass(
+                                viewMode === "normalized"
+                                  ? monthData.stats.normalized.totalProfitLossPercent
+                                  : monthData.stats.totalProfitLossPercent
+                              )}>
+                                {formatPercent(
+                                  viewMode === "normalized"
+                                    ? monthData.stats.normalized.totalProfitLossPercent
+                                    : monthData.stats.totalProfitLossPercent
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
                       )}
                     </>
-                  )}
-                  
-                  {/* Loading indicator while fetching monthly data */}
-                  {expandedYears.has(yearData.period) && !monthlyStats[yearData.period] && (
-                    <TableRow className="bg-muted/20">
-                      <TableCell colSpan={8} className="text-center py-4">
-                        <div className="flex items-center justify-center">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          <span className="text-muted-foreground">Loading monthly data...</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
                   )}
                 </React.Fragment>
               ))}

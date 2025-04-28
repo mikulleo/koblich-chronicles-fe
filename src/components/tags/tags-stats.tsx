@@ -20,6 +20,7 @@ import {
   Legend
 } from 'recharts';
 import { parseISO, format } from 'date-fns';
+import { Construction } from 'lucide-react';
 
 interface TagWithChartCount extends Tag {
   actualChartCount: number;
@@ -174,18 +175,6 @@ export function TagsStats() {
       fill: tag.color
     }));
 
-  // Prepare data for best 3-month windows
-  const bestWindowsData = tagsWithCounts
-    .filter(tag => tag.bestWindow && tag.bestWindow.count > 0)
-    .sort((a, b) => (b.bestWindow?.count || 0) - (a.bestWindow?.count || 0))
-    .slice(0, 10) // Top 10 tags with best windows
-    .map(tag => ({
-      name: tag.name,
-      count: tag.bestWindow?.count || 0,
-      window: `${format(parseISO(tag.bestWindow?.startMonth + '-01'), 'MMM yyyy')} - ${format(parseISO(tag.bestWindow?.endMonth + '-01'), 'MMM yyyy')}`,
-      fill: tag.color
-    }));
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -299,50 +288,19 @@ export function TagsStats() {
         </Card>
       </div>
       
-      {/* New section for best 3-month windows */}
+      {/* Modified "Best 3-Month Windows" section with "In Construction" message */}
       <Card>
         <CardHeader>
           <CardTitle>Best 3-Month Windows for Tags</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
-            {bestWindowsData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={bestWindowsData}
-                  margin={{
-                    top: 5,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 12 }}
-                    tickFormatter={(value) => value.length > 8 ? `${value.substring(0, 8)}...` : value}
-                  />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name, props) => [value, 'Charts']}
-                    labelFormatter={(label) => {
-                      const dataItem = bestWindowsData.find(item => item.name === label);
-                      return `${label}\nBest Window: ${dataItem?.window}`;
-                    }}
-                  />
-                  <Bar dataKey="count" name="Charts in window">
-                    {bestWindowsData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-muted-foreground">Not enough data for 3-month window analysis</p>
-              </div>
-            )}
+          <div className="h-[300px] flex flex-col items-center justify-center bg-muted/20 rounded-lg">
+            <Construction className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Under Construction</h3>
+            <p className="text-muted-foreground text-center max-w-md">
+              This advanced tag analytics feature is currently being developed. 
+              Check back soon for insights on tag patterns from the past.
+            </p>
           </div>
         </CardContent>
       </Card>

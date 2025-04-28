@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 export default function Header() {
@@ -10,7 +11,17 @@ export default function Header() {
         <div className="md:hidden mr-2">
           <SidebarTrigger />
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
+          <div className="relative h-8 w-8 overflow-hidden">
+            {/* Replace with actual logo path - this is using the donut chart image from your example */}
+            <Image 
+              src="/logo.png" 
+              alt="Koblich Chronicles Logo" 
+              width={32} 
+              height={32}
+              className="object-contain"
+            />
+          </div>
           <Link href="/" className="font-bold text-lg">
             Koblich Chronicles
           </Link>

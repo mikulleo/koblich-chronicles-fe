@@ -205,7 +205,7 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No Data for the selected filters: {chartError}
+              No data for the selected filters: {chartError}
             </AlertDescription>
           </Alert>
           

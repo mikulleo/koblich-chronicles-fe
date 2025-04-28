@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode, useState } from "react"
+import { ReactNode } from "react"
 import Header from "./header"
 import SidebarNav from "./sidebar-nav"
 import { 
@@ -25,7 +25,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
           <Sidebar variant="inset">
             <SidebarHeader className="border-b">
               <div className="flex items-center justify-between p-2">
-                <span className="font-medium">Navigation</span>
+                <span className="font-medium text-foreground">Navigation</span>
                 <SidebarTrigger />
               </div>
             </SidebarHeader>
@@ -38,7 +38,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
               </div>
             </SidebarFooter>
           </Sidebar>
-          <main className="flex-1 p-6 overflow-auto">
+          <main className="flex-1 p-6 overflow-auto bg-background">
             {children}
           </main>
         </div>

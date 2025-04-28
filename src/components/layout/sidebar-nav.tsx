@@ -58,7 +58,7 @@ export default function SidebarNav() {
         {/* Trading section with visual grouping */}
         <div className={cn(
           "relative mt-2 mb-2 rounded-md",
-          isTradeSection && "bg-accent/20 py-1"
+          isTradeSection && "bg-secondary py-1"
         )}>
           {isTradeSection && (
             <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary ml-2"></div>
