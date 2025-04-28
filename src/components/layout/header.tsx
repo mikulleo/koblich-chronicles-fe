@@ -16,7 +16,7 @@ export default function Header() {
           <div className="md:hidden mr-2">
             <SidebarTrigger />
           </div>
-          <Link href="/" className="font-bold text-lg tracking-tight">
+          <Link href="/" className="font-semibold text-lg tracking-tight font-manrope text-primary">
             Koblich Chronicles
           </Link>
         </div>

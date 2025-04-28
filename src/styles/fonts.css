@@ -1,0 +1,50 @@
+/* Create this file as src/styles/fonts.css and import it in your layout.tsx */
+
+/* Font face declarations with local fallbacks */
+@layer base {
+    @font-face {
+      font-family: 'InterLocal';
+      src: local('Inter'), url('/fonts/Inter.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
+    
+    @font-face {
+      font-family: 'ManropeLocal';
+      src: local('Manrope'), url('/fonts/Manrope.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: swap;
+    }
+  }
+  
+  /* Font utility classes */
+  .font-heading {
+    font-family: var(--font-manrope, ManropeLocal), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    letter-spacing: -0.02em;
+  }
+  
+  .font-sans {
+    font-family: var(--font-inter, InterLocal), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+  
+  /* Apply heading font to specific elements */
+  h1, h2, h3, h4, h5, h6,
+  .heading {
+    font-family: var(--font-manrope, ManropeLocal), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  
+  /* Weight utilities with the correct font families */
+  .font-semibold, 
+  .font-bold,
+  .font-medium {
+    font-weight: 600;
+  }
+  
+  /* Specific branding element styling */
+  .brand-title {
+    font-family: var(--font-manrope, ManropeLocal), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }

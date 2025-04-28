@@ -31,32 +31,122 @@ const staggerContainer = {
 export default function Home() {
   return (
     <div className="space-y-8 pb-8">
-      {/* Hero Section with Gradient Background */}
-      <section className="hero-section w-full rounded-xl overflow-hidden shadow-lg animate-fade-in-up">
-        <div className="container mx-auto py-12 px-4">
+
+      {/* Hero Section with c7d3da Background - Removed buttons and added logo */}
+      <div className="w-full flex flex-col md:flex-row items-stretch justify-center gap-6">
+      {/* Image on the left */}
+      <div className="flex-shrink-0">
+        <Image 
+          src="/logo2.png" 
+          alt="Koblich Chronicles Logo" 
+          width={200} 
+          height={200}
+          className="rounded-xl shadow-lg"
+        />
+      </div>
+
+      {/* Hero Section with background */}
+      <section className="rounded-xl flex justify-center overflow-hidden shadow-lg animate-fade-in-up w-full md:w-auto" style={{ backgroundColor: "#bec5c6" }}>
+        <div className="py-8 px-6 flex flex-col justify-center h-full">
           <motion.div 
-            className="text-center max-w-3xl mx-auto"
+            className="flex flex-col items-center md:items-start text-center md:text-left"
             initial="hidden"
             animate="visible"
             variants={fadeIn}
           >
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-primary">
-              Koblich Chronicles
-            </h1>
-            <p className="text-xl text-gray-700 mb-8">
-              Interactive stock model-book with insights to my personal trading journey
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Button asChild size="lg" className="px-6">
-                <Link href="/charts">Explore Charts</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="px-6 bg-white">
-                <Link href="/trades">View Trades</Link>
-              </Button>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary mb-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                Koblich Chronicles
+              </h1>
+              <p className="text-xl text-gray-700" style={{ fontFamily: "'Inter', sans-serif" }}>
+                Interactive stock model-book with insights to my personal trading journey
+              </p>
             </div>
           </motion.div>
         </div>
       </section>
+    </div>
+
+    {/* Move Feature Cards to the top */}
+    <motion.div 
+        className="grid gap-6 md:grid-cols-3 mt-4"
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
+      >
+        <motion.div 
+          variants={fadeIn}
+          whileHover={{ 
+            y: -10,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+          }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Card className="h-full shadow-md">
+            <CardContent className="p-5 flex flex-col h-full">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+                <LineChart className="h-5 w-5 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Charts</h3>
+              <p className="text-gray-600 mb-4 flex-grow text-sm">
+                Browse through the model book, filter by ticker or tag to find specific chart patterns.
+              </p>
+              <Button asChild className="mt-auto w-full">
+                <Link href="/charts">View Charts</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div 
+          variants={fadeIn}
+          whileHover={{ 
+            y: -10,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+          }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Card className="h-full shadow-md">
+            <CardContent className="p-5 flex flex-col h-full">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                <ListFilter className="h-5 w-5 text-green-600" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Trades</h3>
+              <p className="text-gray-600 mb-4 flex-grow text-sm">
+                View trade logs with detailed metrics, and jump to specific charts when needed.
+              </p>
+              <Button asChild className="mt-auto w-full">
+                <Link href="/trades">Manage Trades</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div 
+          variants={fadeIn}
+          whileHover={{ 
+            y: -10, 
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+          }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Card className="h-full shadow-md">
+            <CardContent className="p-5 flex flex-col h-full">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-3">
+                <BarChart3 className="h-5 w-5 text-purple-600" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Statistics</h3>
+              <p className="text-gray-600 mb-4 flex-grow text-sm">
+                Get insights on trading statistics that can be used to improve performance and strategy.
+              </p>
+              <Button asChild className="mt-auto w-full">
+                <Link href="/statistics">View Statistics</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+
 
       {/* Main Content Area with Boxed Sections */}
       <motion.div 
@@ -72,17 +162,10 @@ export default function Home() {
               <div className="grid md:grid-cols-12 h-full">
                 {/* Logo and About Title Section */}
                 <div className="md:col-span-4 about-section p-6 flex flex-col">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Image 
-                      src="/logo.png" 
-                      alt="Koblich Chronicles Logo" 
-                      width={60} 
-                      height={60}
-                      className="rounded-lg shadow-md"
-                    />
-                    <h2 className="text-xl font-medium text-gray-700">Why Koblich?</h2>
+                  <div className="mb-4">
+                    <h2 className="text-xl font-medium text-gray-700" style={{ fontFamily: "'Manrope', sans-serif" }}>Why Koblich?</h2>
                   </div>
-                  <p className="text-gray-600 text-sm">
+                  <p className="text-gray-600 text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
                     Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
                   </p>
                 </div>
@@ -175,81 +258,6 @@ export default function Home() {
             </CardContent>
           </Card>
         </motion.div>
-
-        {/* Feature Cards */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <motion.div 
-            variants={fadeIn}
-            whileHover={{ 
-              y: -10,
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-            }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="h-full shadow-md">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                  <LineChart className="h-6 w-6 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">Charts</h3>
-                <p className="text-gray-600 mb-6 flex-grow">
-                  Browse through the model book, filter by ticker or tag to find specific chart patterns.
-                </p>
-                <Button asChild className="mt-auto w-full">
-                  <Link href="/charts">View Charts</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div 
-            variants={fadeIn}
-            whileHover={{ 
-              y: -10,
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-            }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="h-full shadow-md">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                  <ListFilter className="h-6 w-6 text-green-600" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">Trades</h3>
-                <p className="text-gray-600 mb-6 flex-grow">
-                  View trade logs with detailed metrics, and jump to specific charts when needed.
-                </p>
-                <Button asChild className="mt-auto w-full">
-                  <Link href="/trades">Manage Trades</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div 
-            variants={fadeIn}
-            whileHover={{ 
-              y: -10, 
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-            }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="h-full shadow-md">
-              <CardContent className="p-6 flex flex-col h-full">
-                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-4">
-                  <BarChart3 className="h-6 w-6 text-purple-600" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">Statistics</h3>
-                <p className="text-gray-600 mb-6 flex-grow">
-                  Get insights on trading statistics that can be used to improve performance and strategy.
-                </p>
-                <Button asChild className="mt-auto w-full">
-                  <Link href="/statistics">View Statistics</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
       </motion.div>
     </div>
   )
