@@ -57,11 +57,11 @@ export default function SidebarNav() {
         
         {/* Trading section with visual grouping */}
         <div className={cn(
-          "relative mt-2 mb-2 rounded-md",
-          isTradeSection && "bg-secondary py-1"
+          "relative mt-2 mb-2 rounded-md transition-all",
+          isTradeSection && "bg-primary/10 py-1"
         )}>
           {isTradeSection && (
-            <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary ml-2"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary ml-2 rounded-full"></div>
           )}
           
           <SidebarMenuItem>

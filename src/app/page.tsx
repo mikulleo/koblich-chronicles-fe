@@ -1,140 +1,256 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { LineChart, ListFilter, BarChart3, ExternalLink, Twitter, Italic } from "lucide-react"
-import { FaXTwitter } from 'react-icons/fa6';
+import { LineChart, ListFilter, BarChart3 } from "lucide-react"
+import { FaXTwitter } from 'react-icons/fa6'
+import { motion } from "framer-motion"
+
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.6 }
+  }
+}
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2
+    }
+  }
+}
 
 export default function Home() {
   return (
-    <div className="container mx-auto">
-      <div className="flex flex-col items-start gap-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-lg">
-            Welcome to Koblich Chronicles - interactive stock model-book with insights to my personal trading
-          </p>
-        </div>
-
-        {/* About Me Section */}
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Why Koblich?</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>
-              Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
+    <div className="space-y-8 pb-8">
+      {/* Hero Section with Gradient Background */}
+      <section className="hero-section w-full rounded-xl overflow-hidden shadow-lg animate-fade-in-up">
+        <div className="container mx-auto py-12 px-4">
+          <motion.div 
+            className="text-center max-w-3xl mx-auto"
+            initial="hidden"
+            animate="visible"
+            variants={fadeIn}
+          >
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-primary">
+              Koblich Chronicles
+            </h1>
+            <p className="text-xl text-gray-700 mb-8">
+              Interactive stock model-book with insights to my personal trading journey
             </p>
-            
-            <h3 className="text-xl font-medium mt-4">About Me</h3>
-            <p>
-              For those who don't know me - my name is Leoš Mikulka - I'm primarily a Swing trader/shorter-term trader heavily influenced by CANSLIM methodology and some of the brightest minds revolving around this style - starting to learn from the whole IBD personnel, via getting solid foundation by Mark Minervini and being fine-cut in my style by Leif Soreide. With the help of these, I have been able to place in the third place &#x1F949; in the United States Investing Championship 2024.
-            </p>
-            <p className="mt-2">
-              Personally, I've always been an avid athlete - playing ice-hockey as a goalie (in Prague's beer league) and a former football player as a CB with national team experience, having a chance to play across multiple European countries and grapping some championship rings in &#x1F1E8;&#x1F1FF; and &#x1F1EC;&#x1F1E7;.
-            </p>
-            <p className="mt-2">
-              I'm from Czech Republic - if anyone wants to visit Prague, get in touch when you're coming and let's have a beer or two together!
-            </p>
-            
-            <h3 className="text-xl font-medium mt-4">What Is This Page?</h3>
-            <p>
-              The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> - cause "no hindsight trading allowed"!. The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting in some sense) as each proper model-book should have those.
-            </p>
-            <p className="mt-2">
-              Ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
-            </p>
-            
-            <h3 className="text-xl font-medium mt-4">What It Is NOT</h3>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>
-                <strong>Model portfolio or investment advice:</strong> I do not provide watchlists or tell anyone what to buy or sell. The site is purely for educational purposes.
-              </li>
-              <li>
-                <strong>100% of my trades included:</strong> Even though I will be uploading my trades, I will not necessarily include all of them (especially very short term trading around position, day trading, etc.) - the goal is to have a model book, not a website filled with noise of an overly extensive trade log.
-              </li>
-              <li>
-                <strong>Trading platform or educational service:</strong> I am not providing any services, courses or FAQs. As of today, I have not implemented any features that would allow users to build their own model books or enter their own trades. I am still a proud member of ChampionTeamTrading.com - if anyone is looking to join a trading community/education platform - we will be more than happy to see you there!
-              </li>
-            </ul>
-            
-            <div className="flex items-center gap-2 mt-4">
-              <p>Follow me on:</p>
-              <Link href="https://x.com/mikulkal" target="_blank" rel="noopener noreferrer" className="flex items-center text-blue-500 hover:text-blue-700">
-                  <FaXTwitter className="h-4 w-4 mr-1" />
-                  @mikulkal
-              </Link>
-              <p> <em>(or reach out in case of any bug reports, complaints, wishes, or praise)</em></p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Button asChild size="lg" className="px-6">
+                <Link href="/charts">Explore Charts</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="px-6 bg-white">
+                <Link href="/trades">View Trades</Link>
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        <Separator className="my-4" />
-
-        {/* Main Dashboard Cards */}
-        <div className="grid gap-6 md:grid-cols-3 w-full">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LineChart className="h-5 w-5" />
-                Charts
-              </CardTitle>
-              <CardDescription>
-                Browse the model book and filter charts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Browse through the model book, filter by ticker or tag to find specific chart patterns.</p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild>
-                <Link href="/charts">View Charts</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ListFilter className="h-5 w-5" />
-                Trades
-              </CardTitle>
-              <CardDescription>
-                Track trading performance
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>View trade logs with detailed metrics, and jump to specific charts when needed.</p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild>
-                <Link href="/trades">Manage Trades</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Statistics
-              </CardTitle>
-              <CardDescription>
-                Review trading performance
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Get insights on trading statistics that can be used to improve performance and strategy.</p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild>
-                <Link href="/statistics">View Statistics</Link>
-              </Button>
-            </CardFooter>
-          </Card>
+          </motion.div>
         </div>
-      </div>
+      </section>
+
+      {/* Main Content Area with Boxed Sections */}
+      <motion.div 
+        className="space-y-6"
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
+      >
+        {/* About Me Section */}
+        <motion.div variants={fadeIn}>
+          <Card className="overflow-hidden shadow-md">
+            <CardContent className="p-0">
+              <div className="grid md:grid-cols-12 h-full">
+                {/* Logo and About Title Section */}
+                <div className="md:col-span-4 about-section p-6 flex flex-col">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Image 
+                      src="/logo.png" 
+                      alt="Koblich Chronicles Logo" 
+                      width={60} 
+                      height={60}
+                      className="rounded-lg shadow-md"
+                    />
+                    <h2 className="text-xl font-medium text-gray-700">Why Koblich?</h2>
+                  </div>
+                  <p className="text-gray-600 text-sm">
+                    Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
+                  </p>
+                </div>
+
+                {/* About Me Content */}
+                <div className="md:col-span-8 p-6 bg-white">
+                  <div className="space-y-4">
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                      <p className="mb-3">
+                        For those who don't know me - my name is Leoš Mikulka - I'm primarily a Swing trader/shorter-term trader heavily influenced by CANSLIM methodology and some of the brightest minds revolving around this style - starting to learn from the whole IBD personnel, via getting solid foundation by Mark Minervini and being fine-cut in my style by Leif Soreide. With the help of these, I have been able to place in the third place 🥉 in the United States Investing Championship 2024.
+                      </p>
+                      <p className="mb-3">
+                        Personally, I've always been an avid athlete - playing ice-hockey as a goalie (in Prague's beer league) and a former football player as a CB with national team experience, having a chance to play across multiple European countries and grapping some championship rings in 🇨🇿 and 🇬🇧.
+                      </p>
+                      <p>
+                        I'm from Czech Republic - if anyone wants to visit Prague, get in touch when you're coming and let's have a beer or two together!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* What Is This Page Section */}
+        <motion.div variants={fadeIn}>
+          <Card className="shadow-md">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-medium mb-4 text-gray-800">What Is This Page?</h2>
+              <div className="space-y-4">
+                <p>
+                  The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> - cause "no hindsight trading allowed"!. The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting in some sense) as each proper model-book should have those.
+                </p>
+                <p>
+                  Ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* What It Is NOT Section */}
+        <motion.div variants={fadeIn}>
+          <Card className="shadow-md">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-medium mb-4 text-gray-800">What It Is NOT</h2>
+              <ul className="space-y-4">
+                <li className="flex gap-3">
+                  <div className="bg-red-100 h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-red-600 font-bold">•</span>
+                  </div>
+                  <div>
+                    <strong>Model portfolio or investment advice:</strong> I do not provide watchlists or tell anyone what to buy or sell. The site is purely for educational purposes.
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <div className="bg-red-100 h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-red-600 font-bold">•</span>
+                  </div>
+                  <div>
+                    <strong>100% of my trades included:</strong> Even though I will be uploading my trades, I will not necessarily include all of them (especially very short term trading around position, day trading, etc.) - the goal is to have a model book, not a website filled with noise of an overly extensive trade log.
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <div className="bg-red-100 h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-red-600 font-bold">•</span>
+                  </div>
+                  <div>
+                    <strong>Trading platform or educational service:</strong> I am not providing any services, courses or FAQs. As of today, I have not implemented any features that would allow users to build their own model books or enter their own trades. I am still a proud member of ChampionTeamTrading.com - if anyone is looking to join a trading community/education platform - we will be more than happy to see you there!
+                  </div>
+                </li>
+              </ul>
+              
+              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-2">
+                <p>Follow me on:</p>
+                <Link 
+                  href="https://x.com/mikulkal" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center text-primary hover:text-primary/80 transition-colors"
+                >
+                  <FaXTwitter className="h-4 w-4 mr-1" />
+                  <span>@mikulkal</span>
+                </Link>
+                <p className="text-gray-500 italic">
+                  (or reach out in case of any bug reports, complaints, wishes, or praise)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Feature Cards */}
+        <div className="grid gap-6 md:grid-cols-3">
+          <motion.div 
+            variants={fadeIn}
+            whileHover={{ 
+              y: -10,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+            }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <Card className="h-full shadow-md">
+              <CardContent className="p-6 flex flex-col h-full">
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                  <LineChart className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Charts</h3>
+                <p className="text-gray-600 mb-6 flex-grow">
+                  Browse through the model book, filter by ticker or tag to find specific chart patterns.
+                </p>
+                <Button asChild className="mt-auto w-full">
+                  <Link href="/charts">View Charts</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div 
+            variants={fadeIn}
+            whileHover={{ 
+              y: -10,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+            }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <Card className="h-full shadow-md">
+              <CardContent className="p-6 flex flex-col h-full">
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                  <ListFilter className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Trades</h3>
+                <p className="text-gray-600 mb-6 flex-grow">
+                  View trade logs with detailed metrics, and jump to specific charts when needed.
+                </p>
+                <Button asChild className="mt-auto w-full">
+                  <Link href="/trades">Manage Trades</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div 
+            variants={fadeIn}
+            whileHover={{ 
+              y: -10, 
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+            }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <Card className="h-full shadow-md">
+              <CardContent className="p-6 flex flex-col h-full">
+                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+                  <BarChart3 className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">Statistics</h3>
+                <p className="text-gray-600 mb-6 flex-grow">
+                  Get insights on trading statistics that can be used to improve performance and strategy.
+                </p>
+                <Button asChild className="mt-auto w-full">
+                  <Link href="/statistics">View Statistics</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.div>
     </div>
   )
 }

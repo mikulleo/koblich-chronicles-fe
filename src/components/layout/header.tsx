@@ -1,39 +1,37 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { MoonIcon, SunIcon } from "lucide-react"
+import { useTheme } from "next-themes"
 
 export default function Header() {
+  const { theme, setTheme } = useTheme()
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background h-14">
-      <div className="flex h-full items-center px-4 w-full">
-        <div className="md:hidden mr-2">
-          <SidebarTrigger />
-        </div>
+    <header className="sticky top-0 z-40 w-full border-b bg-card/90 backdrop-blur-sm h-14 shadow-sm">
+      <div className="flex h-full items-center justify-between px-4 w-full">
         <div className="flex items-center gap-2">
-          <div className="relative h-8 w-8 overflow-hidden">
-            {/* Replace with actual logo path - this is using the donut chart image from your example */}
-            <Image 
-              src="/logo.png" 
-              alt="Koblich Chronicles Logo" 
-              width={32} 
-              height={32}
-              className="object-contain"
-            />
+          <div className="md:hidden mr-2">
+            <SidebarTrigger />
           </div>
-          <Link href="/" className="font-bold text-lg">
+          <Link href="/" className="font-bold text-lg tracking-tight">
             Koblich Chronicles
           </Link>
         </div>
         
-        {/* Login button commented out for later use 
-        <div className="ml-auto">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/auth/login">Login</Link>
+        {/* Theme toggle button */}
+        <div>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
           </Button>
         </div>
-        */}
       </div>
     </header>
   )

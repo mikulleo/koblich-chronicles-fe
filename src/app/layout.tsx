@@ -1,10 +1,22 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Manrope } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 
-const inter = Inter({ subsets: ["latin"] })
+// Use Inter as our primary font - modern, clean, professional
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+// Use Manrope as an accent font for headings
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-manrope',
+})
 
 export const metadata: Metadata = {
   title: "Koblich Chronicles - Interactive Stock Trading Model Book",
@@ -17,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${manrope.variable}`}>
       <body className={inter.className}>
         <MainLayout>
           {children}
