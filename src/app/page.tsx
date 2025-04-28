@@ -32,158 +32,103 @@ export default function Home() {
   return (
     <div className="space-y-8 pb-8">
 
-      {/* Hero Section with c7d3da Background - Removed buttons and added logo */}
+      {/* Hero Section */}
       <div className="w-full flex flex-col md:flex-row items-stretch justify-center gap-6">
-      {/* Image on the left */}
-      <div className="flex-shrink-0">
-        <Image 
-          src="/logo2.png" 
-          alt="Koblich Chronicles Logo" 
-          width={200} 
-          height={200}
-          className="rounded-xl shadow-lg"
-        />
-      </div>
-
-      {/* Hero Section with background */}
-      <section className="rounded-xl flex justify-center overflow-hidden shadow-lg animate-fade-in-up w-full md:w-auto" style={{ backgroundColor: "#bec5c6" }}>
-        <div className="py-8 px-6 flex flex-col justify-center h-full">
-          <motion.div 
-            className="flex flex-col items-center md:items-start text-center md:text-left"
-            initial="hidden"
-            animate="visible"
-            variants={fadeIn}
-          >
-            <div>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary mb-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="flex-shrink-0">
+          <Image
+            src="/logo2.png"
+            alt="Koblich Chronicles Logo"
+            width={200}
+            height={200}
+            className="rounded-xl shadow-lg"
+          />
+        </div>
+        <section className="rounded-xl flex justify-center overflow-hidden shadow-lg animate-fade-in-up w-full md:w-auto" style={{ backgroundColor: "#bec5c6" }}>
+          <div className="py-8 px-6 flex flex-col justify-center h-full">
+            <motion.div
+              className="flex flex-col items-center md:items-start text-center md:text-left"
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+            >
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary mb-4" style={{ fontFamily: "'Manrope', 'Inter'" }}>
                 Koblich Chronicles
               </h1>
-              <p className="text-xl text-gray-700" style={{ fontFamily: "'Inter', sans-serif" }}>
+              <p className="text-xl text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
                 Interactive stock model-book with insights to my personal trading journey
               </p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-    </div>
+            </motion.div>
+          </div>
+        </section>
+      </div>
 
-    {/* Move Feature Cards to the top */}
-    <motion.div 
+      {/* Feature Cards */}
+      <motion.div
         className="grid gap-6 md:grid-cols-3 mt-4"
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
       >
-        <motion.div 
-          variants={fadeIn}
-          whileHover={{ 
-            y: -10,
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-          }}
-          transition={{ type: "spring", stiffness: 300 }}
-        >
-          <Card className="h-full shadow-md">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-3">
-                <LineChart className="h-5 w-5 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Charts</h3>
-              <p className="text-gray-600 mb-4 flex-grow text-sm">
-                Browse through the model book, filter by ticker or tag to find specific chart patterns.
-              </p>
-              <Button asChild className="mt-auto w-full">
-                <Link href="/charts">View Charts</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div 
-          variants={fadeIn}
-          whileHover={{ 
-            y: -10,
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-          }}
-          transition={{ type: "spring", stiffness: 300 }}
-        >
-          <Card className="h-full shadow-md">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                <ListFilter className="h-5 w-5 text-green-600" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Trades</h3>
-              <p className="text-gray-600 mb-4 flex-grow text-sm">
-                View trade logs with detailed metrics, and jump to specific charts when needed.
-              </p>
-              <Button asChild className="mt-auto w-full">
-                <Link href="/trades">Manage Trades</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div 
-          variants={fadeIn}
-          whileHover={{ 
-            y: -10, 
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-          }}
-          transition={{ type: "spring", stiffness: 300 }}
-        >
-          <Card className="h-full shadow-md">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-3">
-                <BarChart3 className="h-5 w-5 text-purple-600" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Statistics</h3>
-              <p className="text-gray-600 mb-4 flex-grow text-sm">
-                Get insights on trading statistics that can be used to improve performance and strategy.
-              </p>
-              <Button asChild className="mt-auto w-full">
-                <Link href="/statistics">View Statistics</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {[
+          { icon: LineChart, title: 'Charts', desc: 'Browse through the model book, filter by ticker or tag to find specific chart patterns.', href: '/charts', color: 'blue' },
+          { icon: ListFilter, title: 'Trades', desc: 'View trade logs with detailed metrics, and jump to specific charts when needed.', href: '/trades', color: 'green' },
+          { icon: BarChart3, title: 'Statistics', desc: 'Get insights on trading statistics that can be used to improve performance and strategy.', href: '/statistics', color: 'purple' }
+        ].map(({ icon: Icon, title, desc, href, color }) => (
+          <motion.div
+            key={title}
+            variants={fadeIn}
+            whileHover={{
+              y: -10,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            <Card className="h-full shadow-md">
+              <CardContent className="p-5 flex flex-col h-full">
+                <div className={`w-10 h-10 rounded-full bg-${color}-100 flex items-center justify-center mb-3`}>
+                  <Icon className={`h-5 w-5 text-${color}-600`} />
+                </div>
+                <h3 className="text-lg font-medium mb-2">{title}</h3>
+                <p className="text-gray-600 mb-4 flex-grow text-sm">{desc}</p>
+                <Button asChild className="mt-auto w-full">
+                  <Link href={href}>View {title}</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </motion.div>
 
-
-      {/* Main Content Area with Boxed Sections */}
-      <motion.div 
+      {/* Main Content */}
+      <motion.div
         className="space-y-6"
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
       >
-        {/* About Me Section */}
+        {/* About Me */}
         <motion.div variants={fadeIn}>
           <Card className="overflow-hidden shadow-md">
             <CardContent className="p-0">
               <div className="grid md:grid-cols-12 h-full">
-                {/* Logo and About Title Section */}
-                <div className="md:col-span-4 about-section p-6 flex flex-col">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-medium text-gray-700" style={{ fontFamily: "'Manrope', sans-serif" }}>Why Koblich?</h2>
-                  </div>
-                  <p className="text-gray-600 text-sm" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
+                <div className="md:col-span-4 p-6">
+                <h2 className="text-xl font-medium mb-4 text-gray-800">About Me</h2>
+                  <h2 className="text-lg font-medium text-gray-700 mb-4" style={{ fontFamily: "'Manrope', 'Inter'" }}>Why Koblich?</h2>
+                  <p className="text-sm text-gray-600 text-sm" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+                  Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
                   </p>
                 </div>
-
-                {/* About Me Content */}
                 <div className="md:col-span-8 p-6 bg-white">
-                  <div className="space-y-4">
-                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                      <p className="mb-3">
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 space-y-3">
+                  <p className="text-md mb-3">
                         For those who don't know me - my name is Leoš Mikulka - I'm primarily a Swing trader/shorter-term trader heavily influenced by CANSLIM methodology and some of the brightest minds revolving around this style - starting to learn from the whole IBD personnel, via getting solid foundation by Mark Minervini and being fine-cut in my style by Leif Soreide. With the help of these, I have been able to place in the third place 🥉 in the United States Investing Championship 2024.
                       </p>
-                      <p className="mb-3">
+                      <p className="text-md mb-3">
                         Personally, I've always been an avid athlete - playing ice-hockey as a goalie (in Prague's beer league) and a former football player as a CB with national team experience, having a chance to play across multiple European countries and grapping some championship rings in 🇨🇿 and 🇬🇧.
                       </p>
-                      <p>
+                      <p className="text-md mb-3">
                         I'm from Czech Republic - if anyone wants to visit Prague, get in touch when you're coming and let's have a beer or two together!
                       </p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -191,30 +136,28 @@ export default function Home() {
           </Card>
         </motion.div>
 
-        {/* What Is This Page Section */}
+        {/* What Is This Page */}
         <motion.div variants={fadeIn}>
           <Card className="shadow-md">
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">What Is This Page?</h2>
-              <div className="space-y-4">
-                <p>
+              <p className="mb-4">
                   The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> - cause "no hindsight trading allowed"!. The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting in some sense) as each proper model-book should have those.
                 </p>
                 <p>
                   Ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
                 </p>
-              </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* What It Is NOT Section */}
+        {/* What It Is NOT */}
         <motion.div variants={fadeIn}>
           <Card className="shadow-md">
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">What It Is NOT</h2>
               <ul className="space-y-4">
-                <li className="flex gap-3">
+              <li className="flex gap-3">
                   <div className="bg-red-100 h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-red-600 font-bold">•</span>
                   </div>
@@ -239,20 +182,29 @@ export default function Home() {
                   </div>
                 </li>
               </ul>
-              
-              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-2">
-                <p>Follow me on:</p>
-                <Link 
-                  href="https://x.com/mikulkal" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="flex items-center text-primary hover:text-primary/80 transition-colors"
-                >
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Connect & Support */}
+        <motion.div variants={fadeIn}>
+          <Card className="shadow-md">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-medium mb-4 text-gray-800">Connect & Support</h2>
+              <div className="flex items-center gap-2 mb-4">
+                <p className="font-medium">Follow me on:</p>
+                <Link href="https://x.com/mikulkal" target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:text-primary/80 transition-colors">
                   <FaXTwitter className="h-4 w-4 mr-1" />
                   <span>@mikulkal</span>
                 </Link>
-                <p className="text-gray-500 italic">
-                  (or reach out in case of any bug reports, complaints, wishes, or praise)
+                <small><em>(or reach out in case of any bug reports, complaints, wishes, or praise)</em></small>
+              </div>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>
+                  Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you’re finding value here, your donations can help keep this project alive.
+                </p>
+                <p>
+                I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I'm more than happy — it makes it all worthwhile!
                 </p>
               </div>
             </CardContent>

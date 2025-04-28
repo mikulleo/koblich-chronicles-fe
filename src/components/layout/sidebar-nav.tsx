@@ -30,9 +30,9 @@ export default function SidebarNav() {
       <SidebarMenu>
         <SidebarMenuItem>
           <Link href="/" passHref>
-            <SidebarMenuButton isActive={pathname === "/"} tooltip="Dashboard">
+            <SidebarMenuButton isActive={pathname === "/"} tooltip="Home">
               <Home className="h-5 w-5" />
-              <span>Dashboard</span>
+              <span>Home</span>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
