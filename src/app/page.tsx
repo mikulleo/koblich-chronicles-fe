@@ -7,6 +7,7 @@ import Image from "next/image"
 import { LineChart, ListFilter, BarChart3 } from "lucide-react"
 import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
+import { DonationDialog } from "@/components/donations/donation-dialog"
 
 // Animation variants
 const fadeIn = {
@@ -198,6 +199,10 @@ Past performance is not indicative of future results. Markets change constantly,
                 <p>
                 I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I'm more than happy — it makes it all worthwhile!
                 </p>
+                {/* Import at the top of the file: import { DonationDialog } from '@/components/donation/DonationDialog' */}
+                <div className="mt-4">
+                    <DonationDialog />
+                  </div>
               </div>
             </CardContent>
           </Card>
