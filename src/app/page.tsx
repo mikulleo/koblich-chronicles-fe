@@ -55,7 +55,7 @@ export default function Home() {
                 Koblich Chronicles
               </h1>
               <p className="text-xl text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
-                Interactive stock model-book with insights to my personal trading journey
+                Interactive stock model-book with insights to single trades
               </p>
             </motion.div>
           </div>
@@ -108,31 +108,21 @@ export default function Home() {
       >
         {/* About Me */}
         <motion.div variants={fadeIn}>
-          <Card className="overflow-hidden shadow-md">
-            <CardContent className="p-0">
-              <div className="grid md:grid-cols-12 h-full">
-                <div className="md:col-span-4 p-6">
-                <h2 className="text-xl font-medium mb-4 text-gray-800">About Me</h2>
-                  <h2 className="text-lg font-medium text-gray-700 mb-4" style={{ fontFamily: "'Manrope', 'Inter'" }}>Why Koblich?</h2>
-                  <p className="text-sm text-gray-600 text-sm" style={{ fontFamily: "'Manrope', 'Inter'" }}>
-                  Well, that's very personal thing that only my closest friends know. But you're getting the hint in the project logo, or simply google the Czech language term "koblih" and create the narrative for yourself.
-                  </p>
-                </div>
-                <div className="md:col-span-8 p-6 bg-white">
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 space-y-3">
-                  <p className="text-md mb-3">
-                        For those who don't know me - my name is Leoš Mikulka - I'm primarily a Swing trader/shorter-term trader heavily influenced by CANSLIM methodology and some of the brightest minds revolving around this style - starting to learn from the whole IBD personnel, via getting solid foundation by Mark Minervini and being fine-cut in my style by Leif Soreide. With the help of these, I have been able to place in the third place 🥉 in the United States Investing Championship 2024.
-                      </p>
-                      <p className="text-md mb-3">
-                        Personally, I've always been an avid athlete - playing ice-hockey as a goalie (in Prague's beer league) and a former football player as a CB with national team experience, having a chance to play across multiple European countries and grapping some championship rings in 🇨🇿 and 🇬🇧.
-                      </p>
-                      <p className="text-md mb-3">
-                        I'm from Czech Republic - if anyone wants to visit Prague, get in touch when you're coming and let's have a beer or two together!
-                      </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
+          <Card className="overflow-hidden shadow-md p-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
+          <CardContent className=" rounded-lg">
+            <h2 className="text-xl font-medium mb-4 text-gray-800" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+              About me
+            </h2>
+            <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+              For those who don't know me – my name is Leoš Mikulka – I'm primarily a Swing trader/shorter-term trader heavily influenced by the CANSLIM methodology and some of the brightest minds revolving around this style. I have learned a lot from the Investors Business Daily, gotten a solid foundation from Mark Minervini and been fine-tuned in my style by Leif Soreide. All of these factors helped me place third 🥉 in the 2024 United States Investing Championship.
+            </p>
+            <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+              Personally, I've always been an avid athlete – currently playing ice-hockey as a goalie and competed as a football player (cornerback) for the national team, having a chance to play across multiple European countries and grabbing some championship rings in 🇨🇿 and 🇬🇧.
+            </p>
+            <p className="text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+              I'm from the Czech Republic – if anyone wants to visit Prague, feel free to get in touch when you're coming and let's have a beer or two together!
+            </p>
+          </CardContent>
           </Card>
         </motion.div>
 
@@ -145,7 +135,7 @@ export default function Home() {
                   The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> - cause "no hindsight trading allowed"!. The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting in some sense) as each proper model-book should have those.
                 </p>
                 <p>
-                  Ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
+                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
                 </p>
             </CardContent>
           </Card>
@@ -162,7 +152,9 @@ export default function Home() {
                     <span className="text-red-600 font-bold">•</span>
                   </div>
                   <div>
-                    <strong>Model portfolio or investment advice:</strong> I do not provide watchlists or tell anyone what to buy or sell. The site is purely for educational purposes.
+                    <strong>Model portfolio or investment advice:</strong> I do not provide watchlists or tell anyone what to buy or sell. The site is purely for educational purposes.  I am not responsible for any financial losses or outcomes resulting from the use of information provided on this site. By using this site, you agree to assume full responsibility for your investment decisions and acknowledge that you bear sole liability for any resulting financial outcomes.
+You, as the user, agree to hold me harmless from any claims, damages, or losses arising from your use of the information provided on this site. This disclaimer applies to all content, regardless of format or medium.
+Past performance is not indicative of future results. Markets change constantly, and all investors must exercise their own judgment when making investment decisions.
                   </div>
                 </li>
                 <li className="flex gap-3">
@@ -188,7 +180,7 @@ export default function Home() {
 
         {/* Connect & Support */}
         <motion.div variants={fadeIn}>
-          <Card className="shadow-md">
+          <Card className="shadow-md shadow-md p-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">Connect & Support</h2>
               <div className="flex items-center gap-2 mb-4">
