@@ -4,22 +4,23 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 import BarionPixel from "@/components/donations/barion-pixel"
+import FooterPaymentSection from '@/components/layout/footer-payment-section';
 
 // Load fonts with display: swap for better performance
 const inter = Inter({ 
   subsets: ["latin"],
   display: 'swap',
   variable: '--font-inter',
-  weight: ['400', '500', '600', '700'], // Added specific weights for better control
-  preload: true, // Ensure preloading
+  weight: ['400', '500', '600', '700'],
+  preload: true,
 })
 
 const manrope = Manrope({
   subsets: ["latin"],
   display: 'swap',
   variable: '--font-manrope',
-  weight: ['400', '500', '600', '700'], // Added specific weights for headings
-  preload: true, // Ensure preloading
+  weight: ['400', '500', '600', '700'],
+  preload: true,
 })
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({
           {children}
         </MainLayout>
         <Toaster />
+        <FooterPaymentSection />
       </body>
     </html>
   )

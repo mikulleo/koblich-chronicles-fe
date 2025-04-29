@@ -3,6 +3,8 @@
 import { ReactNode } from "react"
 import Header from "./header"
 import SidebarNav from "./sidebar-nav"
+import { FooterComponent } from "./footer-component"
+
 import { 
   Sidebar, 
   SidebarContent,
@@ -44,7 +46,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
           </main>
         </div>
+        <FooterComponent />
       </div>
     </SidebarProvider>
+    
   )
 }
