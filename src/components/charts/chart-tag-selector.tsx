@@ -21,6 +21,9 @@ import {
 import { cn } from '@/lib/utils'
 import { Tag } from '@/lib/types'
 import apiClient from '@/lib/api/client'
+import { useAnalytics } from '@/hooks/use-analytics'
+
+
 
 interface ChartTagSelectorProps {
   selectedTags: string[]
@@ -35,6 +38,9 @@ export function ChartTagSelector({
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+
+  // Use our analytics hook
+  const analytics = useAnalytics()
 
   // Fetch all available tags
   useEffect(() => {
@@ -65,6 +71,23 @@ export function ChartTagSelector({
 
   // Toggle a tag selection
   const toggleTag = (tagId: string) => {
+    // Check if adding or removing
+    const isAdding = !selectedTags.includes(tagId)
+    
+    // Get tag name for analytics
+    const tag = tags.find(t => String(t.id) === tagId)
+
+    if (tag) {
+      // Track tag selection/deselection
+      analytics.trackTagClick(tag.name)
+      analytics.trackEvent(isAdding ? 'tag_selected' : 'tag_deselected', {
+        tag_id: tagId,
+        tag_name: tag.name,
+        tag_color: tag.color,
+        total_selected: isAdding ? selectedTags.length + 1 : selectedTags.length - 1
+      })
+    }
+
     const newSelectedTags = selectedTags.includes(tagId)
       ? selectedTags.filter(id => id !== tagId)
       : [...selectedTags, tagId]
@@ -74,6 +97,15 @@ export function ChartTagSelector({
 
   // Clear all selected tags
   const clearTags = () => {
+    // Track clear tags action
+    analytics.trackEvent('tags_cleared', {
+      tags_count: selectedTags.length,
+      tags: selectedTags.map(id => {
+        const tag = tags.find(t => String(t.id) === id)
+        return tag ? tag.name : id
+      })
+    })
+
     onTagChangeAction([])
     setOpen(false)
   }

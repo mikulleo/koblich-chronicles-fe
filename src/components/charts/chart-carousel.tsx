@@ -9,6 +9,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tag as TagType } from './chart-gallery'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { useAnalytics } from '@/hooks/use-analytics'
+
 
 // Updated ChartImage interface to properly include tags
 export interface ChartImage {
@@ -38,6 +40,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
   const [showAnnotated, setShowAnnotated] = useState(false)
+  // Analytics hook
+  const analytics = useAnalytics()
   
   // Add zoom functionality
   const [zoomLevel, setZoomLevel] = useState(1)
@@ -52,6 +56,13 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   const currentChart = charts[currentIndex]
   const hasAnnotatedImage = currentChart?.annotatedImageUrl !== null && 
                            currentChart?.annotatedImageUrl !== undefined
+
+   // Track chart view on chart change
+   useEffect(() => {
+    if (currentChart) {
+      analytics.trackChartView(currentChart.id, currentChart.ticker)
+    }
+  }, [currentIndex, currentChart, analytics])
   
   // Reset zoom and pan when changing images
   useEffect(() => {
@@ -78,13 +89,27 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
     setFullscreen((prev) => !prev)
     // Reset zoom when toggling fullscreen
     resetZoomAndPan()
-  }, [])
+
+    // Track fullscreen toggle
+    analytics.trackEvent('chart_fullscreen_toggle', {
+      chart_id: currentChart?.id,
+      ticker: currentChart?.ticker,
+      state: !fullscreen ? 'entered' : 'exited'
+    })
+  }, [fullscreen, currentChart, analytics])
   
   const handleToggleAnnotated = useCallback(() => {
     if (hasAnnotatedImage) {
       setShowAnnotated((prev) => !prev)
+
+      // Track annotated view toggle
+      analytics.trackEvent('chart_annotated_toggle', {
+        chart_id: currentChart?.id,
+        ticker: currentChart?.ticker,
+        state: !showAnnotated ? 'showing_annotated' : 'showing_original'
+      })
     }
-  }, [hasAnnotatedImage])
+  }, [hasAnnotatedImage, currentChart, showAnnotated, analytics])
   
   // Zoom functions
   const handleZoomIn = useCallback(() => {
@@ -188,6 +213,12 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   const handleChartClick = () => {
     // Only trigger the click handler if we're not panning and zoom is 1
     if (!isPanning && zoomLevel === 1 && onChartClick && currentChart) {
+      // Track chart click
+      analytics.trackEvent('chart_clicked', {
+        chart_id: currentChart.id,
+        ticker: currentChart.ticker
+      })
+
       onChartClick(currentChart)
     }
   }

@@ -5,6 +5,8 @@ import { Ticker } from '@/lib/types';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LineChart, BarChart, ListFilter } from "lucide-react";
+import { useAnalytics } from '@/hooks/use-analytics'
+
 
 interface TickerWithData extends Ticker {
   tradesCount: number;
@@ -18,6 +20,47 @@ interface TickerCardProps {
 }
 
 const TickerCard: React.FC<TickerCardProps> = ({ ticker, onShowCharts, onShowTrades }) => {
+  // Use our analytics hook
+  const analytics = useAnalytics();
+
+  // Enhanced handler for showing charts with analytics
+  const handleShowCharts = () => {
+    // Track ticker selection for charts view
+    analytics.trackTickerSelect(ticker.symbol);
+    analytics.trackEvent('ticker_charts_view', {
+      ticker_id: ticker.id,
+      ticker_symbol: ticker.symbol,
+      charts_count: ticker.chartsCount,
+      sector: ticker.sector || 'unknown',
+      has_tags: (ticker.tags && ticker.tags.length > 0) ? true : false
+    });
+    
+    onShowCharts(ticker.id.toString());
+  };
+
+  // Enhanced handler for showing trades with analytics
+  const handleShowTrades = () => {
+    // Track ticker selection for trades view
+    analytics.trackEvent('ticker_trades_view', {
+      ticker_id: ticker.id,
+      ticker_symbol: ticker.symbol,
+      trades_count: ticker.tradesCount,
+      sector: ticker.sector || 'unknown',
+      profit_loss: ticker.profitLoss || 0
+    });
+    
+    onShowTrades(ticker);
+  };
+
+  /*
+  // Track ticker card impression (you could use this with Intersection Observer for more accurate data)
+  React.useEffect(() => {
+    analytics.trackEvent('ticker_card_impression', {
+      ticker_id: ticker.id,
+      ticker_symbol: ticker.symbol
+    });
+  }, [ticker, analytics]);*/
+
   return (
     <div className="bg-card border rounded-lg p-4 flex flex-col h-full transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between mb-4">

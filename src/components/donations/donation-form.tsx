@@ -18,6 +18,7 @@ import Link from 'next/link';
 import apiClient from '@/lib/api/client';
 import { BarionTrackProduct } from './barion-pixel';
 import PaymentMethodLogos from './payment-method-logos';
+import { useAnalytics } from '@/hooks/use-analytics';
 
 // Spinner for submit button
 const Spinner = ({ className = '' }) => (
@@ -33,6 +34,14 @@ interface DonationFormProps {
 export function DonationForm({ onSuccess }: DonationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customMode, setCustomMode] = useState(false);
+  const analytics = useAnalytics(); // Use our analytics hook
+
+  // presets by currency
+  const presetsByCurrency: Record<string, number[]> = {
+    CZK: [100, 200, 500, 1000],
+    USD: [5, 10, 20, 50],
+    EUR: [5, 10, 20, 50],
+  };
 
   const [formData, setFormData] = useState({
     amount: 200,
@@ -43,15 +52,36 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
     termsAccepted: false,
   });
 
-  // presets by currency
-  const presetsByCurrency: Record<string, number[]> = {
-    CZK: [100, 200, 500, 1000],
-    USD: [5, 10, 20, 50],
-    EUR: [5, 10, 20, 50],
-  };
   const presets = presetsByCurrency[formData.currency] || presetsByCurrency.CZK;
-
   const productId = 'donation-koblich-chronicles';
+  
+  // Handle currency change
+  const handleCurrencyChange = (newCurrency: string) => {
+    // If the current amount is a preset value in the old currency, 
+    // switch to the corresponding position in the new currency's presets
+    const currentPresets = presetsByCurrency[formData.currency];
+    const newPresets = presetsByCurrency[newCurrency];
+    
+    let newAmount = formData.amount;
+    
+    if (!customMode) {
+      // Find the index of the current amount in the current presets
+      const currentIndex = currentPresets.indexOf(formData.amount);
+      if (currentIndex !== -1 && currentIndex < newPresets.length) {
+        // Use the same position in the new presets
+        newAmount = newPresets[currentIndex];
+      } else {
+        // Default to the first preset if not found
+        newAmount = newPresets[0];
+      }
+    }
+    
+    setFormData({
+      ...formData, 
+      currency: newCurrency,
+      amount: newAmount
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +95,16 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
       const { amount, currency, donorName, donorEmail, message } = formData;
       const numAmount = Number(amount);
 
+      // Track donation initiated event
+      analytics.trackDonation(numAmount, currency);
+      analytics.trackEvent('donation_form_submitted', {
+        currency: currency,
+        value: numAmount,
+        has_name: !!donorName,
+        has_email: !!donorEmail,
+        has_message: !!message,
+      });
+
       const response = await apiClient.post('/donations', {
         amount: numAmount,
         currency,
@@ -75,10 +115,25 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
 
       const data = response.data;
       if (data.gatewayUrl) {
+        // Track successful donation redirect
+        analytics.trackEvent('donation_redirect', {
+          donation_id: data.donationId,
+          payment_id: data.paymentId,
+          currency: currency,
+          value: numAmount,
+        });
+
         toast.success('Redirecting to payment gateway...');
         window.location.href = data.gatewayUrl;
         onSuccess?.();
       } else {
+        // Track donation error
+        analytics.trackEvent('donation_error', {
+          error: data.error || 'Unknown error',
+          currency: currency,
+          value: numAmount,
+        });
+
         toast.error(data.error || 'Payment initialization failed.');
       }
     } catch (error) {
@@ -116,6 +171,24 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Currency Selection - Moved above amount presets */}
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Select
+              value={formData.currency}
+              onValueChange={handleCurrencyChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Currency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CZK">Czech Koruna (CZK)</SelectItem>
+                <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                <SelectItem value="USD">US Dollar (USD)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
           {/* Amount presets + custom */}
           <div className="space-y-2">
             <Label htmlFor="amount">Donation Amount</Label>
@@ -162,21 +235,9 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
                     className="w-full"
                   />
                 </div>
-                <Select
-                  value={formData.currency}
-                  onValueChange={(currency) =>
-                    setFormData({ ...formData, currency })
-                  }
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CZK">CZK</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="w-[120px] flex items-center justify-center px-3 bg-muted border rounded-md">
+                  {formData.currency}
+                </div>
               </div>
             )}
           </div>

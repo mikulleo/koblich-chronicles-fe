@@ -12,6 +12,8 @@ import {
   getFilteredRowModel,
 } from "@tanstack/react-table"
 import * as React from "react"
+import { useState, useEffect } from 'react';
+
 
 import {
   Table,
@@ -25,6 +27,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChartLine } from "lucide-react"
+import { useAnalytics } from '@/hooks/use-analytics'
+
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -40,6 +44,11 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+
+  // Use our analytics hook
+  const analytics = useAnalytics();
 
   const table = useReactTable({
     data,
@@ -56,7 +65,57 @@ export function DataTable<TData, TValue>({
       columnFilters,
       globalFilter,
     },
-  })
+  });
+
+  // Track filtering and sorting actions
+  useEffect(() => {
+    if (sorting.length > 0) {
+      analytics.trackEvent('trade_table_sorted', {
+        column: sorting[0].id,
+        direction: sorting[0].desc ? 'descending' : 'ascending',
+      });
+    }
+  }, [sorting, analytics]);
+
+  useEffect(() => {
+    if (columnFilters.length > 0) {
+      columnFilters.forEach(filter => {
+        analytics.trackEvent('trade_table_filtered', {
+          column: filter.id,
+          value: String(filter.value),
+        });
+      });
+    }
+  }, [columnFilters, analytics]);
+
+  // Enhanced row click handler with analytics
+  const handleRowClick = (row: TData) => {
+    if (onRowClickAction) {
+      // Get trade information for analytics
+      const tradeInfo = row as any; // Using any for simplicity
+      
+      analytics.trackTradeView(
+        String(tradeInfo.id || 'unknown'),
+        typeof tradeInfo.ticker === 'object' ? tradeInfo.ticker.symbol : String(tradeInfo.ticker || 'unknown'),
+        tradeInfo.type || 'unknown'
+      );
+      
+      // Additional details for enhanced analytics
+      analytics.trackEvent('trade_row_clicked', {
+        trade_id: tradeInfo.id,
+        ticker: typeof tradeInfo.ticker === 'object' ? tradeInfo.ticker.symbol : tradeInfo.ticker,
+        status: tradeInfo.status,
+        profit_loss: tradeInfo.profitLossAmount,
+        profit_loss_percent: tradeInfo.profitLossPercent,
+        r_ratio: tradeInfo.rRatio,
+        days_held: tradeInfo.daysHeld,
+      });
+      
+      onRowClickAction(row);
+    }
+  };
+
+
 
   return (
     <div className="space-y-4">
