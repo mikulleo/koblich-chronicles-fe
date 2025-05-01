@@ -492,7 +492,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
               <Button
                 variant={showAnnotated ? "default" : "secondary"}
                 size="sm"
-                className="absolute top-2 left-2 rounded-full bg-background/50 backdrop-blur z-10"
+                className="absolute top-2 left-2 rounded-full bg-background/50 backdrop-blur z-10 ${
+      showAnnotated ? 'bg-background/50' : 'bg-red-700'"
                 onClick={handleToggleAnnotated}
               >
                 {showAnnotated ? 'Show Original' : 'Show Annotated'}

@@ -14,7 +14,7 @@ export default function TagsPage() {
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">Chart Tags</h1>
       <p className="text-muted-foreground mb-8">
-        Select a tag to view related stock charts. Tags help you organize and discover
+        Select a tag to view related stock charts. Tags help to organize and discover
         patterns across different stocks and timeframes.
       </p>
       

@@ -11,7 +11,7 @@ export default function TickersPage() {
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">Stock Tickers</h1>
       <p className="text-muted-foreground mb-8">
-        Browse all tickers in your library. View associated charts and trades for any ticker.
+        Browse all tickers in the library. View associated charts and trades for any ticker.
       </p>
       
       <TickersShowcase />
