@@ -24,11 +24,9 @@ export default function TermsPage() {
         <h2>1. Company Information</h2>
         <p>
           <strong>Business Name:</strong> Leoš Mikulka<br />
-          <strong>Registration Number (IČO):</strong> [YOUR IČO]<br />
-          <strong>Registered Address:</strong> [YOUR REGISTERED ADDRESS]<br />
-          <strong>Tax ID Number:</strong> [YOUR TAX NUMBER]<br />
-          <strong>Email:</strong> leos@mikulka.com<br />
-          <strong>Phone:</strong> [YOUR PHONE NUMBER]
+          <strong>Registration Number (IČO):</strong> 23078928<br />
+          <strong>Registered Address:</strong> Krajinova 1006/88, 674 01 Třebíč<br />
+          <strong>Email:</strong> mikulkal@atlas.cz
         </p>
         
         <h2>2. Services Description</h2>
@@ -53,7 +51,7 @@ export default function TermsPage() {
         <ul>
           <li>Credit/Debit Cards (Visa, Mastercard)</li>
           <li>Barion Balance</li>
-          <li>Bank Transfer</li>
+          <li>Google Pay (where available)</li>
           <li>Apple Pay (where available)</li>
         </ul>
         
@@ -130,8 +128,7 @@ export default function TermsPage() {
         <h2>10. Contact Information</h2>
         <p>
           If you have any questions about these Terms, please contact us at:<br />
-          Email: leos@mikulka.com<br />
-          Phone: [YOUR PHONE NUMBER]
+          Email: mikulkal@atlas.cz
         </p>
       </div>
     </div>

@@ -158,16 +158,14 @@ export default function PrivacyPolicyPage() {
         <h2>12. Contact Us</h2>
         <p>
           If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:<br />
-          Email: leos@mikulka.com<br />
-          Address: [YOUR COMPANY ADDRESS]
+          Email: mikulkal@atlas.cz
         </p>
         
         <h2>13. Data Controller</h2>
         <p>
           Leoš Mikulka<br />
-          [YOUR COMPANY ADDRESS]<br />
-          [YOUR COMPANY REGISTRATION NUMBER]<br />
-          [YOUR TAX ID]
+          Krajinova 1006/88, Třebíč 674 01<br />
+          IČ: 23078928
         </p>
       </div>
     </div>
