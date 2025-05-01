@@ -4,7 +4,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 import BarionPixel from "@/components/donations/barion-pixel"
-import FooterPaymentSection from '@/components/layout/footer-payment-section';
+//import FooterPaymentSection from '@/components/layout/footer-payment-section';
 
 // Load fonts with display: swap for better performance
 const inter = Inter({ 
@@ -45,7 +45,6 @@ export default function RootLayout({
           {children}
         </MainLayout>
         <Toaster />
-        <FooterPaymentSection />
       </body>
     </html>
   )
