@@ -185,7 +185,7 @@ export function TradeExitDetails({
             {/* Progress bar showing exit distribution */}
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">
-                Position closure ({(cumulativePercent).toFixed(1)}% of {totalShares} shares)
+                Position closure ({(cumulativePercent).toFixed(1)}%)
               </div>
               <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex">
                 {progressSegments.map((segment, i) => (
@@ -198,8 +198,8 @@ export function TradeExitDetails({
                 ))}
               </div>
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0 shares</span>
-                <span>{totalShares} shares</span>
+                <span>0%</span>
+                <span>100%</span>
               </div>
             </div>
             
@@ -247,9 +247,9 @@ export function TradeExitDetails({
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-muted-foreground">Shares</div>
+                        <div className="text-xs text-muted-foreground">Position %</div>
                         <div className="font-mono">
-                          {exit.shares} ({exit.percentOfTotal.toFixed(1)}%)
+                          {exit.percentOfTotal.toFixed(1)}%
                         </div>
                       </div>
                       {/* P/L in dollar amount is hidden for now but code is kept for future use */}
