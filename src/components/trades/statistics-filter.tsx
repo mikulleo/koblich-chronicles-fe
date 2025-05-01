@@ -141,7 +141,7 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
                     mode="range"
                     defaultMonth={dateRange.from}
                     selected={dateRange}
-                    onSelect={(range) => setDateRange(range)}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
                     numberOfMonths={2}
                   />
                 </PopoverContent>

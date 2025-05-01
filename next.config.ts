@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    domains: ['localhost', 'via.placeholder.com'],
+    domains: ['localhost', 'via.placeholder.com', 'koblich-chronicles-be-production.up.railway.app'],
     remotePatterns: [
       {
         protocol: 'http',
@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'koblich-chronicles-be-production.up.railway.app',
+        pathname: '/api/media/**',
       },
     ],
   },
