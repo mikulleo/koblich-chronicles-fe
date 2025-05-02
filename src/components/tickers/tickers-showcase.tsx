@@ -342,60 +342,64 @@ export function TickersShowcase() {
       
       {/* Trades modal */}
       <Dialog open={showTradesDialog} onOpenChange={setShowTradesDialog}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span>Trades for {selectedTicker?.symbol}</span>
-              <Badge variant="outline" className="ml-2">
-                {selectedTicker?.name}
-              </Badge>
-            </DialogTitle>
-            <DialogDescription>
-              Viewing all trades for {selectedTicker?.symbol}. Click on any trade to see related charts.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-[60vh]">
-              {loadingTrades ? (
-                <div className="p-8 text-center">
-                  <p>Loading trades...</p>
-                </div>
-              ) : tickerTrades.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p>No trades found for this ticker.</p>
-                </div>
-              ) : (
-                <DataTable 
-                  columns={columns} 
-                  data={tickerTrades}
-                  onRowClickAction={(row) => {
-                    setShowTradesDialog(false);
-                    
-                    // Navigate to charts page with date filter for this trade
-                    const tradeDate = new Date(row.entryDate);
-                    
-                    // Calculate a date range around the trade date (3 days before and after)
-                    const fromDate = new Date(tradeDate);
-                    fromDate.setDate(fromDate.getDate() - 3);
-                    
-                    const toDate = new Date(tradeDate);
-                    toDate.setDate(toDate.getDate() + 3);
-                    
-                    const formatDate = (date: Date) => {
-                      return date.toISOString().split('T')[0];
-                    };
-                    
-                    // Create URL with query parameters
-                    const url = `/charts?tickers=${row.ticker.id}&from=${formatDate(fromDate)}&to=${formatDate(toDate)}`;
-                    
-                    router.push(url);
-                  }}
-                />
-              )}
-            </ScrollArea>
-          </div>
-        </DialogContent>
+        {/* Inside your Dialog in ticker-showcase.tsx, replace the DialogContent section with this: */}
+<DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+  <DialogHeader>
+    <DialogTitle className="flex items-center gap-2">
+      <span>Trades for {selectedTicker?.symbol}</span>
+      <Badge variant="outline" className="ml-2">
+        {selectedTicker?.name}
+      </Badge>
+    </DialogTitle>
+    <DialogDescription>
+      Viewing all trades for {selectedTicker?.symbol}. Click on any trade to see related charts.
+    </DialogDescription>
+  </DialogHeader>
+  
+  {/* The key change is here - removing the overflow-hidden and allowing horizontal scroll */}
+  <div className="flex-1">
+    <ScrollArea className="h-[60vh]" orientation="both">
+      {loadingTrades ? (
+        <div className="p-8 text-center">
+          <p>Loading trades...</p>
+        </div>
+      ) : tickerTrades.length === 0 ? (
+        <div className="p-8 text-center">
+          <p>No trades found for this ticker.</p>
+        </div>
+      ) : (
+        <div className="min-w-max">
+          <DataTable 
+            columns={columns} 
+            data={tickerTrades}
+            onRowClickAction={(row) => {
+              setShowTradesDialog(false);
+              
+              // Navigate to charts page with date filter for this trade
+              const tradeDate = new Date(row.entryDate);
+              
+              // Calculate a date range around the trade date (3 days before and after)
+              const fromDate = new Date(tradeDate);
+              fromDate.setDate(fromDate.getDate() - 3);
+              
+              const toDate = new Date(tradeDate);
+              toDate.setDate(toDate.getDate() + 3);
+              
+              const formatDate = (date: Date) => {
+                return date.toISOString().split('T')[0];
+              };
+              
+              // Create URL with query parameters
+              const url = `/charts?tickers=${row.ticker.id}&from=${formatDate(fromDate)}&to=${formatDate(toDate)}`;
+              
+              router.push(url);
+            }}
+          />
+        </div>
+      )}
+    </ScrollArea>
+  </div>
+</DialogContent>
       </Dialog>
     </div>
   );
