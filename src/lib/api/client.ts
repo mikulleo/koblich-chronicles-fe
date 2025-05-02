@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://koblich-chronicles-be-production.up.railway.app/api';
+const DEFAULT_LIMIT = 10000; // Default limit for pagination
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -16,6 +17,18 @@ apiClient.interceptors.request.use((config) => {
     const token = localStorage.getItem('payload-token');
     if (token) {
       config.headers.Authorization = `JWT ${token}`;
+    }
+  }
+
+
+  // Add pagination limit to all GET requests if not already present
+  if (config.method === 'get') {
+    // Initialize params object if it doesn't exist
+    config.params = config.params || {};
+    
+    // Only set the limit if it's not already set
+    if (!config.params.limit) {
+      config.params.limit = DEFAULT_LIMIT;
     }
   }
   return config;
