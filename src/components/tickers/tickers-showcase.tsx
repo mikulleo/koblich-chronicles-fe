@@ -343,7 +343,7 @@ export function TickersShowcase() {
       {/* Trades modal */}
       <Dialog open={showTradesDialog} onOpenChange={setShowTradesDialog}>
         {/* Inside your Dialog in ticker-showcase.tsx, replace the DialogContent section with this: */}
-<DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-[90vw] md:max-w-[80vw] max-h-[90vh]">
   <DialogHeader>
     <DialogTitle className="flex items-center gap-2">
       <span>Trades for {selectedTicker?.symbol}</span>
@@ -356,23 +356,21 @@ export function TickersShowcase() {
     </DialogDescription>
   </DialogHeader>
   
-  {/* The key change is here - removing the overflow-hidden and allowing horizontal scroll */}
-  <div className="flex-1">
-    <ScrollArea className="h-[60vh] overflow-auto">
-      {loadingTrades ? (
-        <div className="p-8 text-center">
-          <p>Loading trades...</p>
-        </div>
-      ) : tickerTrades.length === 0 ? (
-        <div className="p-8 text-center">
-          <p>No trades found for this ticker.</p>
-        </div>
-      ) : (
-        <div className="min-w-max">
-          <DataTable 
-            columns={columns} 
-            data={tickerTrades}
-            onRowClickAction={(row) => {
+  <div className="w-full overflow-x-auto">
+    {loadingTrades ? (
+      <div className="p-8 text-center">
+        <p>Loading trades...</p>
+      </div>
+    ) : tickerTrades.length === 0 ? (
+      <div className="p-8 text-center">
+        <p>No trades found for this ticker.</p>
+      </div>
+    ) : (
+      <div className="min-w-full">
+        <DataTable 
+          columns={columns} 
+          data={tickerTrades}
+          onRowClickAction={(row) => {
               setShowTradesDialog(false);
               
               // Navigate to charts page with date filter for this trade
@@ -397,7 +395,6 @@ export function TickersShowcase() {
           />
         </div>
       )}
-    </ScrollArea>
   </div>
 </DialogContent>
       </Dialog>
