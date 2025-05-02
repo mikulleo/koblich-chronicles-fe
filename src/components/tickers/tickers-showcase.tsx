@@ -358,7 +358,7 @@ export function TickersShowcase() {
   
   {/* The key change is here - removing the overflow-hidden and allowing horizontal scroll */}
   <div className="flex-1">
-    <ScrollArea className="h-[60vh]" orientation="both">
+    <ScrollArea className="h-[60vh] overflow-auto">
       {loadingTrades ? (
         <div className="p-8 text-center">
           <p>Loading trades...</p>
