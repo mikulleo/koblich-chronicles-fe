@@ -55,7 +55,7 @@ export function TagsStats() {
         const tags: Tag[] = tagsResponse.data.docs;
         
         // Fetch all charts (with a high limit to get as many as possible)
-        const chartsResponse = await apiClient.get('/charts?limit=500');
+        const chartsResponse = await apiClient.get('/charts');
         if (!chartsResponse.data) {
           throw new Error('Failed to fetch charts data');
         }
