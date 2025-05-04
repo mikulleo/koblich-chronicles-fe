@@ -6,7 +6,7 @@ import { ReactNode } from 'react'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   return (
-    <NextThemesProvider attribute="data-theme" defaultTheme="system" enableSystem>
+    <NextThemesProvider attribute="data-theme" defaultTheme="light" enableSystem>
       {children}
     </NextThemesProvider>
   )
