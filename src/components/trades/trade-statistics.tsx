@@ -107,17 +107,25 @@ export function TradeStatistics() {
         } else if (filters.timePeriod !== "all") {
           // Set date range based on selected time period
           const endDate = new Date();
-          const startDate = new Date();
+          const today = new Date();
+          let startDate;
           
           if (filters.timePeriod === "year") {
-            startDate.setFullYear(startDate.getFullYear() - 1);
+            // This year: January 1st of current year to today
+            startDate = new Date(today.getFullYear(), 0, 1); // Month is 0-indexed (0 = January)
           } else if (filters.timePeriod === "month") {
-            startDate.setMonth(startDate.getMonth() - 1);
+            // This month: 1st day of current month to today
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
           } else if (filters.timePeriod === "week") {
-            startDate.setDate(startDate.getDate() - 7);
+            // This week: Monday of current week to today
+            const day = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+            startDate = new Date(today.getFullYear(), today.getMonth(), diff);
           }
           
-          params.append("startDate", startDate.toISOString().split("T")[0]);
+          if (startDate) {
+            params.append("startDate", startDate.toISOString().split("T")[0]);
+          }
           params.append("endDate", endDate.toISOString().split("T")[0]);
         }
         

@@ -11,10 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import apiClient from "@/lib/api/client";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, getYear, getMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { TradeStats, StatsMetadata } from "./trade-statistics";
 
 interface TimeperiodStats {
