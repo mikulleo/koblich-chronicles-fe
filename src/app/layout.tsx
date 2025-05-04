@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 import BarionPixel from "@/components/donations/barion-pixel"
 import AnalyticsProvider from "@/providers/AnalyticsProvider"
+import { ThemeProvider } from "@/providers/ThemeProviders"
 
 // Load fonts with display: swap for better performance
 const inter = Inter({ 
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={`${manrope.variable} ${inter.variable}`}> 
       <body>
         {/* Wrap application in Analytics Provider */}
+        <ThemeProvider>
         <AnalyticsProvider gaMeasurementId={gaMeasurementId}>
           {/* Add Barion Pixel for fraud prevention */}
           {barionPosKey && (
@@ -54,6 +56,7 @@ export default function RootLayout({
           </MainLayout>
           <Toaster />
         </AnalyticsProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

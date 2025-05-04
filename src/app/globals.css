@@ -94,53 +94,57 @@
   --sidebar-ring: #082d7d;
 }
 
-.dark {
-  /* Dark mode - using the dark blue as background */
-  --background: #082d7d;
+[data-theme="dark"] {
+  /* Much darker background - almost navy/black */
+  --background: #0a1629;
   --foreground: #ffffff;
-  --card: #0c3694;
+  
+  /* Darker card background */
+  --card: #11203b;
   --card-foreground: #ffffff;
-  --popover: #0c3694;
+  
+  /* Darker popover background */
+  --popover: #11203b;
   --popover-foreground: #ffffff;
   
-  /* Primary colors for dark mode */
+  /* Primary colors - keep white text on dark backgrounds */
   --primary: #ffffff;
-  --primary-foreground: #082d7d;
+  --primary-foreground: #0a1629;
   
-  /* Secondary colors for dark mode */
-  --secondary: #1e40af;
+  /* Secondary colors - darker blue */
+  --secondary: #172b4d;
   --secondary-foreground: #ffffff;
   
-  /* Muted colors for dark mode */
-  --muted: #1e3a8a;
+  /* Muted colors - deep navy */
+  --muted: #1a365d;
   --muted-foreground: #cbd5e1;
   
-  /* Accent colors for dark mode */
-  --accent: #1e40af;
+  /* Accent colors - rich navy */
+  --accent: #172b4d;
   --accent-foreground: #ffffff;
   
-  /* Other UI colors for dark mode */
+  /* Other UI colors */
   --destructive: #ff5a5f;
-  --border: #1e40af;
-  --input: #1e40af;
-  --ring: #60a5fa;
+  --border: #172b4d;
+  --input: #172b4d;
+  --ring: #3b82f6;
   
-  /* Chart colors for dark mode */
+  /* Chart colors - maintain the same progression but darker */
   --chart-1: #93c5fd;
   --chart-2: #60a5fa;
   --chart-3: #3b82f6;
   --chart-4: #1e40af;
-  --chart-5: #082d7d;
+  --chart-5: #0a1629;
   
-  /* Sidebar specific colors for dark mode */
-  --sidebar: #082d7d;
+  /* Sidebar specific colors - darker blues */
+  --sidebar: #0a1629;
   --sidebar-foreground: #ffffff;
   --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #082d7d;
-  --sidebar-accent: #1e40af;
+  --sidebar-primary-foreground: #0a1629;
+  --sidebar-accent: #172b4d;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1e40af;
-  --sidebar-ring: #60a5fa;
+  --sidebar-border: #172b4d;
+  --sidebar-ring: #3b82f6;
 }
 
 @layer base {
