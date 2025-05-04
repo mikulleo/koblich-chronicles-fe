@@ -26,10 +26,11 @@ interface TimeperiodStats {
 
 interface StatisticsByTimeperiodProps {
   viewMode: "standard" | "normalized";
+  statusFilter: "all" | "closed-only"; // Add statusFilter prop
   selectedYear?: number;
 }
 
-export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByTimeperiodProps) {
+export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }: StatisticsByTimeperiodProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [yearlyStats, setYearlyStats] = useState<TimeperiodStats[]>([]);
@@ -72,7 +73,8 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
           const startDate = `${year}-01-01`;
           const endDate = `${year}-12-31`;
           
-          const response = await apiClient.get(`/trades/stats?startDate=${startDate}&endDate=${endDate}`);
+          // Include statusFilter in the API request
+          const response = await apiClient.get(`/trades/stats?startDate=${startDate}&endDate=${endDate}&statusFilter=${statusFilter}`);
           
           return {
             period: year.toString(),
@@ -103,7 +105,11 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
     };
     
     fetchYearlyStats();
-  }, [year]);
+    
+    // Clear monthly stats when statusFilter changes to force a refresh
+    setMonthlyStats({});
+    
+  }, [year, statusFilter]); // Add statusFilter as dependency
 
   // Function to fetch monthly data for a year
   const fetchMonthlyDataForYear = async (year: string) => {
@@ -121,8 +127,9 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
         const formattedStartDate = format(startDate, "yyyy-MM-dd");
         const formattedEndDate = format(endDate, "yyyy-MM-dd");
         
+        // Include statusFilter in the API request
         const response = await apiClient.get(
-          `/trades/stats?startDate=${formattedStartDate}&endDate=${formattedEndDate}`
+          `/trades/stats?startDate=${formattedStartDate}&endDate=${formattedEndDate}&statusFilter=${statusFilter}`
         );
         
         return {
@@ -190,11 +197,16 @@ export function StatisticsByTimeperiod({ viewMode, selectedYear }: StatisticsByT
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Trading Statistics By Time Period</span>
-          {viewMode === "normalized" && (
-            <Badge variant="outline" className="bg-primary/20 border-primary/50 text-primary">
-              Normalized View
+          <div className="flex gap-2">
+            {viewMode === "normalized" && (
+              <Badge variant="outline" className="bg-primary/20 border-primary/50 text-primary">
+                Normalized View
+              </Badge>
+            )}
+            <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+              {statusFilter === "closed-only" ? "Closed Only" : "Closed & Partial"}
             </Badge>
-          )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>

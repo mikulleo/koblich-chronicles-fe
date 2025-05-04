@@ -1,3 +1,5 @@
+// trade-statistics.tsx
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -207,7 +209,8 @@ export function TradeStatistics() {
       
       {/* Time-period based statistics */}
       <StatisticsByTimeperiod 
-        viewMode={filters.viewMode} 
+        viewMode={filters.viewMode}
+        statusFilter={filters.statusFilter}
       />
       
       {/* Visualizations */}
