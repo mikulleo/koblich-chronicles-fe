@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://koblich-chronicles-be-production.up.railway.app/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 const DEFAULT_LIMIT = 10000; // Default limit for pagination
 
 const apiClient = axios.create({
