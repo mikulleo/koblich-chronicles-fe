@@ -1,8 +1,10 @@
+// charts/chart-carousel.tsx
+
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
-import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, ZoomIn, ZoomOut, Move } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, ZoomIn, ZoomOut, Move, Ruler } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +12,7 @@ import { Tag as TagType } from './chart-gallery'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useAnalytics } from '@/hooks/use-analytics'
-
+import { ChartMeasurement, Measurement } from './chart-measurement'
 
 // Updated ChartImage interface to properly include tags
 export interface ChartImage {
@@ -29,14 +31,16 @@ export interface ChartImage {
     other?: string | null;
   } | string; // Allow string for backward compatibility
   annotatedImageUrl?: string | null
+  measurements?: Measurement[] // Add measurements to the chart data
 }
 
 interface ChartCarouselProps {
   charts: ChartImage[]
   onChartClick?: (chart: ChartImage) => void
+  onMeasurementSave?: (chartId: string, measurements: Measurement[]) => void
 }
 
-export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
+export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: ChartCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
   const [showAnnotated, setShowAnnotated] = useState(false)
@@ -49,24 +53,71 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   const [isPanning, setIsPanning] = useState(false)
   const [startPanPosition, setStartPanPosition] = useState({ x: 0, y: 0 })
   
-  const containerRef = useRef<HTMLDivElement>(null)
-  const imageContainerRef = useRef<HTMLDivElement>(null)
+  // Measurement state
+  const [isMeasurementActive, setIsMeasurementActive] = useState(false)
+  const measurementsRef = useRef<Measurement[]>([]);
+  const [measurementsKey, setMeasurementsKey] = useState(0);
+    
+  const containerRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
+  const imageContainerRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
   const imageDivRef = useRef<HTMLDivElement>(null)
   
   const currentChart = charts[currentIndex]
   const hasAnnotatedImage = currentChart?.annotatedImageUrl !== null && 
                            currentChart?.annotatedImageUrl !== undefined
 
-   // Track chart view on chart change
-   useEffect(() => {
+  // Toggle measurement mode
+  const handleToggleMeasurement = useCallback(() => {
+    setIsMeasurementActive(prev => !prev)
+    
+    // Track measurement mode toggle
+    analytics.trackEvent('measurement_mode_toggled', {
+      chart_id: currentChart?.id,
+      ticker: currentChart?.ticker,
+      state: !isMeasurementActive ? 'enabled' : 'disabled'
+    })
+  }, [isMeasurementActive, currentChart, analytics])
+
+  // Load measurements when chart changes
+  useEffect(() => {
     if (currentChart) {
-      analytics.trackChartView(currentChart.id, currentChart.ticker)
+      // Store measurements in ref to avoid render loops
+      measurementsRef.current = currentChart.measurements || [];
+      // Force re-render with key change
+      setMeasurementsKey(prev => prev + 1);
     }
-  }, [currentIndex, currentChart, analytics])
+  }, [currentIndex, currentChart]);
+
+  // Handle the measurement complete callback safely
+  const handleMeasurementComplete = useCallback((measurement: Measurement) => {
+    if (!currentChart) return;
+    
+    // Update the ref
+    const updatedMeasurements = [...measurementsRef.current, measurement];
+    measurementsRef.current = updatedMeasurements;
+    
+    // Force re-render
+    setMeasurementsKey(prev => prev + 1);
+    
+    // Track measurement creation
+    analytics.trackEvent('measurement_created', {
+      chart_id: currentChart.id,
+      ticker: currentChart.ticker,
+      measurement_id: measurement.id,
+      percentage_change: measurement.percentageChange
+    });
+    
+    // Save the measurement to the chart data if callback is provided
+    if (onMeasurementSave) {
+      onMeasurementSave(currentChart.id, updatedMeasurements);
+    }
+  }, [currentChart, analytics, onMeasurementSave]);
   
   // Reset zoom and pan when changing images
   useEffect(() => {
     resetZoomAndPan()
+    // Disable measurement mode when changing images
+    setIsMeasurementActive(false)
   }, [currentIndex, showAnnotated])
   
   const resetZoomAndPan = () => {
@@ -145,6 +196,9 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   
   // Pan functions
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Skip if in measurement mode
+    if (isMeasurementActive) return;
+    
     // Only enable panning when zoomed in
     if (zoomLevel > 1) {
       setIsPanning(true)
@@ -161,9 +215,12 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
       // Prevent image drag behavior
       e.preventDefault()
     }
-  }, [zoomLevel, panPosition])
+  }, [zoomLevel, panPosition, isMeasurementActive])
   
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Skip if in measurement mode
+    if (isMeasurementActive) return;
+    
     if (isPanning && zoomLevel > 1) {
       const newX = e.clientX - startPanPosition.x
       const newY = e.clientY - startPanPosition.y
@@ -182,7 +239,7 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
       
       e.preventDefault()
     }
-  }, [isPanning, startPanPosition, zoomLevel, calculatePanLimits])
+  }, [isPanning, startPanPosition, zoomLevel, calculatePanLimits, isMeasurementActive])
   
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
@@ -212,7 +269,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   
   const handleChartClick = () => {
     // Only trigger the click handler if we're not panning and zoom is 1
-    if (!isPanning && zoomLevel === 1 && onChartClick && currentChart) {
+    // and not in measurement mode
+    if (!isPanning && zoomLevel === 1 && !isMeasurementActive && onChartClick && currentChart) {
       // Track chart click
       analytics.trackEvent('chart_clicked', {
         chart_id: currentChart.id,
@@ -226,6 +284,15 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts when in measurement mode
+      if (isMeasurementActive) {
+        // Allow ESC to exit measurement mode
+        if (e.key === 'Escape') {
+          setIsMeasurementActive(false)
+        }
+        return
+      }
+      
       if (e.key === 'ArrowRight') {
         handleNext()
       } else if (e.key === 'ArrowLeft') {
@@ -240,6 +307,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
         handleZoomOut()
       } else if (e.key === '0') {
         resetZoomAndPan()
+      } else if (e.key === 'm') {
+        handleToggleMeasurement()
       }
     }
     
@@ -259,7 +328,9 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
     hasAnnotatedImage, 
     handleZoomIn, 
     handleZoomOut, 
-    handleMouseUp
+    handleMouseUp,
+    isMeasurementActive,
+    handleToggleMeasurement
   ])
   
   // Format date for display
@@ -304,7 +375,9 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
   const imageTransform = `scale(${zoomLevel}) translate(${panPosition.x / zoomLevel}px, ${panPosition.y / zoomLevel}px)`;
   
   // Determine cursor style based on zoom and panning state
-  const imageCursorStyle = zoomLevel > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default';
+  const imageCursorStyle = isMeasurementActive 
+    ? 'crosshair' 
+    : (zoomLevel > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default');
 
   // Helper function to check if a notes section has content
   const hasNoteContent = (content: string | null | undefined): boolean => {
@@ -413,6 +486,21 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
               </div>
             )}
             
+            {/* Measurement Component */}
+            {currentChart && (
+              <ChartMeasurement
+                key={`measurement-${currentChart.id}-${measurementsKey}`}
+                isActive={isMeasurementActive}
+                onToggle={handleToggleMeasurement}
+                containerRef={containerRef}
+                imageContainerRef={imageContainerRef}
+                zoomLevel={zoomLevel}
+                panPosition={panPosition}
+                onMeasurementComplete={handleMeasurementComplete}
+                savedMeasurements={measurementsRef.current}
+              />
+            )}
+            
             {/* Navigation Controls */}
             <Button
               variant="secondary"
@@ -444,6 +532,17 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
               ) : (
                 <Maximize2 className="h-4 w-4" />
               )}
+            </Button>
+            
+            {/* Measurement Toggle - New prominent button */}
+            <Button
+              variant={isMeasurementActive ? "default" : "secondary"}
+              size="sm"
+              className="absolute top-2 left-2 rounded-full bg-background/50 backdrop-blur z-10 flex items-center gap-1"
+              onClick={handleToggleMeasurement}
+            >
+              <Ruler className="h-4 w-4" />
+              {isMeasurementActive ? 'Exit Measure' : 'Measure'}
             </Button>
             
             {/* Zoom Controls - only visible in fullscreen mode */}
@@ -492,8 +591,7 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
               <Button
                 variant={showAnnotated ? "default" : "secondary"}
                 size="sm"
-                className="absolute top-2 left-2 rounded-full bg-background/50 backdrop-blur z-10 ${
-      showAnnotated ? 'bg-background/50' : 'bg-red-700'"
+                className={`absolute top-2 ${isMeasurementActive ? 'left-[130px]' : 'left-[130px]'} rounded-full bg-background/50 backdrop-blur z-10`}
                 onClick={handleToggleAnnotated}
               >
                 {showAnnotated ? 'Show Original' : 'Show Annotated'}
@@ -504,6 +602,13 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-background/40 backdrop-blur text-xs text-muted-foreground/80 z-10">
               {currentIndex + 1}/{charts.length}
             </div>
+            
+            {/* Measurement active indicator */}
+            {isMeasurementActive && (
+              <div className="absolute bottom-2 left-2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium z-10 animate-pulse">
+                Measurement Mode Active - Click to enter a price point
+              </div>
+            )}
           </div>
           
           {/* Chart Info Panel - Updated for structured notes */}
@@ -555,6 +660,8 @@ export function ChartCarousel({ charts, onChartClick }: ChartCarouselProps) {
                 <span className="inline-block mx-1">+/-: Zoom</span>
                 <span className="inline-block mx-1">0: Reset</span>
                 <span className="inline-block mx-1">F: Exit</span>
+                <span className="inline-block mx-1">M: Measure</span>
+                <span className="inline-block mx-1">ESC: Exit Measure</span>
                 {hasAnnotatedImage && <span className="inline-block mx-1">A: Annotated</span>}
               </div>
             )}
