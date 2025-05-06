@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { DateRange } from "react-day-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -95,7 +96,11 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
   };
 
   // Handle date range selection
-  const handleDateRangeSelect = (range: { from?: Date; to?: Date }) => {
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    if (!range) {
+      setDateRange({ from: undefined, to: undefined });
+      return;
+    }
     setDateRange({ from: range.from, to: range.to });
     
     // Only update parent if we have both dates
