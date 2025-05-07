@@ -22,6 +22,7 @@ export function ThankYouContent() {
       console.log('Order ID:', orderId)
       
       // Get donation details if needed
+      /*
       const fetchDonationDetails = async () => {
         try {
           // Fix the URL - remove the duplicate /api/
@@ -34,7 +35,7 @@ export function ThankYouContent() {
         }
       }
       
-      fetchDonationDetails()
+      fetchDonationDetails()*/
     }
   }, [orderId])
 
