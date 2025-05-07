@@ -1,3 +1,5 @@
+// src/app/privacy/page.tsx
+
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
@@ -16,7 +18,7 @@ export default function PrivacyPolicyPage() {
         <h1>Privacy Policy</h1>
         
         <div className="bg-muted p-4 rounded-lg mb-6">
-          <p className="font-medium">Last Updated: May 1, 2025</p>
+          <p className="font-medium">Last Updated: May 7, 2025</p>
           <p>This Privacy Policy describes how we collect, use, and disclose your personal information when you use our services.</p>
         </div>
         
@@ -26,7 +28,7 @@ export default function PrivacyPolicyPage() {
         <p>We may collect the following types of information when you interact with our services:</p>
         <ul>
           <li><strong>Contact Information:</strong> Name, email address when you make a donation</li>
-          <li><strong>Payment Information:</strong> We do not store your payment details. All payment processing is handled securely by our payment processor, Barion</li>
+          <li><strong>Payment Information:</strong> We do not store your payment details. All payment processing is handled securely by our payment processor, PayPal</li>
           <li><strong>Communication:</strong> Messages you send us via contact forms or email</li>
         </ul>
         
@@ -38,31 +40,31 @@ export default function PrivacyPolicyPage() {
           <li><strong>Cookies and Similar Technologies:</strong> We use cookies and similar tracking technologies to enhance your experience</li>
         </ul>
         
-        <h3>1.3 Barion Pixel</h3>
+        <h3>1.3 PayPal Services</h3>
         <p>
-          Our website uses Barion Pixel, a tracking tool provided by Barion Payment Inc., to help prevent fraud 
-          and improve payment security. The Barion Pixel collects information about your browsing behavior, 
-          device information, and transaction data to identify potentially fraudulent transactions.
+          Our website uses PayPal for payment processing. When you make a donation through PayPal, they may collect
+          additional information according to their privacy policy. PayPal collects information necessary to process
+          payments and prevent fraud, including your payment method details, device information, and transaction data.
         </p>
         <p>
-          <strong>What data does Barion Pixel collect?</strong> The Barion Pixel may collect the following information:
+          <strong>What data does PayPal collect?</strong> PayPal may collect the following information:
         </p>
         <ul>
-          <li>Browser information (type, version, language settings)</li>
-          <li>Device information (type, operating system, screen resolution)</li>
+          <li>Name, email address, and billing information</li>
+          <li>Payment method details (credit card information, bank account information)</li>
+          <li>Device information (type, operating system, browser details)</li>
           <li>IP address and approximate location</li>
-          <li>Page interaction events (clicks, scrolls, form inputs)</li>
-          <li>Session information (duration, pages visited)</li>
-          <li>Referral information (where you came from)</li>
+          <li>Transaction details and history</li>
         </ul>
         <p>
-          <strong>How is Barion Pixel data used?</strong> This data is used solely for fraud prevention, payment security, 
-          and improving the payment experience. Barion processes this data in accordance with their privacy policy,
-          which you can find at <a href="https://www.barion.com/en/privacy-policy/" target="_blank" rel="noopener noreferrer">https://www.barion.com/en/privacy-policy/</a>.
+          <strong>How is PayPal data used?</strong> This data is used for payment processing, fraud prevention, 
+          customer support, and improving services. PayPal processes this data in accordance with their privacy policy,
+          which you can find at <a href="https://www.paypal.com/us/webapps/mpp/ua/privacy-full" target="_blank" rel="noopener noreferrer">https://www.paypal.com/privacy</a>.
         </p>
         <p>
-          <strong>Legal basis for processing:</strong> The legal basis for processing data through Barion Pixel is our legitimate 
-          interest in securing online transactions and preventing fraud, as permitted under GDPR Article 6(1)(f).
+          <strong>Legal basis for processing:</strong> The legal basis for processing data through PayPal is our legitimate 
+          interest in processing donations and preventing fraud, as permitted under GDPR Article 6(1)(f), as well as
+          the necessity for the performance of a contract (donation acceptance) under GDPR Article 6(1)(b).
         </p>
         
         <h2>2. How We Use Your Information</h2>
@@ -71,7 +73,7 @@ export default function PrivacyPolicyPage() {
           <li>To provide and maintain our services</li>
           <li>To process donations and send receipts</li>
           <li>To respond to your inquiries and provide customer support</li>
-          <li>To prevent fraudulent transactions (through Barion Pixel)</li>
+          <li>To prevent fraudulent transactions</li>
           <li>To analyze usage patterns and improve our website</li>
           <li>To comply with legal obligations</li>
         </ul>
@@ -88,7 +90,7 @@ export default function PrivacyPolicyPage() {
         <h2>4. Data Sharing and Disclosure</h2>
         <p>We may share your information with the following categories of third parties:</p>
         <ul>
-          <li><strong>Payment Processors:</strong> We share transaction data with Barion to process donations</li>
+          <li><strong>Payment Processors:</strong> We share transaction data with PayPal to process donations</li>
           <li><strong>Service Providers:</strong> We use third-party vendors who provide services such as hosting, analytics, and customer support</li>
           <li><strong>Legal Requirements:</strong> We may disclose information if required by law or to protect our rights</li>
         </ul>
@@ -127,7 +129,7 @@ export default function PrivacyPolicyPage() {
           <li><strong>Essential Cookies:</strong> Necessary for the website to function properly</li>
           <li><strong>Analytics Cookies:</strong> Help us understand how visitors interact with our website</li>
           <li><strong>Functional Cookies:</strong> Enable enhanced functionality and personalization</li>
-          <li><strong>Security Cookies:</strong> Used to detect and prevent fraud in financial transactions</li>
+          <li><strong>Security Cookies:</strong> Used for security purposes in the donation process</li>
         </ul>
         
         <h2>8. Data Security</h2>
@@ -138,9 +140,10 @@ export default function PrivacyPolicyPage() {
         
         <h2>9. International Data Transfers</h2>
         <p>
-          Your information may be transferred to and processed in countries other than the country in which you reside. 
-          These countries may have data protection laws that are different from those in your country. 
-          We ensure that adequate safeguards are in place to protect your information when transferred internationally.
+          Your information may be transferred to and processed in countries other than the country in which you reside, 
+          particularly to servers in the United States where PayPal processes payments. These countries may have data 
+          protection laws that are different from those in your country. We ensure that adequate safeguards are in place 
+          to protect your information when transferred internationally.
         </p>
         
         <h2>10. Children's Privacy</h2>

@@ -1,3 +1,5 @@
+// src/app/terms/page.tsx
+
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
@@ -17,7 +19,7 @@ export default function TermsPage() {
         <h1>Terms of Service</h1>
         
         <div className="bg-muted p-4 rounded-lg mb-6">
-          <p className="font-medium">Last Updated: May 1, 2025</p>
+          <p className="font-medium">Last Updated: May 7, 2025</p>
           <p>Please read these terms and conditions carefully before using our service.</p>
         </div>
         
@@ -37,22 +39,23 @@ export default function TermsPage() {
         </p>
         
         <h2>3. Payment Terms</h2>
-        <h3>3.1 Donation Payments with Barion</h3>
+        <h3>3.1 Donation Payments with PayPal</h3>
         <p>
-          We accept donations through the Barion Payment Gateway. Barion is a licensed financial institution 
-          that provides secure payment processing. When making a donation, you will be redirected to the Barion 
-          payment interface to complete your transaction.
+          We accept donations through PayPal, a secure and globally trusted payment processor. When making a donation, 
+          you may be redirected to the PayPal website or presented with PayPal's embedded payment interface to complete 
+          your transaction securely.
         </p>
         
         <h3>3.2 Payment Methods</h3>
         <p>
-          Through Barion, we accept the following payment methods:
+          Through PayPal, we accept the following payment methods:
         </p>
         <ul>
-          <li>Credit/Debit Cards (Visa, Mastercard)</li>
-          <li>Barion Balance</li>
-          <li>Google Pay (where available)</li>
-          <li>Apple Pay (where available)</li>
+          <li>Credit/Debit Cards (Visa, Mastercard, American Express)</li>
+          <li>PayPal Balance</li>
+          <li>Bank Accounts linked to PayPal</li>
+          <li>PayPal Credit (where available)</li>
+          <li>Venmo (in supported regions)</li>
         </ul>
         
         <div className="my-6">
@@ -62,14 +65,30 @@ export default function TermsPage() {
         <h3>3.3 Processing Time</h3>
         <p>
           Donations are typically processed immediately. You will receive confirmation of your donation 
-          via email once the payment is complete. Donation acknowledgments are typically issued within 24 hours.
+          via email once the payment is complete. PayPal will provide an instant receipt, and we may send 
+          an additional donation acknowledgment within 24 hours.
         </p>
         
-        <h3>3.4 Fulfillment Information</h3>
+        <h3>3.4 Currency & Cross-Border Transactions</h3>
         <p>
-          Donations are processed before the service is provided. After your payment is confirmed, you will 
-          immediately gain access to any associated benefits (such as premium content access). There is no 
-          delivery required as all services are provided digitally through our platform.
+          We accept donations in various currencies including USD, EUR, and CZK. If you choose to donate in a 
+          currency different from your primary payment method currency, PayPal may apply a currency conversion 
+          fee according to their current rates. These conversion fees are determined solely by PayPal and are 
+          not within our control.
+        </p>
+        
+        <h3>3.5 Fulfillment Information</h3>
+        <p>
+          Donations are processed before any premium service is provided. After your payment is confirmed, you will 
+          immediately gain access to any associated benefits (such as premium content access if applicable). There is no 
+          physical delivery required as all services are provided digitally through our platform.
+        </p>
+        
+        <h3>3.6 Refund Policy</h3>
+        <p>
+          As donations are voluntary contributions to support our service, they are generally non-refundable. 
+          However, in case of accidental or duplicate donations, please contact us within 7 days of the transaction, 
+          and we will consider refund requests on a case-by-case basis.
         </p>
         
         <h2>4. Service Usage</h2>
@@ -104,12 +123,12 @@ export default function TermsPage() {
           By using our service, you consent to such processing and you warrant that all data provided by you is accurate.
         </p>
         
-        <h3>7.1 Barion Pixel Usage</h3>
+        <h3>7.1 PayPal Data Handling</h3>
         <p>
-          Our website uses Barion Pixel, a tool provided by Barion Payment Inc., to prevent fraudulent transactions and
-          enhance payment security. The Barion Pixel collects information about your browsing behavior, device information,
-          and interactions with our site. For more information about how Barion processes this data, please refer to
-          <a href="https://www.barion.com/en/privacy-policy/" target="_blank" rel="noopener noreferrer"> Barion's Privacy Policy</a>.
+          When making a donation through PayPal, your payment information is handled directly by PayPal and subject to 
+          their privacy practices and security measures. We do not store your complete payment details on our servers. 
+          For more information about how PayPal processes your personal data, please refer to
+          <a href="https://www.paypal.com/us/webapps/mpp/ua/privacy-full" target="_blank" rel="noopener noreferrer"> PayPal's Privacy Policy</a>.
         </p>
         
         <h2>8. Governing Law</h2>

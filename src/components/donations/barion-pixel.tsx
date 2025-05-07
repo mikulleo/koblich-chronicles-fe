@@ -1,3 +1,4 @@
+// src/donations/barion-pixel.tsx
 'use client';
 
 import { useEffect } from 'react';

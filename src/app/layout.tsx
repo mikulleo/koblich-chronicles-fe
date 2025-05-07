@@ -4,7 +4,6 @@ import { Inter, Manrope } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
-import BarionPixel from "@/components/donations/barion-pixel"
 import AnalyticsProvider from "@/providers/AnalyticsProvider"
 import { ThemeProvider } from "@/providers/ThemeProviders"
 
@@ -37,7 +36,6 @@ export default function RootLayout({
 }>) {
   // Get environment variables
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  const barionPosKey = process.env.NEXT_PUBLIC_BARION_POS_KEY;
   console.debug('[RootLayout] NEXT_PUBLIC_GA_MEASUREMENT_ID =', gaMeasurementId);
   
   return (
@@ -45,12 +43,7 @@ export default function RootLayout({
       <body>
         {/* Wrap application in Analytics Provider */}
         <ThemeProvider>
-        <AnalyticsProvider gaMeasurementId={gaMeasurementId}>
-          {/* Add Barion Pixel for fraud prevention */}
-          {barionPosKey && (
-            <BarionPixel posKey={barionPosKey} />
-          )}
-          
+        <AnalyticsProvider gaMeasurementId={gaMeasurementId}>          
           <MainLayout>
             {children}
           </MainLayout>
