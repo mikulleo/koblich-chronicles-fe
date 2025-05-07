@@ -45,11 +45,13 @@ export default function PayPalButton({
         if (container) container.innerHTML = ''
 
         // Render the PayPal button
+        
         window.paypal
           .Buttons({
+            fundingSource: window.paypal.FUNDING.CARD,
             style: {
               layout: 'vertical',
-              color: 'blue',
+              color: 'black',
               shape: 'rect',
               label: 'paypal',
             },
