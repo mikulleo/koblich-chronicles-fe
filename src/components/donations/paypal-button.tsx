@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { useScript } from '@/hooks/use-script'
 import { Spinner } from '@/components/ui/spinner'
 
 declare global {
