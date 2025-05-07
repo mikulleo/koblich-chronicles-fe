@@ -1,6 +1,8 @@
+// src/donations/thank-you-content.tsx
+
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,18 +10,36 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle, HeartHandshake, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import PaymentMethodLogos from '@/components/donations/payment-method-logos'
+import apiClient from '@/lib/api/client'
 
 export function ThankYouContent() {
   const searchParams = useSearchParams()
-  const paymentId = searchParams.get('paymentId')
+  const orderId = searchParams.get('orderId')
+  const [donationDetails, setDonationDetails] = useState<any>(null)
 
   useEffect(() => {
-    if (paymentId) {
-      console.log('Payment ID:', paymentId)
+    if (orderId) {
+      console.log('Order ID:', orderId)
+      
+      // Get donation details if needed
+      const fetchDonationDetails = async () => {
+        try {
+          // Fix the URL - remove the duplicate /api/
+          const response = await apiClient.get(`/paypal-capture?orderId=${orderId}`)
+          if (response.data.success) {
+            setDonationDetails(response.data)
+          }
+        } catch (error) {
+          console.error('Error fetching donation details:', error)
+        }
+      }
+      
+      fetchDonationDetails()
     }
-  }, [paymentId])
+  }, [orderId])
 
   return (
+    // Rest of your component remains the same
     <motion.div 
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
@@ -27,6 +47,7 @@ export function ThankYouContent() {
       className="max-w-2xl mx-auto"
     >
       <Card className="text-center">
+        {/* Card content remains the same */}
         <CardHeader>
           <div className="flex justify-center mb-6">
             <div className="bg-primary/10 rounded-full p-4">

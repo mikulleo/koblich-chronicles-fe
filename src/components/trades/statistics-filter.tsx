@@ -64,15 +64,26 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
     fetchTickers();
   }, []);
 
-  // Update date range when custom dates change
+  // Initialize dateRange when filters change (only if coming from external source)
   useEffect(() => {
-    if (filters.timePeriod === "custom" && dateRange.from && dateRange.to) {
-      onFilterChange({
-        startDate: format(dateRange.from, "yyyy-MM-dd"),
-        endDate: format(dateRange.to, "yyyy-MM-dd"),
+    // Only update local state if the date values actually changed and are not undefined
+    const newFromDate = filters.startDate ? new Date(filters.startDate) : undefined;
+    const newToDate = filters.endDate ? new Date(filters.endDate) : undefined;
+    
+    const currentFromStr = dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+    const currentToStr = dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+    
+    // Check if we need to update our local state based on props
+    if (
+      (filters.startDate !== currentFromStr || filters.endDate !== currentToStr) &&
+      (filters.startDate || filters.endDate)
+    ) {
+      setDateRange({
+        from: newFromDate,
+        to: newToDate,
       });
     }
-  }, [dateRange, filters.timePeriod, onFilterChange]);
+  }, [filters.startDate, filters.endDate]);
 
   // Handle time period change
   const handleTimePeriodChange = (value: string) => {
@@ -81,6 +92,19 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
       // Clear custom date range if not in custom mode
       ...(value !== "custom" && { startDate: undefined, endDate: undefined })
     });
+  };
+
+  // Handle date range selection
+  const handleDateRangeSelect = (range: { from?: Date; to?: Date }) => {
+    setDateRange({ from: range.from, to: range.to });
+    
+    // Only update parent if we have both dates
+    if (range.from && range.to) {
+      onFilterChange({
+        startDate: format(range.from, "yyyy-MM-dd"),
+        endDate: format(range.to, "yyyy-MM-dd"),
+      });
+    }
   };
 
   return (
@@ -141,7 +165,7 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
                     mode="range"
                     defaultMonth={dateRange.from}
                     selected={dateRange}
-                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                    onSelect={handleDateRangeSelect}
                     numberOfMonths={2}
                   />
                 </PopoverContent>

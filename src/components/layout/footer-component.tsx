@@ -12,7 +12,7 @@ export function FooterComponent() {
           
           <div className="text-xs text-center text-muted-foreground max-w-md mx-auto">
             <p>
-              Payment processing provided by Barion Payment Inc. By using our services, you agree to our{' '}
+              Payment processing provided by PayPal. By using our services, you agree to our{' '}
               <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link> and{' '}
               <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
             </p>

@@ -1,3 +1,4 @@
+// src/donations/payment-method-logos.tsx
 import React from 'react';
 import Image from 'next/image';
 
@@ -29,11 +30,11 @@ const PaymentMethodLogos: React.FC<PaymentMethodLogosProps> = ({
       )}
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {/* Barion Logo */}
+        {/* PayPal Logo */}
         <div className="relative" style={{ width: width * 2.5, height }}>
           <Image
-            src="/barion.png"
-            alt="Barion Payment"
+            src="/PayPal_logo.svg"
+            alt="PayPal"
             width={width * 2.5}
             height={height}
             className="object-contain"
@@ -63,24 +64,13 @@ const PaymentMethodLogos: React.FC<PaymentMethodLogosProps> = ({
             />
           </div>
 
-          {/* Apple Pay Logo */}
-          <div className="relative" style={{ width: width * 1.5, height }}>
+          {/* American Express Logo */}
+          <div className="relative" style={{ width, height: height * 0.8 }}>
             <Image
-              src="/Apple_Pay_logo.png"
-              alt="Apple Pay"
-              width={width * 1.5}
-              height={height}
-              className="object-contain"
-            />
-          </div>
-
-          {/* Google Pay Logo */}
-          <div className="relative" style={{ width: width * 1.5, height }}>
-            <Image
-              src="/Google_Pay_Logo.webp"
-              alt="Google Pay"
-              width={width * 1.5}
-              height={height}
+              src="/amex-logo.svg"
+              alt="American Express"
+              width={width}
+              height={height * 0.8}
               className="object-contain"
             />
           </div>

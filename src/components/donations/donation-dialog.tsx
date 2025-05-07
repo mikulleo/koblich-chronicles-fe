@@ -1,7 +1,9 @@
+// src/donations/donation-dialog.tsx
+
 'use client'
 
 import React, { useState } from 'react'
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { HeartIcon } from 'lucide-react'
 import { DonationForm } from './donation-form'
@@ -22,6 +24,7 @@ export function DonationDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
+        <DialogTitle className="sr-only">Donation Form</DialogTitle>
         <DonationForm onSuccess={handleSuccess} />
       </DialogContent>
     </Dialog>

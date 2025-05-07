@@ -1,3 +1,4 @@
+// src/donations/donation-form.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -16,16 +17,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import apiClient from '@/lib/api/client';
-import { BarionTrackProduct } from './barion-pixel';
 import PaymentMethodLogos from './payment-method-logos';
 import { useAnalytics } from '@/hooks/use-analytics';
-
-// Spinner for submit button
-const Spinner = ({ className = '' }) => (
-  <div
-    className={`animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full ${className}`}
-  />
-);
+import PayPalButton from './paypal-button';
+import { Spinner } from '@/components/ui/spinner';
 
 interface DonationFormProps {
   onSuccess?: () => void;
@@ -34,26 +29,26 @@ interface DonationFormProps {
 export function DonationForm({ onSuccess }: DonationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customMode, setCustomMode] = useState(false);
-  const analytics = useAnalytics(); // Use our analytics hook
+  const [showPayPalButtons, setShowPayPalButtons] = useState(false);
+  const analytics = useAnalytics();
 
   // presets by currency
   const presetsByCurrency: Record<string, number[]> = {
-    CZK: [100, 200, 500, 1000],
     USD: [5, 10, 20, 50],
     EUR: [5, 10, 20, 50],
+    CZK: [100, 200, 500, 1000],
   };
 
   const [formData, setFormData] = useState({
-    amount: 200,
-    currency: 'CZK',
+    amount: 10,
+    currency: 'USD',
     donorName: '',
     donorEmail: '',
     message: '',
     termsAccepted: false,
   });
 
-  const presets = presetsByCurrency[formData.currency] || presetsByCurrency.CZK;
-  const productId = 'donation-koblich-chronicles';
+  const presets = presetsByCurrency[formData.currency] || presetsByCurrency.USD;
   
   // Handle currency change
   const handleCurrencyChange = (newCurrency: string) => {
@@ -90,58 +85,18 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const { amount, currency, donorName, donorEmail, message } = formData;
-      const numAmount = Number(amount);
+    // Track donation initiated event
+    analytics.trackDonation(formData.amount, formData.currency);
+    analytics.trackEvent('donation_form_submitted', {
+      currency: formData.currency,
+      value: formData.amount,
+      has_name: !!formData.donorName,
+      has_email: !!formData.donorEmail,
+      has_message: !!formData.message,
+    });
 
-      // Track donation initiated event
-      analytics.trackDonation(numAmount, currency);
-      analytics.trackEvent('donation_form_submitted', {
-        currency: currency,
-        value: numAmount,
-        has_name: !!donorName,
-        has_email: !!donorEmail,
-        has_message: !!message,
-      });
-
-      const response = await apiClient.post('/donations', {
-        amount: numAmount,
-        currency,
-        donorName,
-        donorEmail,
-        message,
-      });
-
-      const data = response.data;
-      if (data.gatewayUrl) {
-        // Track successful donation redirect
-        analytics.trackEvent('donation_redirect', {
-          donation_id: data.donationId,
-          payment_id: data.paymentId,
-          currency: currency,
-          value: numAmount,
-        });
-
-        toast.success('Redirecting to payment gateway...');
-        window.location.href = data.gatewayUrl;
-        onSuccess?.();
-      } else {
-        // Track donation error
-        analytics.trackEvent('donation_error', {
-          error: data.error || 'Unknown error',
-          currency: currency,
-          value: numAmount,
-        });
-
-        toast.error(data.error || 'Payment initialization failed.');
-      }
-    } catch (error) {
-      console.error('Donation error:', error);
-      toast.error('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Show PayPal buttons instead of redirecting
+    setShowPayPalButtons(true);
   };
 
   const handleAmountInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,25 +108,88 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
     }
   };
 
+  const handlePayPalSuccess = async (details: any) => {
+    setIsSubmitting(true);
+    try {
+      // Record the donation in your system
+      await apiClient.post('/donations', {
+        amount: formData.amount,
+        currency: formData.currency,
+        donorName: formData.donorName,
+        donorEmail: formData.donorEmail,
+        message: formData.message,
+        paymentId: details.id,
+        status: 'completed',
+        metadata: details,
+      });
+
+      // Track successful donation
+      analytics.trackEvent('donation_completed', {
+        payment_id: details.id,
+        currency: formData.currency,
+        value: formData.amount,
+      });
+
+      toast.success('Thank you for your donation!');
+      
+      // Redirect to thank you page
+      window.location.href = `/donation/thank-you?orderId=${details.id}`;
+      
+      onSuccess?.();
+    } catch (error) {
+      console.error('Error recording donation:', error);
+      toast.error('Your donation was processed, but we had an error recording it. Please contact support.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePayPalError = (error: any) => {
+    console.error('PayPal error:', error);
+    toast.error('There was an error processing your donation. Please try again.');
+    setShowPayPalButtons(false);
+  };
+
+  const handlePayPalCancel = () => {
+    toast.info('Donation cancelled');
+    setShowPayPalButtons(false);
+  };
+
   return (
-    <>
-      <BarionTrackProduct
-        productId={productId}
-        title="Donation to Koblich Chronicles"
-        price={formData.amount}
-        currency={formData.currency}
-      />
+    <div className="space-y-6">
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-semibold">Support Koblich Chronicles</h2>
+        <p className="text-sm text-muted-foreground">
+          Your donation helps keep this resource available to everyone
+        </p>
+      </div>
 
-      <div className="space-y-6">
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-semibold">Support Koblich Chronicles</h2>
-          <p className="text-sm text-muted-foreground">
-            Your donation helps keep this resource available to everyone
-          </p>
+      {showPayPalButtons ? (
+        <div className="space-y-4">
+          <div className="p-4 bg-muted rounded-lg text-center">
+            <p className="font-medium">Donating {formData.amount} {formData.currency}</p>
+            {formData.donorName && <p className="text-sm">From: {formData.donorName}</p>}
+          </div>
+          
+          <PayPalButton
+            amount={formData.amount}
+            currency={formData.currency}
+            onSuccess={handlePayPalSuccess}
+            onError={handlePayPalError}
+            onCancel={handlePayPalCancel}
+          />
+          
+          <Button
+            variant="outline"
+            className="w-full mt-2"
+            onClick={() => setShowPayPalButtons(false)}
+          >
+            Back to donation form
+          </Button>
         </div>
-
+      ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Currency Selection - Moved above amount presets */}
+          {/* Currency Selection */}
           <div className="space-y-2">
             <Label htmlFor="currency">Currency</Label>
             <Select
@@ -182,9 +200,9 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
                 <SelectValue placeholder="Select Currency" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CZK">Czech Koruna (CZK)</SelectItem>
-                <SelectItem value="EUR">Euro (EUR)</SelectItem>
                 <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                <SelectItem value="CZK">Czech Koruna (CZK)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -350,11 +368,10 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            Secured by Barion Payment Inc., an EU-licensed financial
-            institution. Your payment information is securely processed.
+            Secured by PayPal, a trusted payment processor. Your payment information is handled securely.
           </p>
         </form>
-      </div>
-    </>
+      )}
+    </div>
   );
 }

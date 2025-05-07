@@ -20,6 +20,10 @@ apiClient.interceptors.request.use((config) => {
     }
   }
 
+  // Make sure URL doesn't have duplicate /api/ prefix
+  if (config.url && config.url.startsWith('/api/')) {
+    config.url = config.url.substring(4); // Remove leading /api/
+  }
 
   // Add pagination limit to all GET requests if not already present
   if (config.method === 'get') {
