@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/spinner'
 
 declare global {
   interface Window {
-    paypal: any
+    paypal: any;
   }
 }
 
@@ -27,31 +27,25 @@ export default function PayPalButton({
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const [scriptError, setScriptError] = useState<Error | null>(null)
   const paypalContainerRef = useRef<HTMLDivElement>(null)
+  const cardContainerRef = useRef<HTMLDivElement>(null)
   const scriptRef = useRef<HTMLScriptElement | null>(null)
+  const buttonsInstanceRef = useRef<any>(null)
+  const cardButtonsInstanceRef = useRef<any>(null)
+  const isMountedRef = useRef(true) // Track component mount state
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
-
+  
+  // Set isMounted to false when component unmounts
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
-      if (window.paypal) {
-        try {
-          if (paypalContainerRef.current) {
-            paypalContainerRef.current.innerHTML = '';
-          }
-          const cardContainer = document.getElementById('card-button-container');
-          if (cardContainer) {
-            cardContainer.innerHTML = '';
-          }
-        } catch (err) {
-          console.warn('Error cleaning up PayPal buttons:', err);
-        }
-      }
-    };
-  }, []);
-
+      isMountedRef.current = false
+    }
+  }, [])
+  
   // Load PayPal script
   useEffect(() => {
     if (!clientId || scriptLoaded) return
-
+    
     const loadScript = () => {
       // Check if script already exists
       const existingScript = document.querySelector(
@@ -65,19 +59,20 @@ export default function PayPalButton({
 
       // Create script element
       const script = document.createElement('script')
-      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&commit=true&disable-funding=paylater,venmo&enable-funding=card`
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&commit=true&disable-funding=paylater,venmo`
       script.async = true
       script.dataset.clientId = clientId
 
-      const cspNonce = document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content'); // Example: get from a meta tag
-    if (cspNonce) {
-      script.setAttribute('data-csp-nonce', cspNonce);
-    }
-    
-      script.onload = () => setScriptLoaded(true)
+      script.onload = () => {
+        if (isMountedRef.current) {
+          setScriptLoaded(true)
+        }
+      }
       script.onerror = (e) => {
         console.error('PayPal script loading error:', e)
-        setScriptError(new Error('Failed to load PayPal script'))
+        if (isMountedRef.current) {
+          setScriptError(new Error('Failed to load PayPal script'))
+        }
       }
 
       document.body.appendChild(script)
@@ -88,13 +83,35 @@ export default function PayPalButton({
 
     // Cleanup
     return () => {
-      if (scriptRef.current && document.body.contains(scriptRef.current)) {
-        document.body.removeChild(scriptRef.current)
-      }
+      // Don't immediately remove the script as it might still be in use
+      // In a real app, you might want to check if any other PayPal components are still active
+      // before removing the script
     }
   }, [clientId, currency, scriptLoaded])
 
-  // Render buttons when script is loaded
+  // Main cleanup effect that runs on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        // Clear containers if they still exist
+        if (paypalContainerRef.current) {
+          paypalContainerRef.current.innerHTML = ''
+        }
+        
+        if (cardContainerRef.current) {
+          cardContainerRef.current.innerHTML = ''
+        }
+        
+        // Reset instance refs
+        buttonsInstanceRef.current = null
+        cardButtonsInstanceRef.current = null
+      } catch (err) {
+        console.warn('PayPal cleanup error:', err)
+      }
+    }
+  }, [])
+
+  // Render PayPal buttons when script is loaded
   useEffect(() => {
     // Only proceed if script is loaded and container exists
     if (!scriptLoaded || !window.paypal || !paypalContainerRef.current) return
@@ -105,127 +122,184 @@ export default function PayPalButton({
     }
 
     try {
-      window.paypal
-        .Buttons({
-          // Explicitly set to only show PayPal option
-          fundingSource: window.paypal.FUNDING.PAYPAL,
-          style: {
-            layout: 'vertical',
-            color: 'gold',
-            shape: 'rect',
-            label: 'paypal'
-          },
-          createOrder: (_data: any, actions: any) => {
-            return actions.order.create({
-              purchase_units: [
-                {
-                  description: 'Donation to Koblich Chronicles',
-                  amount: {
-                    currency_code: currency,
-                    value: amount.toFixed(2),
-                  },
+      // Create buttons with proper error handling
+      const buttonOptions = {
+        fundingSource: window.paypal.FUNDING.PAYPAL,
+        style: {
+          layout: 'vertical',
+          color: 'gold',
+          shape: 'rect',
+          label: 'paypal'
+        },
+        createOrder: (_data: any, actions: any) => {
+          return actions.order.create({
+            purchase_units: [
+              {
+                description: 'Donation to Koblich Chronicles',
+                amount: {
+                  currency_code: currency,
+                  value: amount.toFixed(2),
                 },
-              ],
-              application_context: {
-                shipping_preference: 'NO_SHIPPING',
-                user_action: 'PAY_NOW',
-                landing_page: 'BILLING',
               },
+            ],
+            application_context: {
+              shipping_preference: 'NO_SHIPPING',
+              user_action: 'PAY_NOW',
+              landing_page: 'BILLING',
+            },
+          })
+        },
+        onApprove: async (data: any, actions: any) => {
+          try {
+            // Check if component is still mounted
+            if (!isMountedRef.current) return
+            
+            console.log('PayPal order approved with ID:', data.orderID);
+            onSuccess({
+              orderId: data.orderID
             })
-          },
-          onApprove: async (data: any, actions: any) => {
-            try {
-              // Log the order ID to verify it's present
-              console.log('PayPal order approved with ID:', data.orderID);
-              
-              // Ensure we pass the correct property name for orderID
-              onSuccess({
-                orderId: data.orderID // Use orderId (not orderID) to match backend expectations
-                //paymentSource: 'paypal'
-              })
-            } catch (err) {
-              console.error('Error handling PayPal approval:', err)
+          } catch (err) {
+            console.error('Error handling PayPal approval:', err)
+            if (isMountedRef.current) {
               onError(err)
             }
-          },
-          onCancel,
-          onError
-        })
-        .render(paypalContainerRef.current)
+          }
+        },
+        onCancel: () => {
+          if (isMountedRef.current) {
+            onCancel()
+          }
+        },
+        onError: (err: any) => {
+          console.error('PayPal button error:', err)
+          if (isMountedRef.current) {
+            onError(err)
+          }
+        }
+      }
+      
+      // Only render if container is still in DOM
+      if (document.body.contains(paypalContainerRef.current)) {
+        const buttons = window.paypal.Buttons(buttonOptions)
+        
+        // Store instance for cleanup
+        buttonsInstanceRef.current = buttons
+        
+        // Check if eligible to render
+        if (buttons.isEligible()) {
+          buttons.render(paypalContainerRef.current)
+        } else {
+          console.warn('PayPal buttons not eligible to render')
+        }
+      }
     } catch (err) {
       console.error('Error rendering PayPal buttons:', err)
-      onError(err)
+      if (isMountedRef.current) {
+        onError(err)
+      }
+    }
+    
+    // Cleanup this specific instance
+    return () => {
+      buttonsInstanceRef.current = null
     }
   }, [scriptLoaded, amount, currency, onSuccess, onError, onCancel])
 
-  // Separately render card button when PayPal script is loaded
+  // Separately render card buttons
   useEffect(() => {
-    // Only proceed if script is loaded and container exists
     if (!scriptLoaded || !window.paypal) return
     
-    const cardContainer = document.getElementById('card-button-container')
-    if (!cardContainer) return
+    // Get container by ref instead of ID
+    if (!cardContainerRef.current) return
     
     // Clear existing content
-    if (cardContainer.firstChild) {
-      cardContainer.innerHTML = ''
+    if (cardContainerRef.current.firstChild) {
+      cardContainerRef.current.innerHTML = ''
     }
     
     try {
-      // This renders a separate card-only button
-      window.paypal
-        .Buttons({
-          fundingSource: window.paypal.FUNDING.CARD,
-          style: {
-            layout: 'vertical',
-            color: 'black',
-            shape: 'rect',
-            label: 'pay'
-          },
-          createOrder: (_data: any, actions: any) => {
-            return actions.order.create({
-              purchase_units: [
-                {
-                  description: 'Donation to Koblich Chronicles',
-                  amount: {
-                    currency_code: currency,
-                    value: amount.toFixed(2),
-                  },
+      // Skip rendering if not mounted
+      if (!isMountedRef.current) return
+      
+      // Only render if container is still in DOM
+      if (!document.body.contains(cardContainerRef.current)) return
+      
+      const cardButtonOptions = {
+        fundingSource: window.paypal.FUNDING.CARD,
+        style: {
+          layout: 'vertical',
+          color: 'black',
+          shape: 'rect',
+          label: 'pay'
+        },
+        createOrder: (_data: any, actions: any) => {
+          return actions.order.create({
+            purchase_units: [
+              {
+                description: 'Donation to Koblich Chronicles',
+                amount: {
+                  currency_code: currency,
+                  value: amount.toFixed(2),
                 },
-              ],
-              application_context: {
-                shipping_preference: 'NO_SHIPPING',
-                user_action: 'PAY_NOW',
-                landing_page: 'BILLING',
               },
+            ],
+            application_context: {
+              shipping_preference: 'NO_SHIPPING',
+              user_action: 'PAY_NOW',
+              landing_page: 'BILLING',
+            },
+          })
+        },
+        onApprove: async (data: any, actions: any) => {
+          try {
+            if (!isMountedRef.current) return
+            
+            console.log('Card payment approved with ID:', data.orderID);
+            onSuccess({
+              orderId: data.orderID,
+              paymentSource: 'card'
             })
-          },
-          onApprove: async (data: any, actions: any) => {
-            try {
-              // Log the order ID to verify it's present
-              console.log('Card payment approved with ID:', data.orderID);
-              
-              // Ensure we pass the correct property name for orderID
-              onSuccess({
-                orderId: data.orderID, // Use orderId (not orderID) to match backend expectations
-                paymentSource: 'card'
-              })
-            } catch (err) {
-              console.error('Error handling card approval:', err)
+          } catch (err) {
+            console.error('Error handling card approval:', err)
+            if (isMountedRef.current) {
               onError(err)
             }
-          },
-          onCancel,
-          onError
-        })
-        .render('#card-button-container')
+          }
+        },
+        onCancel: () => {
+          if (isMountedRef.current) {
+            onCancel()
+          }
+        },
+        onError: (err: any) => {
+          console.error('Card button error:', err)
+          if (isMountedRef.current) {
+            onError(err)
+          }
+        }
+      }
+      
+      const cardButtons = window.paypal.Buttons(cardButtonOptions)
+      
+      // Store instance for cleanup
+      cardButtonsInstanceRef.current = cardButtons
+      
+      // Only render if eligible
+      if (cardButtons.isEligible()) {
+        cardButtons.render(cardContainerRef.current)
+      }
     } catch (err) {
       console.error('Error rendering card button:', err)
-      // Don't call onError here - it's not critical if this fails
+      // Don't call onError for card button failures
+    }
+    
+    // Cleanup this specific instance
+    return () => {
+      cardButtonsInstanceRef.current = null
     }
   }, [scriptLoaded, amount, currency, onSuccess, onError, onCancel])
 
-  // Render UI based on script loading state
+  // UI rendering
   if (!clientId) {
     return (
       <div className="p-4 text-center border border-destructive bg-destructive/10 rounded-md">
@@ -254,7 +328,7 @@ export default function PayPalButton({
   return (
     <div className="w-full space-y-4">
       <div ref={paypalContainerRef} className="w-full min-h-[50px]"></div>
-      <div id="card-button-container" className="w-full min-h-[50px]"></div>
+      <div ref={cardContainerRef} id="card-button-container" className="w-full min-h-[50px]"></div>
     </div>
   )
 }
