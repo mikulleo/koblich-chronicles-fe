@@ -66,6 +66,10 @@ export default function PayPalButton({
                 application_context: {
                   shipping_preference: 'NO_SHIPPING',
                 },
+                redirect_urls: {
+                  return_url: window.location.origin + '/donation/thank-you',
+                  cancel_url: window.location.origin,
+},
               })
             },
             onApprove: async (_data: any, actions: any) => {
