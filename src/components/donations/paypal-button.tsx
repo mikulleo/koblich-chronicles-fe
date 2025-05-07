@@ -31,17 +31,12 @@ export default function PayPalButton({
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
 
   useEffect(() => {
-    // Cleanup function for PayPal rendering
     return () => {
-      // When the component unmounts, store a flag that we're unmounting
-      // This helps prevent PayPal from trying to update removed DOM elements
       if (window.paypal) {
         try {
-          // Clear any pending renders or callbacks
           if (paypalContainerRef.current) {
             paypalContainerRef.current.innerHTML = '';
           }
-          
           const cardContainer = document.getElementById('card-button-container');
           if (cardContainer) {
             cardContainer.innerHTML = '';
@@ -73,6 +68,12 @@ export default function PayPalButton({
       script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&commit=true&disable-funding=paylater,venmo`
       script.async = true
       script.dataset.clientId = clientId
+
+      const cspNonce = document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content'); // Example: get from a meta tag
+    if (cspNonce) {
+      script.setAttribute('data-csp-nonce', cspNonce);
+    }
+    
       script.onload = () => setScriptLoaded(true)
       script.onerror = (e) => {
         console.error('PayPal script loading error:', e)
@@ -139,8 +140,8 @@ export default function PayPalButton({
               
               // Ensure we pass the correct property name for orderID
               onSuccess({
-                orderId: data.orderID, // Use orderId (not orderID) to match backend expectations
-                paymentSource: 'paypal'
+                orderId: data.orderID // Use orderId (not orderID) to match backend expectations
+                //paymentSource: 'paypal'
               })
             } catch (err) {
               console.error('Error handling PayPal approval:', err)
