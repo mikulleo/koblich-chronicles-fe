@@ -65,7 +65,7 @@ export default function PayPalButton({
 
       // Create script element
       const script = document.createElement('script')
-      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&commit=true&disable-funding=paylater,venmo`
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&commit=true&disable-funding=paylater,venmo&enable-funding=card`
       script.async = true
       script.dataset.clientId = clientId
 
