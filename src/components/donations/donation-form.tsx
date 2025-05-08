@@ -1,4 +1,3 @@
-// src/donations/donation-form.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -24,9 +23,11 @@ import { Spinner } from '@/components/ui/spinner';
 
 interface DonationFormProps {
   onSuccess?: () => void;
+  onShowPayment?: () => void;
+  onHidePayment?: () => void;
 }
 
-export function DonationForm({ onSuccess }: DonationFormProps) {
+export function DonationForm({ onSuccess, onShowPayment, onHidePayment }: DonationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customMode, setCustomMode] = useState(false);
   const [showPayPalButtons, setShowPayPalButtons] = useState(false);
@@ -95,8 +96,11 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
       has_message: !!formData.message,
     });
 
-    // Show PayPal buttons instead of redirecting
+    // Show PayPal buttons
     setShowPayPalButtons(true);
+    
+    // Notify parent component that payment UI is being shown
+    if (onShowPayment) onShowPayment();
   };
 
   const handleAmountInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,11 +152,24 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
     console.error('PayPal error:', error);
     toast.error('There was an error processing your donation. Please try again.');
     setShowPayPalButtons(false);
+    
+    // Notify parent that payment UI is being hidden
+    if (onHidePayment) onHidePayment();
   };
 
   const handlePayPalCancel = () => {
     toast.info('Donation cancelled');
     setShowPayPalButtons(false);
+    
+    // Notify parent that payment UI is being hidden
+    if (onHidePayment) onHidePayment();
+  };
+
+  const handleBackToForm = () => {
+    setShowPayPalButtons(false);
+    
+    // Notify parent that payment UI is being hidden
+    if (onHidePayment) onHidePayment();
   };
 
   return (
@@ -171,18 +188,20 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
             {formData.donorName && <p className="text-sm">From: {formData.donorName}</p>}
           </div>
           
-          <PayPalButton
-            amount={formData.amount}
-            currency={formData.currency}
-            onSuccess={handlePayPalSuccess}
-            onError={handlePayPalError}
-            onCancel={handlePayPalCancel}
-          />
+          <div className="payment-wrapper">
+            <PayPalButton
+              amount={formData.amount}
+              currency={formData.currency}
+              onSuccess={handlePayPalSuccess}
+              onError={handlePayPalError}
+              onCancel={handlePayPalCancel}
+            />
+          </div>
           
           <Button
             variant="outline"
             className="w-full mt-2"
-            onClick={() => setShowPayPalButtons(false)}
+            onClick={handleBackToForm}
           >
             Back to donation form
           </Button>
