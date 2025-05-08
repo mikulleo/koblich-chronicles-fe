@@ -1,5 +1,3 @@
-// src/donations/donation-dialog.tsx
-
 'use client'
 
 import React, { useState } from 'react'
@@ -23,7 +21,7 @@ export function DonationDialog() {
           Donate
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogTitle className="sr-only">Donation Form</DialogTitle>
         <DonationForm onSuccess={handleSuccess} />
       </DialogContent>
