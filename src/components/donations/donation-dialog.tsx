@@ -21,7 +21,20 @@ export function DonationDialog() {
           Donate
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto" 
+        // Higher z-index to ensure payment UI is properly displayed
+        style={{ zIndex: 1000 }}
+        // Reduce animation to prevent conflicts with payment interface
+        onPointerDownOutside={(e) => {
+          // Prevent closing when clicking inside payment interface iframe
+          if (e.target instanceof HTMLElement && 
+              (e.target.closest('iframe') || 
+               e.target.closest('[data-paypal-button]'))) {
+            e.preventDefault()
+          }
+        }}
+      >
         <DialogTitle className="sr-only">Donation Form</DialogTitle>
         <DonationForm onSuccess={handleSuccess} />
       </DialogContent>
