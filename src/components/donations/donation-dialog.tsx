@@ -23,9 +23,7 @@ export function DonationDialog() {
       </DialogTrigger>
       <DialogContent 
         className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto" 
-        // Higher z-index to ensure payment UI is properly displayed
-        style={{ zIndex: 1000 }}
-        // Reduce animation to prevent conflicts with payment interface
+        // Don't set custom z-index that would break other components
         onPointerDownOutside={(e) => {
           // Prevent closing when clicking inside payment interface iframe
           if (e.target instanceof HTMLElement && 
