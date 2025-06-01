@@ -183,6 +183,7 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
               // Find the appropriate P/L bucket
               const bucket = buckets.find(b => {
                 if (b.range === "No P/L Data") return false; // Skip the no-data bucket
+                if (profitLossPercent === undefined) return false;
                 if (b.upperBound === Infinity) {
                   return profitLossPercent >= b.lowerBound;
                 }
