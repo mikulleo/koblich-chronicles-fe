@@ -1,3 +1,4 @@
+// src/components/trades/trades-tab-view.tsx
 "use client";
 
 import React from "react";

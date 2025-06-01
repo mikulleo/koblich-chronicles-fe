@@ -1,3 +1,5 @@
+// src/components/trades/trades-table.tsx
+
 "use client"
 
 import React, { useState, useEffect } from 'react'

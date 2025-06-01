@@ -1,3 +1,5 @@
+// src/components/trades/statistics-details.tsx
+
 "use client";
 
 import React, { useState } from "react";

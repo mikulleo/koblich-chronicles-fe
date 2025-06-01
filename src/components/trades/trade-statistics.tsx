@@ -1,5 +1,4 @@
-// trade-statistics.tsx
-
+// src/components/trades/trade-statistics.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -8,6 +7,7 @@ import { StatisticsSummary } from "./statistics-summary";
 import { StatisticsDetails } from "./statistics-details";
 import { StatisticsCharts } from "./statistics-charts";
 import { StatisticsByTimeperiod } from "./statistics-by-timeperiod";
+import { StatisticsHistogram } from "./statistics-histogram"; // Add this import
 import { MetricCalculationsInfo } from "./metric-calculation-info";
 import apiClient from "@/lib/api/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -219,6 +219,12 @@ export function TradeStatistics() {
       <StatisticsByTimeperiod 
         viewMode={filters.viewMode}
         statusFilter={filters.statusFilter}
+      />
+      
+      {/* Trade Distribution Histogram - NEW ADDITION */}
+      <StatisticsHistogram 
+        filters={filters}
+        viewMode={filters.viewMode}
       />
       
       {/* Visualizations */}

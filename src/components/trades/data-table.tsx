@@ -1,3 +1,4 @@
+// src/components/trades/data-table.tsx
 "use client"
 
 import {
