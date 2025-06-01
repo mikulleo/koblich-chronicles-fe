@@ -603,7 +603,7 @@ export function TagsStats() {
               quarter.months.forEach(month => {
                 const monthTagCounts = new Map<string, number>();
                 month.weeks.forEach(week => {
-                  week.topTags.forEach(tag => {
+                  week.topTags.forEach((tag: TagWithChartCount & { weekCount: number }) => {
                     quarterTagCounts.set(tag.id, (quarterTagCounts.get(tag.id) || 0) + tag.weekCount);
                     monthTagCounts.set(tag.id, (monthTagCounts.get(tag.id) || 0) + tag.weekCount);
                   });
@@ -745,7 +745,7 @@ export function TagsStats() {
                                       </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1">
-                                      {week.topTags.map((tag, tagIndex) => (
+                                      {week.topTags.map((tag: TagWithChartCount & { weekCount: number }, tagIndex: number) => (
                                         <div
                                           key={tag.id}
                                           className="flex items-center gap-1 px-2 py-1 rounded text-xs border"

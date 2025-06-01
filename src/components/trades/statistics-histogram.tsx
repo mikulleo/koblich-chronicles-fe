@@ -167,7 +167,7 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
           
           // Process every single trade
           allTrades.forEach(trade => {
-            let profitLossPercent;
+            let profitLossPercent: number | undefined;
             let hasValidPLData = false;
             
             // Try to get P/L data based on view mode

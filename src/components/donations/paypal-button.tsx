@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { useScript } from '@/hooks/use-script'
 import { Spinner } from '@/components/ui/spinner'
 
 declare global {
@@ -45,10 +44,10 @@ export default function PayPalButton({
         if (container) container.innerHTML = ''
 
         // Render the PayPal button
-        
         window.paypal
           .Buttons({
             fundingSource: window.paypal.FUNDING.CARD,
+
             style: {
               layout: 'vertical',
               color: 'black',
@@ -69,6 +68,10 @@ export default function PayPalButton({
                 application_context: {
                   shipping_preference: 'NO_SHIPPING',
                 },
+                redirect_urls: {
+                  return_url: window.location.origin + '/donation/thank-you',
+                  cancel_url: window.location.origin,
+},
               })
             },
             onApprove: async (_data: any, actions: any) => {
