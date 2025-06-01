@@ -1,3 +1,5 @@
+// src/components/trades/statistics-filter.tsx
+
 "use client";
 
 import React, { useState, useEffect } from "react";

@@ -1,3 +1,5 @@
+// src/components/trades/statistics-summary.tsx
+
 "use client";
 
 import React from "react";

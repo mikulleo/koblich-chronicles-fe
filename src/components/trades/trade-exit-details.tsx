@@ -1,3 +1,5 @@
+// src/components/trades/trade-exit-details.tsx
+
 "use client"
 
 import React, { useState } from "react"
