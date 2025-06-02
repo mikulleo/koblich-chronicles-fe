@@ -298,7 +298,9 @@ export function ExposureBuckets() {
               <div>
                 <div className="text-2xl font-bold">{trades.length}</div>
                 <div className="text-sm text-muted-foreground">Active Positions</div>
-                <div className="text-xs text-muted-foreground">open + partial trades</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Set(trades.map(trade => trade.ticker.symbol)).size} unique tickers
+                </div>
               </div>
               <div className="space-y-1">
                 <Badge className={`${exposureLevel.bgColor} ${exposureLevel.color}`} variant="secondary">
