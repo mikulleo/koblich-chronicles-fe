@@ -194,15 +194,47 @@ Past performance is not indicative of future results. Markets change constantly,
               </div>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>
-                  Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you’re finding value here, your donations can help keep this project alive.
+                  Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you're finding value here, your donations can help keep this project alive.
                 </p>
                 <p>
                 I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I'm more than happy — it makes it all worthwhile!
                 </p>
-                {/* Import at the top of the file: import { DonationDialog } from '@/components/donation/DonationDialog' */}
+                {/* Main donation dialog */}
                 <div className="mt-4">
-                    <DonationDialog />
+                  <DonationDialog />
+                </div>
+                
+                {/* Fallback donation options */}
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+                  <p className="text-sm text-gray-700 mb-3">
+                    <strong>In case the donation via "Donate" button is not working, you can donate via PayPal directly:</strong>
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    {/* PayPal Link */}
+                    <Button asChild variant="outline" size="sm">
+                      <Link 
+                        href="https://www.paypal.com/donate/?hosted_button_id=HD7Z22B88AYNL" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        PayPal Direct Link
+                      </Link>
+                    </Button>
+                    
+                    {/* QR Code */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">or scan:</span>
+                      <Image
+                        src="/QR_code.png"
+                        alt="PayPal Donation QR Code"
+                        width={60}
+                        height={60}
+                        className="border rounded"
+                      />
+                    </div>
                   </div>
+                </div>
               </div>
             </CardContent>
           </Card>
