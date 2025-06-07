@@ -134,7 +134,11 @@ export function ChartGallery() {
     const fetchCharts = async () => {
       try {
         setChartsLoading(true)
-        const response = await apiClient.get('/charts')
+        const response = await apiClient.get('/charts', {
+        params: {
+          sort: '-timestamp',  // The minus sign indicates descending order
+        }
+      })
         
         if (response.data && response.data.docs) {
           // Map API charts to ChartImage format
