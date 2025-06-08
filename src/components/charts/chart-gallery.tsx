@@ -96,7 +96,7 @@ export function ChartGallery() {
   const [filters, setFilters] = useState<ChartFilters>({
     tickers: initialTickers,
     dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : undefined,
-    timeframes: initialTimeframes.length > 0 ? initialTimeframes : ['daily', 'weekly'],
+    timeframes: initialTimeframes.length > 0 ? initialTimeframes : ['daily', 'weekly', 'monthly', 'intraday'],
     tags: initialTags, // Initialize tags from URL
   })
   
