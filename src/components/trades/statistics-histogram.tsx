@@ -24,6 +24,12 @@ interface Trade {
   id: string;
   profitLossPercent: number;
   status: string;
+  entryDate: string;
+  exits?: Array<{
+    date: string;
+    price: number;
+    shares: number;
+  }>;
   normalizedMetrics?: {
     profitLossPercent: number;
   };
@@ -60,7 +66,7 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
     totalInHistogram: 0,
   });
 
-  // Create buckets from -40% to 40%+ in 2% increments, plus a bucket for trades without P/L data
+  // Create buckets from -40% to 40%+ in 2% increments
   const createBuckets = (): HistogramBucket[] => {
     const buckets: HistogramBucket[] = [];
     let rangeIndex = 0;
@@ -91,82 +97,184 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
       isNegative: false,
     });
     
-    // Add bucket for trades without P/L data (open trades, incomplete data, etc.)
-    buckets.push({
-      range: "No P/L Data",
-      count: 0,
-      lowerBound: -999, // Special value to identify this bucket
-      upperBound: -999,
-      rangeIndex: rangeIndex,
-      color: "#6b7280", // Gray for unknown/incomplete data
-      isNegative: false,
-    });
-    
     return buckets;
   };
 
-  // Fetch trade data and create histogram
+  // Helper function to get completion date for a trade
+  const getTradeCompletionDate = (trade: Trade): Date => {
+    // For open trades, use entry date
+    if (trade.status === 'open') {
+      return new Date(trade.entryDate);
+    }
+    
+    // For closed and partial trades, use the last exit date
+    if (trade.exits && trade.exits.length > 0) {
+      // Find the most recent exit date
+      const lastExitDate = trade.exits.reduce((latest: string, exit: any) => {
+        const exitDate = new Date(exit.date);
+        const latestDate = new Date(latest);
+        return exitDate > latestDate ? exit.date : latest;
+      }, trade.exits[0].date);
+      
+      return new Date(lastExitDate);
+    }
+    
+    // Fallback to entry date if no exits
+    return new Date(trade.entryDate);
+  };
+
+  // Helper function to filter trades by completion date AND status
+  const filterTrades = (trades: Trade[], filters: StatsFilters) => {
+    return trades.filter(trade => {
+      // Apply status filter first
+      if (filters.statusFilter === "closed-only") {
+        if (trade.status !== "closed") {
+          return false;
+        }
+      } else {
+        // Default: include both closed and partial trades
+        if (!["closed", "partial"].includes(trade.status)) {
+          return false;
+        }
+      }
+
+      // Then apply date filtering
+      const completionDate = getTradeCompletionDate(trade);
+      
+      // Get the target date range based on filters
+      let targetStartDate: Date | undefined;
+      let targetEndDate: Date | undefined;
+      
+      if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
+        targetStartDate = new Date(filters.startDate);
+        targetEndDate = new Date(filters.endDate);
+        targetEndDate.setHours(23, 59, 59, 999); // End of day
+      } else if (filters.timePeriod !== "all") {
+        const today = new Date();
+        
+        if (filters.timePeriod === "year") {
+          // This year: January 1st of current year to TODAY
+          targetStartDate = new Date(today.getFullYear(), 0, 1);
+          targetEndDate = new Date(today);
+          targetEndDate.setHours(23, 59, 59, 999);
+        } else if (filters.timePeriod === "month") {
+          // This month: 1st day of current month to TODAY
+          targetStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+          targetEndDate = new Date(today);
+          targetEndDate.setHours(23, 59, 59, 999);
+        } else if (filters.timePeriod === "week") {
+          // This week: Monday of current week to TODAY
+          const day = today.getDay();
+          const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+          targetStartDate = new Date(today.getFullYear(), today.getMonth(), diff);
+          targetEndDate = new Date(today);
+          targetEndDate.setHours(23, 59, 59, 999);
+        }
+      }
+      
+      // Apply date filtering
+      if (targetStartDate && completionDate < targetStartDate) {
+        return false;
+      }
+      
+      if (targetEndDate && completionDate > targetEndDate) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
   useEffect(() => {
     const fetchTradeData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Build query parameters
-        const params = new URLSearchParams();
-        
-        // Handle time period filters
-        if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
-          params.append("where[entryDate][greater_than_equal]", filters.startDate);
-          params.append("where[entryDate][less_than_equal]", filters.endDate);
-        } else if (filters.timePeriod !== "all") {
-          // Set date range based on selected time period
-          const endDate = new Date();
-          const today = new Date();
-          let startDate;
-          
-          if (filters.timePeriod === "year") {
-            // This year: January 1st of current year to today
-            startDate = new Date(today.getFullYear(), 0, 1);
-          } else if (filters.timePeriod === "month") {
-            // This month: 1st day of current month to today
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-          } else if (filters.timePeriod === "week") {
-            // This week: Monday of current week to today
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            startDate = new Date(today.getFullYear(), today.getMonth(), diff);
-          }
-          
-          if (startDate) {
-            params.append("where[entryDate][greater_than_equal]", startDate.toISOString().split("T")[0]);
-          }
-          params.append("where[entryDate][less_than_equal]", endDate.toISOString().split("T")[0]);
-        }
+        // Build the where clause as an object (more reliable than URL params)
+        const whereClause: any = {};
         
         // Add ticker filter if selected
         if (filters.tickerId) {
-          params.append("where[ticker][equals]", filters.tickerId);
+          whereClause.ticker = { equals: filters.tickerId };
         }
         
-        // Add status filter - get all trades (same as stats)
+        // For status filter, we'll apply it client-side to ensure consistency
+        // But we can still optimize the API call by excluding 'open' trades if we only want closed
         if (filters.statusFilter === "closed-only") {
-          params.append("where[status][equals]", "closed");
+          whereClause.status = { equals: "closed" };
         } else {
-          params.append("where[status][in]", "closed,partial");
+          // Fetch both closed and partial trades
+          whereClause.status = { in: ["closed", "partial"] };
         }
         
-        // Fetch trades with profit/loss data
-        const response = await apiClient.get(`/trades?${params.toString()}`);
+        // For date filtering, fetch a wider range to capture trades that might have exits in target period
+        if (filters.timePeriod !== "all") {
+          const today = new Date();
+          let fetchStartDate;
+          
+          if (filters.timePeriod === "year") {
+            // Fetch from beginning of previous year to cover all possible exits in current year
+            fetchStartDate = new Date(today.getFullYear() - 1, 0, 1);
+          } else if (filters.timePeriod === "month") {
+            // Fetch from 3 months ago to cover trades that might exit this month
+            fetchStartDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+          } else if (filters.timePeriod === "week") {
+            // Fetch from 1 month ago to cover trades that might exit this week
+            fetchStartDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+          } else if (filters.timePeriod === "custom" && filters.startDate) {
+            // For custom range, fetch from 3 months before start date
+            const customStart = new Date(filters.startDate);
+            fetchStartDate = new Date(customStart.getFullYear(), customStart.getMonth() - 3, 1);
+          }
+          
+          if (fetchStartDate) {
+            whereClause.entryDate = { 
+              greater_than_equal: fetchStartDate.toISOString().split("T")[0] 
+            };
+          }
+        }
+        
+        // Build query parameters
+        const params = new URLSearchParams();
+        params.append("limit", "1000");
+        params.append("depth", "1");
+        
+        // Convert where clause to URL parameters
+        const encodeWhereClause = (obj: any, prefix = "where") => {
+          for (const [key, value] of Object.entries(obj)) {
+            if (value && typeof value === "object") {
+              if (Array.isArray(value)) {
+                // Handle arrays (for 'in' operations)
+                params.append(`${prefix}[${key}][in]`, value.join(","));
+              } else {
+                // Handle nested objects
+                for (const [nestedKey, nestedValue] of Object.entries(value)) {
+                  params.append(`${prefix}[${key}][${nestedKey}]`, String(nestedValue));
+                }
+              }
+            } else {
+              params.append(`${prefix}[${key}]`, String(value));
+            }
+          }
+        };
+        
+        encodeWhereClause(whereClause);
+        
+        // Fetch trades
+        const response = await apiClient.get(`/trades`);
         
         if (response.data && response.data.docs) {
           const allTrades: Trade[] = response.data.docs;
           
-          // Create buckets and populate with ALL trade data
+          // Apply comprehensive filtering (status + date)
+          const filteredTrades = filterTrades(allTrades, filters);
+          
+          // Create buckets and populate with filtered trade data
           const buckets = createBuckets();
           
-          // Process every single trade
-          allTrades.forEach(trade => {
+          // Process only the filtered trades
+          filteredTrades.forEach(trade => {
             let profitLossPercent: number | undefined;
             let hasValidPLData = false;
             
@@ -182,7 +290,6 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
             if (hasValidPLData) {
               // Find the appropriate P/L bucket
               const bucket = buckets.find(b => {
-                if (b.range === "No P/L Data") return false; // Skip the no-data bucket
                 if (profitLossPercent === undefined) return false;
                 if (b.upperBound === Infinity) {
                   return profitLossPercent >= b.lowerBound;
@@ -193,17 +300,11 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
               if (bucket) {
                 bucket.count++;
               }
-            } else {
-              // Trade has no valid P/L data - put it in the "No P/L Data" bucket
-              const noPLBucket = buckets.find(b => b.range === "No P/L Data");
-              if (noPLBucket) {
-                noPLBucket.count++;
-              }
             }
           });
           
-          // Calculate summary data - now all trades are included
-          const tradesWithPLData = allTrades.filter(trade => {
+          // Calculate summary data - using filtered trades
+          const tradesWithPLData = filteredTrades.filter(trade => {
             if (viewMode === "normalized" && trade.normalizedMetrics?.profitLossPercent !== undefined) {
               return !isNaN(trade.normalizedMetrics.profitLossPercent);
             }
@@ -213,9 +314,9 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
           });
           
           const summary: TradeDataSummary = {
-            totalFetched: allTrades.length,
+            totalFetched: filteredTrades.length,
             totalWithPLData: tradesWithPLData.length,
-            totalInHistogram: allTrades.length, // NOW ALL TRADES ARE IN THE HISTOGRAM
+            totalInHistogram: tradesWithPLData.length, // Only trades with P/L data are shown
           };
           
           setHistogramData(buckets);
@@ -316,27 +417,21 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
         </CardTitle>
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Distribution showing ALL trades by profit/loss percentages in 2% increments. Red bars = losses, green bars = gains, gray = trades without P/L data.
+            Distribution showing {filters.statusFilter === "closed-only" ? "CLOSED" : "CLOSED & PARTIAL"} trades by profit/loss percentages in 2% increments. Red bars = losses, green bars = gains.
           </p>
           
           {/* Data Summary */}
           <div className="flex flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-1">
-              <span className="font-medium">Total trades:</span>
+              <span className="font-medium">
+                {filters.statusFilter === "closed-only" ? "Closed trades:" : "Closed & partial trades:"}
+              </span>
               <span className="text-primary">{tradeDataSummary.totalFetched}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-medium">All shown in histogram:</span>
+              <span className="font-medium">Shown in histogram:</span>
               <span className="text-primary">{tradeDataSummary.totalInHistogram}</span>
             </div>
-            {tradeDataSummary.totalWithPLData < tradeDataSummary.totalFetched && (
-              <div className="flex items-center gap-1">
-                <Info className="h-3 w-3 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  {tradeDataSummary.totalFetched - tradeDataSummary.totalWithPLData} trades in "No P/L Data" bucket
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </CardHeader>
@@ -381,18 +476,6 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
           </ResponsiveContainer>
         </div>
         
-        {/* Additional Info - only show if there are trades without P/L data */}
-        {tradeDataSummary.totalWithPLData < tradeDataSummary.totalFetched && (
-          <Alert className="mt-4">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Note:</strong> {tradeDataSummary.totalFetched - tradeDataSummary.totalWithPLData} trade{tradeDataSummary.totalFetched - tradeDataSummary.totalWithPLData === 1 ? '' : 's'} 
-              {tradeDataSummary.totalFetched - tradeDataSummary.totalWithPLData === 1 ? ' is' : ' are'} shown in the "No P/L Data" bucket because 
-              {tradeDataSummary.totalFetched - tradeDataSummary.totalWithPLData === 1 ? ' it lacks' : ' they lack'} profit/loss data. 
-              This typically happens with open trades that haven't been exited or trades with incomplete data.
-            </AlertDescription>
-          </Alert>
-        )}
       </CardContent>
     </Card>
   );
