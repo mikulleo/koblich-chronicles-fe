@@ -370,6 +370,8 @@ export function TickersShowcase() {
         <DataTable 
           columns={columns} 
           data={tickerTrades}
+          showFilters={false}
+          setShowFilters={() => {}}
           onRowClickAction={(row) => {
               setShowTradesDialog(false);
               
