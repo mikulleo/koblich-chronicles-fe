@@ -1,21 +1,24 @@
 // src/components/trades/data-table.tsx
+
 "use client"
 
+import * as React from "react"
 import {
   ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  SortingState,
   useReactTable,
-  ColumnFiltersState,
-  getFilteredRowModel,
 } from "@tanstack/react-table"
-import * as React from "react"
-import { useState, useEffect } from 'react';
-
-
+import { Filter, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -24,130 +27,231 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChartLine } from "lucide-react"
-import { useAnalytics } from '@/hooks/use-analytics'
-
+import { Trade } from "./columns"
+import { FilterState } from "./trades-table-filters"
+import { isWithinInterval, parseISO } from "date-fns"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   onRowClickAction?: (row: TData) => void
+  filters?: FilterState
+  showFilters: boolean
+  setShowFilters: (show: boolean) => void
+  activeFiltersCount?: number
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData extends Trade, TValue>({
   columns,
   data,
   onRowClickAction,
+  filters,
+  showFilters,
+  setShowFilters,
+  activeFiltersCount,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [rowSelection, setRowSelection] = useState({});
+  
 
-  // Use our analytics hook
-  const analytics = useAnalytics();
+  // Apply custom filters to data
+  const filteredData = React.useMemo(() => {
+    if (!filters) return data
+
+    return data.filter((trade) => {
+      // Type filter
+      if (filters.type.length > 0 && !filters.type.includes(trade.type)) {
+        return false
+      }
+
+      // Ticker filter
+      if (filters.tickers.length > 0 && !filters.tickers.includes(trade.ticker?.symbol || '')) {
+        return false
+      }
+
+      // Date range filter
+      if (filters.dateRange?.from || filters.dateRange?.to) {
+        const tradeDate = parseISO(trade.entryDate)
+        if (filters.dateRange.from && filters.dateRange.to) {
+          if (!isWithinInterval(tradeDate, { 
+            start: filters.dateRange.from, 
+            end: filters.dateRange.to 
+          })) {
+            return false
+          }
+        } else if (filters.dateRange.from) {
+          if (tradeDate < filters.dateRange.from) {
+            return false
+          }
+        } else if (filters.dateRange.to) {
+          if (tradeDate > filters.dateRange.to) {
+            return false
+          }
+        }
+      }
+
+      // Entry price range filter
+      if (trade.entryPrice < filters.entryPriceRange[0] || 
+          trade.entryPrice > filters.entryPriceRange[1]) {
+        return false
+      }
+
+      // Size range filter (convert normalization factor to percentage)
+      const sizePercent = (trade.normalizationFactor || 0) * 100
+      if (sizePercent < filters.sizeRange[0] || sizePercent > filters.sizeRange[1]) {
+        return false
+      }
+
+      // Stop loss range filter
+      if (trade.initialStopLoss < filters.stopLossRange[0] || 
+          trade.initialStopLoss > filters.stopLossRange[1]) {
+        return false
+      }
+
+      // Modified stops filter
+      if (filters.hasModifiedStops !== null) {
+        const hasModifiedStops = trade.modifiedStops && trade.modifiedStops.length > 0
+        if (filters.hasModifiedStops !== hasModifiedStops) {
+          return false
+        }
+      }
+
+      // Exits filter
+      if (filters.hasExits !== null) {
+        const hasExits = trade.exits && trade.exits.length > 0
+        if (filters.hasExits !== hasExits) {
+          return false
+        }
+      }
+
+      // R-Ratio filter (only for trades with R-Ratio values)
+      if (trade.rRatio !== undefined && trade.rRatio !== null) {
+        if (trade.rRatio < filters.rRatioRange[0] || trade.rRatio > filters.rRatioRange[1]) {
+          return false
+        }
+      }
+
+      // Days held filter
+      const calculateDaysHeld = (trade: Trade): number => {
+        const entryDate = new Date(trade.entryDate)
+        let endDate: Date
+        
+        if (trade.status === 'closed' && trade.exits && trade.exits.length > 0) {
+          endDate = trade.exits.reduce((latest, exit) => {
+            const exitDate = new Date(exit.date)
+            return exitDate > latest ? exitDate : latest
+          }, new Date(0))
+        } else {
+          endDate = new Date()
+        }
+        
+        const diffTime = Math.abs(endDate.getTime() - entryDate.getTime())
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      }
+
+      const daysHeld = calculateDaysHeld(trade)
+      if (daysHeld < filters.daysHeldRange[0] || daysHeld > filters.daysHeldRange[1]) {
+        return false
+      }
+
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(trade.status)) {
+        return false
+      }
+
+      return true
+    })
+  }, [data, filters])
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-    onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: "includesString",
     state: {
       sorting,
       columnFilters,
+      columnVisibility,
+      rowSelection,
       globalFilter,
     },
-  });
+    initialState: {
+      pagination: {
+        pageSize: 25,
+      },
+    },
+  })
 
-  // Track filtering and sorting actions
-  useEffect(() => {
-    if (sorting.length > 0) {
-      analytics.trackEvent('trade_table_sorted', {
-        column: sorting[0].id,
-        direction: sorting[0].desc ? 'descending' : 'ascending',
-      });
-    }
-  }, [sorting, analytics]);
-
-  useEffect(() => {
-    if (columnFilters.length > 0) {
-      columnFilters.forEach(filter => {
-        analytics.trackEvent('trade_table_filtered', {
-          column: filter.id,
-          value: String(filter.value),
-        });
-      });
-    }
-  }, [columnFilters, analytics]);
-
-  // Enhanced row click handler with analytics
   const handleRowClick = (row: TData) => {
     if (onRowClickAction) {
-      // Get trade information for analytics
-      const tradeInfo = row as any; // Using any for simplicity
-      
-      analytics.trackTradeView(
-        String(tradeInfo.id || 'unknown'),
-        typeof tradeInfo.ticker === 'object' ? tradeInfo.ticker.symbol : String(tradeInfo.ticker || 'unknown'),
-        tradeInfo.type || 'unknown'
-      );
-      
-      // Additional details for enhanced analytics
-      analytics.trackEvent('trade_row_clicked', {
-        trade_id: tradeInfo.id,
-        ticker: typeof tradeInfo.ticker === 'object' ? tradeInfo.ticker.symbol : tradeInfo.ticker,
-        status: tradeInfo.status,
-        profit_loss: tradeInfo.profitLossAmount,
-        profit_loss_percent: tradeInfo.profitLossPercent,
-        r_ratio: tradeInfo.rRatio,
-        days_held: tradeInfo.daysHeld,
-      });
-      
-      onRowClickAction(row);
+      onRowClickAction(row)
     }
-  };
-
-
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="w-full space-y-4">
+      {/* Search and Filter Controls */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center space-x-2">
           <Input
-            placeholder="Search all columns..."
-            value={globalFilter ?? ""}
+            placeholder="Search all trades..."
+            value={globalFilter}
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="max-w-sm"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Select
-            value={table.getState().pagination.pageSize.toString()}
-            onValueChange={(value) => {
-              table.setPageSize(Number(value))
-            }}
+        
+        {/* Filter Toggle */}
+        <div className="flex items-center gap-3">
+          {(activeFiltersCount || 0) > 0 && (
+            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
+            </Badge>
+          )}
+          
+          <Button 
+            variant={showFilters ? "default" : "outline"} 
+            onClick={() => setShowFilters(!showFilters)}
+            className={showFilters 
+              ? "bg-blue-600 hover:bg-blue-700 text-white" 
+              : "border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950"
+            }
           >
-            <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
-            </SelectTrigger>
-            <SelectContent>
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={pageSize.toString()}>
-                  {pageSize}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {showFilters ? (
+              <>
+                <X className="mr-2 h-4 w-4" />
+                Hide Filters
+              </>
+            ) : (
+              <>
+                <Filter className="mr-2 h-4 w-4" />
+                Column Filters
+              </>
+            )}
+          </Button>
         </div>
       </div>
+
+      {/* Results Count */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {table.getFilteredRowModel().rows.length} of {data.length} trade{data.length !== 1 ? 's' : ''}
+          {filteredData.length !== data.length && ' (filtered)'}
+        </div>
+      </div>
+
+      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -165,9 +269,6 @@ export function DataTable<TData, TValue>({
                     </TableHead>
                   )
                 })}
-                {onRowClickAction && (
-                  <TableHead className="w-14 text-right">Charts</TableHead>
-                )}
               </TableRow>
             ))}
           </TableHeader>
@@ -177,48 +278,43 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  // Removed the onClick handler for the entire row
+                  className={onRowClickAction ? "cursor-pointer hover:bg-muted/50" : ""}
+                  onClick={() => handleRowClick(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
-                  {onRowClickAction && (
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="h-8 px-2 py-0 flex items-center gap-1"
-                        onClick={() => onRowClickAction(row.original)}
-                      >
-                        <ChartLine className="h-4 w-4" />
-                        <span className="text-xs">View</span>
-                      </Button>
-                    </TableCell>
-                  )}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length + (onRowClickAction ? 1 : 0)} className="h-24 text-center">
-                  No results.
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  {filteredData.length === 0 && data.length > 0 
+                    ? "No trades match your filters."
+                    : "No trades found."
+                  }
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            table.getFilteredRowModel().rows.length
-          )}{" "}
-          of {table.getFilteredRowModel().rows.length} entries
+
+      {/* Pagination */}
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex-1 text-sm text-muted-foreground">
+          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          {table.getPageCount()}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="space-x-2">
           <Button
             variant="outline"
             size="sm"

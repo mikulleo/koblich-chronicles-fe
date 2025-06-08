@@ -1,3 +1,5 @@
+// src/components/trades/columns.tsx
+
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
