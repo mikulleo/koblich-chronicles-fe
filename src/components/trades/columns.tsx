@@ -4,7 +4,7 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, MoreHorizontal, AlertTriangle, PackageOpen, XCircle, CheckCircle, Film } from "lucide-react"
-import TradeStoryTimeline from "@/components/trade-story/TradeStoryTimeline"
+//import TradeStoryTimeline from "@/components/trade-story/TradeStoryTimeline"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
