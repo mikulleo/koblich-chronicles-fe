@@ -3,7 +3,8 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, AlertTriangle, PackageOpen, XCircle, CheckCircle } from "lucide-react"
+import { ArrowUpDown, MoreHorizontal, AlertTriangle, PackageOpen, XCircle, CheckCircle, Film } from "lucide-react"
+import TradeStoryTimeline from "@/components/trade-story/TradeStoryTimeline"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -14,6 +15,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Tooltip,
@@ -70,6 +72,7 @@ export interface Trade {
   rRatio?: number
   modifiedStops?: ModifiedStop[];
   exits?: TradeExit[];
+  relatedCharts?: any[];
 }
 
 // Component to render the modified stops modal
@@ -87,14 +90,21 @@ const ModifiedStopsModal = ({
   initialStop: number;
 }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+  // Prevent event bubbling when modal closes
+  setTimeout(() => setIsOpen(open), 0);
+}}>
+      <DialogContent 
+        className="sm:max-w-md max-h-[100vh] flex flex-col" 
+        onClick={(e) => e.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle>Modified Stop Levels</DialogTitle>
           <DialogDescription>
             Stop loss modifications for this trade, from most recent to oldest.
           </DialogDescription>
         </DialogHeader>
+        <div className="flex-1 overflow-y-auto">
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-3 text-sm font-medium text-muted-foreground mb-2">
             <div>Date</div>
@@ -143,6 +153,7 @@ const ModifiedStopsModal = ({
             );
           })}
         </div>
+      </div>
       </DialogContent>
     </Dialog>
   );
@@ -597,4 +608,28 @@ export const columns: ColumnDef<Trade>[] = [
       )
     },
   },
+  /*
+  {
+  id: 'story',
+  header: 'Story',
+  cell: ({ row }) => {
+    const trade = row.original
+    const hasCharts = trade.relatedCharts && trade.relatedCharts.length > 0
+    
+    return hasCharts ? (
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="sm">
+            <Film className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <TradeStoryTimeline tradeId={trade.id} />
+        </DialogContent>
+      </Dialog>
+    ) : (
+      <span className="text-muted-foreground text-sm">No charts</span>
+    )
+  }
+}*/
 ]

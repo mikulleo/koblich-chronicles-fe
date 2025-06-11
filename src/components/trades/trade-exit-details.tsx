@@ -161,8 +161,13 @@ export function TradeExitDetails({
   }
   
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-xl">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      setTimeout(() => setIsOpen(open), 0);
+    }}>
+      <DialogContent 
+        className="sm:max-w-lg max-h-[90vh] flex flex-col" 
+        onClick={(e) => e.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle className="flex justify-between">
             <span>Trade Exit Details</span>
@@ -181,8 +186,9 @@ export function TradeExitDetails({
               : 'No exits recorded for this trade'}
           </DialogDescription>
         </DialogHeader>
-        
+      
         {exits.length > 0 && (
+        <div className="flex-1 overflow-y-auto">
           <div className="mt-4 space-y-6">
             {/* Progress bar showing exit distribution */}
             <div className="space-y-2">
@@ -273,6 +279,7 @@ export function TradeExitDetails({
               </div>
             </div>
           </div>
+        </div>
         )}
       </DialogContent>
     </Dialog>
