@@ -307,7 +307,7 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                 <TableHead>Avg Win %</TableHead>
                 <TableHead>Avg Loss %</TableHead>
                 <TableHead>R-Ratio</TableHead>
-                <TableHead>P/L %</TableHead>
+  
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -370,17 +370,6 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                         viewMode === "normalized"
                           ? yearData.stats.normalized.averageRRatio
                           : yearData.stats.averageRRatio
-                      )}
-                    </TableCell>
-                    <TableCell className={getColorClass(
-                      viewMode === "normalized"
-                        ? yearData.stats.normalized.totalProfitLossPercent
-                        : yearData.stats.totalProfitLossPercent
-                    )}>
-                      {formatPercent(
-                        viewMode === "normalized"
-                          ? yearData.stats.normalized.totalProfitLossPercent
-                          : yearData.stats.totalProfitLossPercent
                       )}
                     </TableCell>
                   </TableRow>
@@ -459,17 +448,6 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                                   viewMode === "normalized"
                                     ? monthData.stats.normalized.averageRRatio
                                     : monthData.stats.averageRRatio
-                                )}
-                              </TableCell>
-                              <TableCell className={getColorClass(
-                                viewMode === "normalized"
-                                  ? monthData.stats.normalized.totalProfitLossPercent
-                                  : monthData.stats.totalProfitLossPercent
-                              )}>
-                                {formatPercent(
-                                  viewMode === "normalized"
-                                    ? monthData.stats.normalized.totalProfitLossPercent
-                                    : monthData.stats.totalProfitLossPercent
                                 )}
                               </TableCell>
                             </TableRow>
