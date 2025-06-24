@@ -400,7 +400,7 @@ export function TagsStats() {
       {/* Best 3-Week Windows for Tags */}
       <Card>
         <CardHeader>
-          <CardTitle>Best 3-Week Performance Windows</CardTitle>
+          <CardTitle>'Tag Most Utilized' 3-Week Windows</CardTitle>
         </CardHeader>
         <CardContent>
           {(() => {
