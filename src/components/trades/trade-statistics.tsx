@@ -64,6 +64,15 @@ export interface StatsMetadata {
   tickerFilter: boolean;
 }
 
+// Trade interface for P/L calculation
+interface Trade {
+  profitLossPercent: number;
+  normalizedMetrics?: {
+    profitLossPercent: number;
+  };
+  status: 'open' | 'partial' | 'closed';
+}
+
 // Supported time periods for filtering
 export type TimePeriod = "all" | "year" | "month" | "week" | "custom";
 
@@ -82,6 +91,7 @@ export function TradeStatistics() {
   const [metadata, setMetadata] = useState<StatsMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   
   // State for filters
   const [filters, setFilters] = useState<StatsFilters>({
@@ -89,6 +99,29 @@ export function TradeStatistics() {
     statusFilter: "all",
     viewMode: "standard",
   });
+
+  // Function to calculate total P/L percentage as simple sum
+  const calculateTotalProfitLossPercent = (trades: Trade[]) => {
+    // Filter trades to only include closed and partial (same as backend filter)
+    const relevantTrades = trades.filter(trade => 
+      trade.status === 'closed' || trade.status === 'partial'
+    );
+
+    // Standard total P/L % - simple sum
+    const standardTotal = relevantTrades.reduce((sum, trade) => {
+      return sum + (trade.profitLossPercent || 0);
+    }, 0);
+
+    // Normalized total P/L % - simple sum of normalized values
+    const normalizedTotal = relevantTrades.reduce((sum, trade) => {
+      return sum + (trade.normalizedMetrics?.profitLossPercent || trade.profitLossPercent || 0);
+    }, 0);
+
+    return {
+      standard: Number(standardTotal.toFixed(2)),
+      normalized: Number(normalizedTotal.toFixed(2))
+    };
+  };
 
   // Fetch statistics data based on filters
   useEffect(() => {
@@ -139,12 +172,32 @@ export function TradeStatistics() {
           params.append("statusFilter", "closed-only");
         }
         
-        // Fetch data
-        const response = await apiClient.get(`/trades/stats?${params.toString()}`);
+        // Fetch both statistics and individual trades for P/L calculation
+        const [statsResponse, tradesResponse] = await Promise.all([
+          apiClient.get(`/trades/stats?${params.toString()}`),
+          apiClient.get(`/trades?${params.toString()}`) // Get all relevant trades
+        ]);
         
-        if (response.data) {
-          setStats(response.data.stats);
-          setMetadata(response.data.metadata);
+        if (statsResponse.data && tradesResponse.data) {
+          const backendStats = statsResponse.data.stats;
+          const backendMetadata = statsResponse.data.metadata;
+          const trades = tradesResponse.data.docs;
+
+          // Calculate client-side total P/L percentages
+          const clientPLCalculation = calculateTotalProfitLossPercent(trades);
+          
+          // Create enhanced stats with client-calculated P/L percentages
+          const enhancedStats: TradeStats = {
+            ...backendStats,
+            totalProfitLossPercent: clientPLCalculation.standard,
+            normalized: {
+              ...backendStats.normalized,
+              totalProfitLossPercent: clientPLCalculation.normalized
+            }
+          };
+
+          setStats(enhancedStats);
+          setMetadata(backendMetadata);
         } else {
           throw new Error("Unexpected response format");
         }
@@ -202,6 +255,8 @@ export function TradeStatistics() {
   // Show stats or no data message
   return (
     <div className="space-y-6">
+
+
       {/* Filters */}
       <StatisticsFilters 
         filters={filters} 

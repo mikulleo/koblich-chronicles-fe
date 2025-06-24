@@ -18,6 +18,15 @@ import apiClient from "@/lib/api/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { TradeStats, StatsMetadata } from "./trade-statistics";
 
+// Trade interface for P/L calculation
+interface Trade {
+  profitLossPercent: number;
+  normalizedMetrics?: {
+    profitLossPercent: number;
+  };
+  status: 'open' | 'partial' | 'closed';
+}
+
 interface TimeperiodStats {
   period: string;
   periodLabel: string;
@@ -40,6 +49,29 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
   
   const currentYear = new Date().getFullYear();
   const year = selectedYear || currentYear;
+  
+  // Function to calculate total P/L percentage as simple sum
+  const calculateTotalProfitLossPercent = (trades: Trade[]) => {
+    // Filter trades to only include closed and partial (same as backend filter)
+    const relevantTrades = trades.filter(trade => 
+      trade.status === 'closed' || trade.status === 'partial'
+    );
+
+    // Standard total P/L % - simple sum
+    const standardTotal = relevantTrades.reduce((sum, trade) => {
+      return sum + (trade.profitLossPercent || 0);
+    }, 0);
+
+    // Normalized total P/L % - simple sum of normalized values
+    const normalizedTotal = relevantTrades.reduce((sum, trade) => {
+      return sum + (trade.normalizedMetrics?.profitLossPercent || trade.profitLossPercent || 0);
+    }, 0);
+
+    return {
+      standard: Number(standardTotal.toFixed(2)),
+      normalized: Number(normalizedTotal.toFixed(2))
+    };
+  };
   
   // Format percentage values
   const formatPercent = (value: number): string => {
@@ -74,14 +106,40 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
           const startDate = `${year}-01-01`;
           const endDate = `${year}-12-31`;
           
-          // Include statusFilter in the API request
-          const response = await apiClient.get(`/trades/stats?startDate=${startDate}&endDate=${endDate}&statusFilter=${statusFilter}`);
+          // Build query parameters
+          const params = new URLSearchParams();
+          params.append("startDate", startDate);
+          params.append("endDate", endDate);
+          params.append("statusFilter", statusFilter);
+          
+          // Fetch both statistics and individual trades for P/L calculation
+          const [statsResponse, tradesResponse] = await Promise.all([
+            apiClient.get(`/trades/stats?${params.toString()}`),
+            apiClient.get(`/trades?${params.toString()}`)
+          ]);
+          
+          const backendStats = statsResponse.data.stats;
+          const backendMetadata = statsResponse.data.metadata;
+          const trades = tradesResponse.data.docs;
+
+          // Calculate client-side total P/L percentages
+          const clientPLCalculation = calculateTotalProfitLossPercent(trades);
+          
+          // Create enhanced stats with client-calculated P/L percentages
+          const enhancedStats: TradeStats = {
+            ...backendStats,
+            totalProfitLossPercent: clientPLCalculation.standard,
+            normalized: {
+              ...backendStats.normalized,
+              totalProfitLossPercent: clientPLCalculation.normalized
+            }
+          };
           
           return {
             period: year.toString(),
             periodLabel: year.toString(),
-            stats: response.data.stats,
-            metadata: response.data.metadata
+            stats: enhancedStats,
+            metadata: backendMetadata
           };
         });
         
@@ -128,16 +186,40 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
         const formattedStartDate = format(startDate, "yyyy-MM-dd");
         const formattedEndDate = format(endDate, "yyyy-MM-dd");
         
-        // Include statusFilter in the API request
-        const response = await apiClient.get(
-          `/trades/stats?startDate=${formattedStartDate}&endDate=${formattedEndDate}&statusFilter=${statusFilter}`
-        );
+        // Build query parameters
+        const params = new URLSearchParams();
+        params.append("startDate", formattedStartDate);
+        params.append("endDate", formattedEndDate);
+        params.append("statusFilter", statusFilter);
+        
+        // Fetch both statistics and individual trades for P/L calculation
+        const [statsResponse, tradesResponse] = await Promise.all([
+          apiClient.get(`/trades/stats?${params.toString()}`),
+          apiClient.get(`/trades?${params.toString()}&limit=10000`)
+        ]);
+        
+        const backendStats = statsResponse.data.stats;
+        const backendMetadata = statsResponse.data.metadata;
+        const trades = tradesResponse.data.docs;
+
+        // Calculate client-side total P/L percentages
+        const clientPLCalculation = calculateTotalProfitLossPercent(trades);
+        
+        // Create enhanced stats with client-calculated P/L percentages
+        const enhancedStats: TradeStats = {
+          ...backendStats,
+          totalProfitLossPercent: clientPLCalculation.standard,
+          normalized: {
+            ...backendStats.normalized,
+            totalProfitLossPercent: clientPLCalculation.normalized
+          }
+        };
         
         return {
           period: `${year}-${month + 1}`,
           periodLabel: format(startDate, "MMMM"),
-          stats: response.data.stats,
-          metadata: response.data.metadata
+          stats: enhancedStats,
+          metadata: backendMetadata
         };
       });
       
@@ -206,6 +288,9 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
             )}
             <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
               {statusFilter === "closed-only" ? "Closed Only" : "Closed & Partial"}
+            </Badge>
+            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-xs">
+              Client P/L
             </Badge>
           </div>
         </CardTitle>

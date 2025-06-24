@@ -107,7 +107,10 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
                         {formatPercent(isNormalized ? stats.normalized.totalProfitLossPercent : stats.totalProfitLossPercent)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        Cumulative percentage profit/loss across all trades.
+                        <div className="space-y-1">
+                          <div>Sum of percentage gains/losses over single trades - this is NOT account equity!</div>
+                          <div className="text-xs">Actual equity calculation needs position sizing & compounding accounted for. Education only here - therefore I'll keep the number under wraps 😉</div>
+                        </div>
                       </TableCell>
                     </TableRow>
                     {/* Profit/Loss $ is intentionally excluded as per requirements */}
