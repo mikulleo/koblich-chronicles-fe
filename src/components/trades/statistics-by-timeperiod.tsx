@@ -289,9 +289,6 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
             <Badge variant="outline" className="bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700">
               {statusFilter === "closed-only" ? "Closed Only" : "Closed & Partial"}
             </Badge>
-            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-xs">
-              Client P/L
-            </Badge>
           </div>
         </CardTitle>
       </CardHeader>
