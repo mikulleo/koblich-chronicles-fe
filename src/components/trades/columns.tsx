@@ -1,14 +1,10 @@
-// src/components/trades/columns.tsx
-
-"use client"
-
+import React, { useState, useCallback } from 'react' // Explicitly import React, useState, and useCallback
+import Link from "next/link"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, MoreHorizontal, AlertTriangle, PackageOpen, XCircle, CheckCircle, Film } from "lucide-react"
-//import TradeStoryTimeline from "@/components/trade-story/TradeStoryTimeline"
+import { ArrowUpDown, Film, XCircle, CheckCircle, AlertTriangle, PackageOpen } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
-import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -163,35 +159,39 @@ const ModifiedStopsModal = ({
 const ModifiedStopsCell = ({ row }: { row: any }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const trade = row.original;
-  const hasModifiedStops = trade.modifiedStops && trade.modifiedStops.length > 0;
+  const hasModifiedStops = !!trade.modifiedStops?.length;
   
-  // Handler to prevent event propagation to the row
-  const handleClick = (e: React.MouseEvent) => {
+  // Refactor onClick to a useCallback hook
+  const handleNoModifiedStopsClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const handleModifiedStopsButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setIsModalOpen(true);
-  };
+  }, []);
   
   if (!hasModifiedStops) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div 
-              className="flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()} // Prevent row click
-            >
-              <div className="bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400 rounded-full p-1">
-                <XCircle className="h-5 w-5" />
-              </div>
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="flex items-center justify-center"
+            onClick={handleNoModifiedStopsClick}
+          >
+            <div className="bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400 rounded-full p-1">
+              <XCircle className="h-5 w-5" />
             </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>No stop modifications</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>No stop modifications</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
   
   return (
     <>
@@ -202,7 +202,7 @@ const ModifiedStopsCell = ({ row }: { row: any }) => {
               variant="outline" 
               size="sm"
               className="h-8 rounded-full bg-green-100 border-green-300 hover:bg-green-200 dark:bg-green-950 dark:border-green-800 dark:hover:bg-green-900" 
-              onClick={handleClick}
+              onClick={handleModifiedStopsButtonClick} // Use the new useCallback handler
             >
               <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
               <span className="text-green-700 dark:text-green-300 text-xs font-medium">
@@ -231,35 +231,39 @@ const ModifiedStopsCell = ({ row }: { row: any }) => {
 const ExitsCell = ({ row }: { row: any }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const trade = row.original;
-  const hasExits = trade.exits && trade.exits.length > 0;
+  const hasExits = !!trade.exits?.length;
   
-  // Handler to prevent event propagation to the row
-  const handleClick = (e: React.MouseEvent) => {
+  // Refactor onClick to a useCallback hook
+  const handleNoExitsClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const handleExitsButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setIsModalOpen(true);
-  };
+  }, []);
   
   if (!hasExits) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div 
-              className="flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()} // Prevent row click
-            >
-              <div className="bg-muted text-muted-foreground rounded-full p-1">
-                <PackageOpen className="h-5 w-5" />
-              </div>
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="flex items-center justify-center"
+            onClick={handleNoExitsClick}
+          >
+            <div className="bg-muted text-muted-foreground rounded-full p-1">
+              <PackageOpen className="h-5 w-5" />
             </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>No exits recorded</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>No exits recorded</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
   
   // Calculate total shares exited
   const totalExitedShares = trade.exits.reduce((sum: number, exit: any) => sum + exit.shares, 0);
@@ -274,7 +278,7 @@ const ExitsCell = ({ row }: { row: any }) => {
               variant="outline" 
               size="sm"
               className="h-8 rounded-full bg-blue-100 border-blue-300 hover:bg-blue-200 dark:bg-blue-950 dark:border-blue-800 dark:hover:bg-blue-900" 
-              onClick={handleClick}
+              onClick={handleExitsButtonClick} // Use the new useCallback handler
             >
               <PackageOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-1" />
               <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">
@@ -356,7 +360,7 @@ export const columns: ColumnDef<Trade>[] = [
     ),
     cell: ({ row }) => {
       const date = new Date(row.getValue("entryDate"))
-      return format(date, "MMM d, yyyy")
+      return format(date, "MMM d, yyyy") // Corrected date format
     },
   },
   {
@@ -608,7 +612,6 @@ export const columns: ColumnDef<Trade>[] = [
       )
     },
   },
-  /*
   {
   id: 'story',
   header: 'Story',
@@ -617,19 +620,21 @@ export const columns: ColumnDef<Trade>[] = [
     const hasCharts = trade.relatedCharts && trade.relatedCharts.length > 0
     
     return hasCharts ? (
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <Film className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-y-auto">
-          <TradeStoryTimeline tradeId={trade.id} />
-        </DialogContent>
-      </Dialog>
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={(e) => {
+          // Prevent the row click from firing
+          e.stopPropagation()
+        }}
+        asChild // Render as child to allow Link to apply its behavior
+      >
+        <Link href={`/trades/${trade.id}/story`}>
+          <Film className="h-4 w-4" />
+        </Link>
+      </Button>
     ) : (
       <span className="text-muted-foreground text-sm">No charts</span>
     )
   }
-}*/
-]
+}]
