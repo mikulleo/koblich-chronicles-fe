@@ -1111,7 +1111,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
           {/* stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {[
-              ['Duration', `${metadata.duration} days`],
+              ['Duration', `${metadata.duration + 1} days`],
               [
                 'Return %',
                 <>
@@ -1159,9 +1159,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
             Charts on top, events stacked beneath. Scroll, drag or click to browse.
           </p>
 
-          <div className="overflow-y-hidden max-h-[720px]">
-
-          <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+          <ScrollArea className="w-full whitespace-nowrap rounded-md border -mb-25">
             <div className="flex p-6 space-x-8">
               {groups.map((g, i) => (
                 <div key={g.date} className="flex items-start">
@@ -1180,7 +1178,6 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
-          </div>
         </Card>
 
         {/* single-chart viewer */}
