@@ -663,7 +663,7 @@ function GroupedTimelineItem({
         <div className="relative mb-3">
           {/* dot nav */}
           {group.charts.length > 1 && (
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex space-x-1">
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 flex space-x-1">
               {group.charts.map((_, i) => (
                 <button
                   key={i}
