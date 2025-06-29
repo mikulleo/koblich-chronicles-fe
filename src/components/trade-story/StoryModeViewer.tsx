@@ -136,7 +136,7 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
       title: `${storyData.metadata.ticker.symbol} Trade Story`,
       subtitle: `${storyData.metadata.tradeType.toUpperCase()} • ${storyData.metadata.setupType || 'N/A'}`,
       content: {
-        duration: storyData.metadata.duration,
+        duration: storyData.metadata.duration + 1, // Duration in days, +1 to include the start day
         returnPercent: storyData.metadata.totalReturnPercent,
         normalizedReturnPercent: storyData.metadata.normalizedTotalReturnPercent ?? 0,
         rRatio: storyData.metadata.rRatio,
