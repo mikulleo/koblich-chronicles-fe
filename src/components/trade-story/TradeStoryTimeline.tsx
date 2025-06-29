@@ -849,7 +849,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                   details: {
                     ...event.details,
                     profitLossPercent: Number(profitLossPercent?.toFixed(2)),
-                    normalizedProfitLossPercent: Number(normalizedProfitLossPercent?.toFixed(2)),
+                    //normalizedProfitLossPercent: Number(normalizedProfitLossPercent?.toFixed(2)),
                   }
                 };
                 console.log('🧹 CLEANED EXIT EVENT:', {
