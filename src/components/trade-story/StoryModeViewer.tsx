@@ -50,7 +50,7 @@ interface TimelineEvent {
   description: string
   details: {
     price?: number
-    shares?: number
+    //shares?: number
     normalizationFactor?: number;
     riskAmount?: number
     previousStop?: number
@@ -71,9 +71,9 @@ interface StoryMetadata {
   duration: number
   // totalReturn: number; // Removed from metadata to avoid dollar display
   totalReturnPercent: number
-  normalizedTotalReturnPercent: number // Added normalized
+  normalizedTotalReturnPercent?: number // Added normalized
   rRatio: number
-  normalizedRRatio: number // Added normalized
+  normalizedRRatio?: number // Added normalized
   chartCount: number
   eventCount: number
 }
@@ -138,9 +138,9 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
       content: {
         duration: storyData.metadata.duration,
         returnPercent: storyData.metadata.totalReturnPercent,
-        normalizedReturnPercent: storyData.metadata.normalizedTotalReturnPercent,
+        normalizedReturnPercent: storyData.metadata.normalizedTotalReturnPercent ?? 0,
         rRatio: storyData.metadata.rRatio,
-        normalizedRRatio: storyData.metadata.normalizedRRatio,
+        normalizedRRatio: storyData.metadata.normalizedRRatio ?? 0,
         chartCount: storyData.metadata.chartCount, // Pass chartCount
       }
     })
