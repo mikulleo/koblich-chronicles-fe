@@ -482,7 +482,10 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
                 {currentSlide.content.returnPercent?.toFixed(2)}%
                 {currentSlide.content.normalizedReturnPercent !== currentSlide.content.returnPercent && (
                   <span className="ml-1 text-base text-muted-foreground">
-                    ({currentSlide.content.normalizedReturnPercent?.toFixed(2)}% N)
+                    (
+                      {currentSlide.content.normalizedReturnPercent.toFixed(2)}%{" "}
+                      <span className="text-xs align-super">normalized</span>
+                    )
                   </span>
                 )}
               </p>
@@ -492,11 +495,6 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
               <p className="text-sm text-muted-foreground mb-2">R-Ratio</p>
               <p className="text-3xl font-bold">
                 {currentSlide.content.rRatio?.toFixed(2)}R
-                {currentSlide.content.normalizedRRatio !== currentSlide.content.rRatio && (
-                  <span className="ml-1 text-base text-muted-foreground">
-                    ({currentSlide.content.normalizedRRatio?.toFixed(2)}R N)
-                  </span>
-                )}
               </p>
             </div>
             {/* Display Charts count */}
@@ -739,7 +737,10 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
                   {currentSlide.metadata.totalReturnPercent?.toFixed(2)}%
                   {currentSlide.metadata.normalizedTotalReturnPercent !== currentSlide.metadata.totalReturnPercent && (
                     <span className="ml-1 text-base text-muted-foreground">
-                      ({currentSlide.metadata.normalizedTotalReturnPercent?.toFixed(2)}% N)
+                      (
+                      {currentSlide.metadata.normalizedTotalReturnPercent?.toFixed(2)}%{" "}
+                      <span className="text-xs align-super">normalized</span>
+                      )
                     </span>
                   )}
                 </p>
@@ -748,11 +749,6 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
                 <p className="text-sm text-muted-foreground">R-Ratio</p>
                 <p className="text-xl font-semibold">
                   {currentSlide.metadata.rRatio?.toFixed(2)}R
-                  {currentSlide.metadata.normalizedRRatio !== currentSlide.metadata.rRatio && (
-                    <span className="ml-1 text-base text-muted-foreground">
-                      ({currentSlide.metadata.normalizedRRatio?.toFixed(2)}R N)
-                    </span>
-                  )}
                 </p>
               </div>
             </div>

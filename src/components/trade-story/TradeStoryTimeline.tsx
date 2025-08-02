@@ -757,8 +757,21 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
 
       console.log('🔍 RAW API RESPONSE:', JSON.stringify(data, null, 2));
 
-      if (data?.success && data.story) d = data.story
-      else if (data?.metadata) d = data
+      if (data?.success && data.story) {
+        d = data.story
+        if (d) {
+          d.metadata.normalizedTotalReturnPercent =
+            data.trade?.normalizedMetrics?.profitLossPercent
+            ?? d.metadata.normalizedTotalReturnPercent
+        }
+      } else if (data?.metadata) {
+        d = data
+        if (d) {
+          d.metadata.normalizedTotalReturnPercent =
+            data.trade?.normalizedMetrics?.profitLossPercent
+            ?? d.metadata.normalizedTotalReturnPercent
+        }
+      } 
       else if (data?.trade) {
         const t = data.trade
         console.log('📊 TRADE DATA:', JSON.stringify(t, null, 2));
@@ -867,7 +880,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                   details: {
                     ...event.details,
                     profitLossPercent: Number(profitLossPercent?.toFixed(2)),
-                    //normalizedProfitLossPercent: Number(normalizedProfitLossPercent?.toFixed(2)),
+                    //normalizedProfitLossPercent: Number(normalizedProfitLossPercent.toFixed(2)),
                   }
                 };
                 console.log('🧹 CLEANED EXIT EVENT:', {
@@ -1143,7 +1156,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                   </span>
                   {metadata.normalizedTotalReturnPercent != null && metadata.normalizedTotalReturnPercent !== metadata.totalReturnPercent && (
                     <span className="ml-1 text-xs text-muted-foreground">
-                      ({metadata.normalizedTotalReturnPercent?.toFixed(2)}% N)
+                      ({metadata.normalizedTotalReturnPercent?.toFixed(2)}% normalized)
                     </span>
                   )}
                 </>,
@@ -1152,11 +1165,6 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                 'R-Ratio',
                 <>
                   {metadata.rRatio?.toFixed(2)}R
-                  {metadata.rRatio !== metadata.normalizedRRatio && (
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      ({metadata.normalizedRRatio?.toFixed(2)}R N)
-                    </span>
-                  )}
                 </>,
               ],
               ['Charts', metadata.chartCount],
