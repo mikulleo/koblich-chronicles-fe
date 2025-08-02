@@ -100,6 +100,21 @@ export function TradeStatistics() {
     viewMode: "standard",
   });
 
+  // ────────────────────────────────────────────────────────────────────────────────
+// Helpers for local‐time date parsing/formatting
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+// Build a "YYYY-MM-DD" *local* string (no UTC shift).
+const toLocalISODate = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+// Parse a "YYYY-MM-DD" as local-midnight rather than UTC-midnight.
+const parseLocalDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
+
+// Parse end-of-day for a local date.
+const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999`);
+// ────────────────────────────────────────────────────────────────────────────────
+
   // Function to calculate total P/L percentage as simple sum
   const calculateTotalProfitLossPercent = (trades: Trade[]) => {
     // Filter trades to only include closed and partial (same as backend filter)
@@ -135,31 +150,28 @@ export function TradeStatistics() {
         
         // Handle time period filters
         if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
-          params.append("startDate", filters.startDate);
-          params.append("endDate", filters.endDate);
+          // use local parsing
+          params.append("startDate", toLocalISODate(parseLocalDate(filters.startDate)));
+          params.append("endDate", toLocalISODate(parseLocalEndDate(filters.endDate)));
         } else if (filters.timePeriod !== "all") {
-          // Set date range based on selected time period
-          const endDate = new Date();
           const today = new Date();
-          let startDate;
-          
+          let start: Date | undefined;
+
           if (filters.timePeriod === "year") {
-            // This year: January 1st of current year to today
-            startDate = new Date(today.getFullYear(), 0, 1); // Month is 0-indexed (0 = January)
+            start = new Date(today.getFullYear(), 0, 1);
           } else if (filters.timePeriod === "month") {
-            // This month: 1st day of current month to today
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            start = new Date(today.getFullYear(), today.getMonth(), 1);
           } else if (filters.timePeriod === "week") {
-            // This week: Monday of current week to today
-            const day = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-            startDate = new Date(today.getFullYear(), today.getMonth(), diff);
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            start = new Date(today.getFullYear(), today.getMonth(), diff);
           }
-          
-          if (startDate) {
-            params.append("startDate", startDate.toISOString().split("T")[0]);
+
+          if (start) {
+            params.append("startDate", toLocalISODate(start));
           }
-          params.append("endDate", endDate.toISOString().split("T")[0]);
+          // endDate = today at local-midnight
+          params.append("endDate", toLocalISODate(today));
         }
         
         // Add ticker filter if selected
