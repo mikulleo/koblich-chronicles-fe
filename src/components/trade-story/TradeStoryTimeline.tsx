@@ -360,23 +360,41 @@ function Card3D({ event, index, currentActiveIdx, dragOffset, totalEvents, onCar
       <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
       <animated3d.meshStandardMaterial transparent opacity={springProps.opacity} />
       
-      {/* Remove wrapper styling and let TimelineEvent handle its own styling */}
+      {/* Fixed HTML wrapper with proper width constraints */}
       <Html
         transform
         center
         distanceFactor={15} // Increased for better scaling control
         className="card-html-content"
         style={{
-          // Set min-width and min-height to allow content to dictate size
-          // And remove overflow: hidden to prevent clipping
+          // Set both min and max width to constrain the card size
+          width: `${CARD_WIDTH * 110}px`,
+          maxWidth: `${CARD_WIDTH * 110}px`, // FIXED: Add maxWidth constraint
           minWidth: `${CARD_WIDTH * 110}px`, 
           minHeight: `${CARD_HEIGHT * 110}px`,
           pointerEvents: isActive ? 'auto' : 'none',
-          // overflow: 'hidden', // <--- REMOVE THIS LINE
+          overflow: 'hidden', // FIXED: Re-enable overflow hidden to prevent text spillover
+          // Add word wrapping styles
+          wordWrap: 'break-word',
+          wordBreak: 'break-word',
+          hyphens: 'auto',
         }}
       >
-        {/* Use TimelineEvent directly without additional wrapper styling */}
-        <TimelineEvent event={event} />
+        {/* Wrap TimelineEvent in a div with explicit sizing and text wrapping */}
+        <div 
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            wordWrap: 'break-word',
+            wordBreak: 'break-word',
+            hyphens: 'auto',
+            fontSize: '12px', // Ensure consistent font size
+            lineHeight: '1.3', // Compact line height
+          }}
+        >
+          <TimelineEvent event={event} />
+        </div>
       </Html>
     </animated3d.mesh>
   );
@@ -1159,7 +1177,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
             Charts on top, events stacked beneath. Scroll, drag or click to browse.
           </p>
 
-          <ScrollArea className="w-full whitespace-nowrap rounded-md border -mb-25">
+          <ScrollArea className="w-full whitespace-nowrap rounded-md border mb-6">
             <div className="flex p-6 space-x-8">
               {groups.map((g, i) => (
                 <div key={g.date} className="flex items-start">

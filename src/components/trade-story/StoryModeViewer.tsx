@@ -63,6 +63,9 @@ interface TimelineEvent {
     notes?: string
     profitLossPercent?: number // Normal % for exit
     normalizedProfitLossPercent?: number // Normalized % for exit
+    positionSizeDescription?: string // Added to fix type error
+    initialRiskPercent?: number // Also used in rendering, add for completeness
+    reason?: string // Also used in rendering, add for completeness
   }
 }
 
@@ -525,7 +528,7 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
               </div>
             </div>
             
-            <div className="w-96 bg-card p-6 overflow-y-auto">
+            <div className="w-96 bg-card p-6 overflow-y-auto pb-24">
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">
@@ -555,18 +558,78 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
                 )}
                 
                 {currentSlide.relevantEvents.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Related Events</h3>
-                    {currentSlide.relevantEvents.map((event, idx) => (
-                      <div key={idx} className="bg-muted p-3 rounded mb-2">
-                        <p className="font-medium text-sm">{event.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(event.date), 'MMM dd')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+  <div>
+    <h3 className="font-semibold mb-2">Related Events</h3>
+    {currentSlide.relevantEvents.map((event, idx) => (
+      <div key={idx} className="bg-muted p-3 rounded mb-2">
+        <p className="font-medium text-sm">{event.title}</p>
+        <p className="text-xs text-muted-foreground">
+          {format(new Date(event.date), 'MMM dd')}
+        </p>
+
+        {/* ── details just like your TimelineEvent card ── */}
+        <div className="text-xs mt-2 space-y-1">
+          {event.type === 'entry' && (
+            <>
+              <p>Price: ${event.details.price}</p>
+              {event.details.positionSizeDescription && (
+                <p>Size: {event.details.positionSizeDescription}</p>
+              )}
+              {event.details.initialRiskPercent !== undefined && (
+                <p>Risk: {event.details.initialRiskPercent.toFixed(2)}%</p>
+              )}
+            </>
+          )}
+
+          {event.type === 'stopModified' && (
+            <>
+              <p>From: ${event.details.previousStop}</p>
+              <p>To: ${event.details.newStop}</p>
+              {event.details.notes && (
+                <p className="italic">Note: {event.details.notes}</p>
+              )}
+            </>
+          )}
+
+          {event.type === 'exit' && (
+            <>
+              <p>Price: ${event.details.price}</p>
+
+              {event.details.profitLossPercent !== undefined && (
+                <p
+                  className={cn(
+                    "font-medium",
+                    event.details.profitLossPercent >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  )}
+                >
+                  P/L: {event.details.profitLossPercent >= 0 ? '+' : ''}
+                  {event.details.profitLossPercent}%
+                  {event.details.normalizedProfitLossPercent !== undefined && (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      (
+                      {event.details.normalizedProfitLossPercent >= 0 ? '+' : ''}
+                      {event.details.normalizedProfitLossPercent}% N)
+                    </span>
+                  )}
+                </p>
+              )}
+
+              {event.details.reason && (
+                <p>Reason: {event.details.reason}</p>
+              )}
+              {event.details.notes && (
+                <p className="italic">Note: {event.details.notes}</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
                 
                 {currentSlide.chart.notes && (
                   <div>

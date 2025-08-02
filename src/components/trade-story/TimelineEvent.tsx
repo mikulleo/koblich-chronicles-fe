@@ -98,8 +98,11 @@ export default function TimelineEvent({ event }: TimelineEventProps) {
             <p>From: ${event.details.previousStop}</p>
             <p>To: ${event.details.newStop}</p>
             {event.details.notes && (
-              <p className="italic mt-1">{event.details.notes}</p>
-            )}
+  <p className="italic mt-1 whitespace-normal break-words">
+    {event.details.notes}
+  </p>
+)}
+
           </>
         )}
         
@@ -124,6 +127,11 @@ export default function TimelineEvent({ event }: TimelineEventProps) {
             )}
             {event.details.reason && (
               <p>Reason: {event.details.reason}</p>
+            )}
+            {event.details.notes && (
+              <p className="text-xs italic mt-1 whitespace-normal break-words">
+                {event.details.notes}
+              </p>
             )}
           </>
         )}
