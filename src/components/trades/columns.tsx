@@ -467,7 +467,7 @@ export const columns: ColumnDef<Trade>[] = [
   // Modified Stops column
   {
     id: "modifiedStops",
-    header: (
+  header: () => (
     <>
       Modified<br />Stops
     </>
