@@ -307,32 +307,26 @@ const ExitsCell = ({ row }: { row: any }) => {
 };
 
 export const columns: ColumnDef<Trade>[] = [
-  {
-    accessorKey: "type",
+    {
+    accessorKey: "status",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Type
+        Status
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
     cell: ({ row }) => {
-      const type = row.getValue("type") as string
-      const isLong = type === "long"
-      
+      const status = row.getValue("status") as string
       return (
-        <Badge 
-          variant={isLong ? "default" : "destructive"}
-          className={isLong ? "bg-green-600" : ""}
-        >
-          {type.toUpperCase()}
-        </Badge>
+          <Badge 
+            variant={status === 'open' ? 'outline' : status === 'closed' ? 'default' : 'secondary'}
+          >
+            {status.toUpperCase()}
+          </Badge>
       )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
     },
   },
   {
@@ -342,11 +336,37 @@ export const columns: ColumnDef<Trade>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Ticker
+         Ticker
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
   },
+    {
+  id: 'story',
+  header: 'Story',
+  cell: ({ row }) => {
+    const trade = row.original
+    const hasCharts = trade.relatedCharts && trade.relatedCharts.length > 0
+    
+    return hasCharts ? (
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={(e) => {
+          // Prevent the row click from firing
+          e.stopPropagation()
+        }}
+        asChild // Render as child to allow Link to apply its behavior
+      >
+        <Link href={`/trades/${trade.id}/story`}>
+          <Film className="h-4 w-4" />
+        </Link>
+      </Button>
+    ) : (
+      <span className="text-muted-foreground text-sm">No charts</span>
+    )
+  }
+},
   {
     accessorKey: "entryDate",
     header: ({ column }) => (
@@ -381,13 +401,15 @@ export const columns: ColumnDef<Trade>[] = [
         currency: "USD",
       }).format(amount)
       
-      return formatted
+      return (
+        <div className="flex justify-center">{formatted}</div>
+      )
     },
   },
   {
     accessorKey: "normalizationFactor",
     header: ({ column }) => (
-      <div className="flex items-center space-x-1">
+      <div className="flex flex-col items-center">
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -412,7 +434,11 @@ export const columns: ColumnDef<Trade>[] = [
     ),
     cell: ({ row }) => {
       const size = row.getValue("normalizationFactor") as number
-      return size ? `${Math.round(size * 100)}%` : "";
+      return ( 
+        <div className="flex justify-center">
+          {size ? `${Math.round(size * 100)}%` : ""}
+        </div>
+      )
     },
   },
   {
@@ -422,7 +448,7 @@ export const columns: ColumnDef<Trade>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Init Stop Loss
+        Init Stop<br />Loss
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
@@ -433,13 +459,19 @@ export const columns: ColumnDef<Trade>[] = [
         currency: "USD",
       }).format(amount)
       
-      return formatted
+      return (
+        <div className="flex justify-center">{formatted}</div>
+      )
     },
   },
   // Modified Stops column
   {
     id: "modifiedStops",
-    header: "Mod-Stops",
+    header: (
+    <>
+      Modified<br />Stops
+    </>
+  ),
     cell: ModifiedStopsCell
   },
   // Exits column
@@ -455,13 +487,15 @@ export const columns: ColumnDef<Trade>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Position Risk
+        Position<br />Risk
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
     cell: ({ row }) => {
       const riskPercent = parseFloat(row.getValue("riskPercent") || "0")
-      return `${riskPercent.toFixed(2)}%`
+      return (
+        <div className="flex justify-center">{`${riskPercent.toFixed(2)}%`}</div>
+      )
     },
   },
   {
@@ -481,7 +515,7 @@ export const columns: ColumnDef<Trade>[] = [
       
       // Only show for closed or partially closed trades
       if (trade.status === 'open' || rRatio === undefined) {
-        return "—"
+        return (<div className="flex justify-center">—</div>)
       }
       
       // Format to 2 decimal places and add a + sign for positive values
@@ -490,9 +524,11 @@ export const columns: ColumnDef<Trade>[] = [
         : `${rRatio.toFixed(2)}R`
       
       return (
-        <span className={rRatio >= 0 ? "text-green-600" : "text-red-600"}>
-          {formattedRRatio}
-        </span>
+        <div className="flex justify-center">
+          <span className={rRatio >= 0 ? "text-green-600" : "text-red-600"}>
+            {formattedRRatio}
+          </span>
+        </div>
       )
     },
   },
@@ -538,7 +574,7 @@ export const columns: ColumnDef<Trade>[] = [
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Days Held
+        Days<br />Held
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
@@ -564,8 +600,8 @@ export const columns: ColumnDef<Trade>[] = [
       // Calculate days held
       const diffTime = Math.abs(endDate.getTime() - entryDate.getTime())
       const daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      
-      return daysHeld || 0
+
+      return (<div className="flex justify-center">{daysHeld || 0}</div>)
     },
     sortingFn: (rowA, rowB) => {
       // Custom sorting function for days held
@@ -591,50 +627,31 @@ export const columns: ColumnDef<Trade>[] = [
     }
   },
   {
-    accessorKey: "status",
+    accessorKey: "type",
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
       >
-        Status
+        Type
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
     cell: ({ row }) => {
-      const status = row.getValue("status") as string
+      const type = row.getValue("type") as string
+      const isLong = type === "long"
+      
       return (
         <Badge 
-          variant={status === 'open' ? 'outline' : status === 'closed' ? 'default' : 'secondary'}
+          variant={isLong ? "default" : "destructive"}
+          className={isLong ? "bg-green-600" : ""}
         >
-          {status.toUpperCase()}
+          {type.toUpperCase()}
         </Badge>
       )
     },
-  },
-  {
-  id: 'story',
-  header: 'Story',
-  cell: ({ row }) => {
-    const trade = row.original
-    const hasCharts = trade.relatedCharts && trade.relatedCharts.length > 0
-    
-    return hasCharts ? (
-      <Button 
-        variant="ghost" 
-        size="sm"
-        onClick={(e) => {
-          // Prevent the row click from firing
-          e.stopPropagation()
-        }}
-        asChild // Render as child to allow Link to apply its behavior
-      >
-        <Link href={`/trades/${trade.id}/story`}>
-          <Film className="h-4 w-4" />
-        </Link>
-      </Button>
-    ) : (
-      <span className="text-muted-foreground text-sm">No charts</span>
-    )
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
+    },
   }
-}]
+]
