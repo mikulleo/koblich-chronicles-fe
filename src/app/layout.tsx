@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 import AnalyticsProvider from "@/providers/AnalyticsProvider"
 import { ThemeProvider } from "@/providers/ThemeProviders"
+import { GoogleTagManager } from '@next/third-parties/google'
 
 // Load fonts with display: swap for better performance
 const inter = Inter({ 
@@ -37,18 +38,21 @@ export default function RootLayout({
   // Get environment variables
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   console.debug('[RootLayout] NEXT_PUBLIC_GA_MEASUREMENT_ID =', gaMeasurementId);
+  const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || '';
+  console.debug('[RootLayout] NEXT_PUBLIC_GTM_ID =', GTM_ID);
   
   return (
-    <html lang="en" suppressHydrationWarning className={`${manrope.variable} ${inter.variable}`}> 
-      <body>
-        {/* Wrap application in Analytics Provider */}
+    <html lang="en" suppressHydrationWarning>
+      {/* Add GTM script here. It fetches the original inline script after hydration. */}
+      {GTM_ID && <GoogleTagManager gtmId={GTM_ID} />}
+      <body className={inter.className}>
         <ThemeProvider>
-        <AnalyticsProvider gaMeasurementId={gaMeasurementId}>          
-          <MainLayout>
-            {children}
-          </MainLayout>
-          <Toaster />
-        </AnalyticsProvider>
+          <AnalyticsProvider>
+            <MainLayout>
+              {children}
+            </MainLayout>
+            <Toaster />
+          </AnalyticsProvider>
         </ThemeProvider>
       </body>
     </html>

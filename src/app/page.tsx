@@ -1,13 +1,25 @@
+// app/page.tsx
 "use client"
 
+import { useEffect } from 'react';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { LineChart, ListFilter, BarChart3 } from "lucide-react"
+import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown } from "lucide-react"
 import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
+import { PdfExportDialog } from "@/components/exports/pdf-export-dialog"
+import { usePathname, useSearchParams } from 'next/navigation';
+
+// Import sendGTMEvent for Data Layer pushes
+import { sendGTMEvent } from '@next/third-parties/google';
+
+// Import Firebase Analytics for screen_view and other direct Firebase events
+import { analytics } from '@/firebase/clientApp'; // Adjust path if needed for your project structure
+import { logEvent } from "firebase/analytics"; // Keep this import for logEvent
+
 
 // Animation variants
 const fadeIn = {
@@ -30,6 +42,29 @@ const staggerContainer = {
 }
 
 export default function Home() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Effect for Firebase Analytics screen_view tracking on route changes
+  /*useEffect(() => {
+    if (analytics) {
+      const url = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
+      console.debug('[Firebase] Logging screen_view for', url);
+
+      // Use 'screen_view' for SPA navigations
+      // The 'as "screen_view"' is a TypeScript assertion to bypass potential 'never' type errors
+      // if your Firebase Analytics types are being overly strict. It's often not needed
+      // if your Firebase setup and package versions are correct, but can be a quick fix.
+      logEvent(analytics, 'page_view', { 
+        screen_name: document.title, // Or a more dynamic name based on route
+        screen_class: pathname,      // Represents the path as a class
+        page_location: window.location.href, // Still useful
+        page_path: url // Still useful
+      });
+    }
+  }, [pathname, searchParams]); // Re-run whenever the URL path or query params change */
+
+
   return (
     <div className="space-y-8 pb-8">
 
@@ -63,6 +98,42 @@ export default function Home() {
         </section>
       </div>
 
+      {/* PDF Announcement Banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <div className="relative overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50 p-5 shadow-md">
+          <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-blue-100/50 blur-2xl" />
+          <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-blue-100/50 blur-2xl" />
+          <div className="relative flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
+              <FileDown className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <p className="font-semibold text-gray-800">
+                Stock Charts 2025 Analysis is out!
+              </p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                A comprehensive PDF with all annotated charts from 2025 is now available for download.
+              </p>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                document.getElementById("connect-support")?.scrollIntoView({ behavior: "smooth" })
+              }}
+            >
+              Get the PDF
+              <ArrowDown className="ml-1.5 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Feature Cards */}
       <motion.div
         className="grid gap-6 md:grid-cols-3 mt-4"
@@ -74,7 +145,7 @@ export default function Home() {
           { icon: LineChart, title: 'Charts', desc: 'Browse through the model book, filter by ticker or tag to find specific chart patterns.', href: '/charts', color: 'blue' },
           { icon: ListFilter, title: 'Trades', desc: 'View trade logs with detailed metrics, and jump to specific charts when needed.', href: '/trades', color: 'green' },
           { icon: BarChart3, title: 'Statistics', desc: 'Get insights on trading statistics that can be used to improve performance and strategy.', href: '/statistics', color: 'purple' }
-        ].map(({ icon: Icon, title, desc, href, color }) => (
+        ].map(({ icon: Icon, title, desc, href, color }) => ( // `title`, `desc`, `href`, `color` are available here
           <motion.div
             key={title}
             variants={fadeIn}
@@ -92,7 +163,30 @@ export default function Home() {
                 <h3 className="text-lg font-medium mb-2">{title}</h3>
                 <p className="text-gray-600 mb-4 flex-grow text-sm">{desc}</p>
                 <Button asChild className="mt-auto w-full">
-                  <Link href={href}>View {title}</Link>
+                  <Link 
+                    href={href} 
+                    onClick={() => { // Move onClick here to access `href` and `title`
+                      sendGTMEvent({
+                        event: 'feature_card_click', // Your custom event name for GTM
+                        feature_title: title, // Parameter from current map iteration
+                        feature_href: href,   // Parameter from current map iteration
+                        // Add other relevant parameters if needed
+                      });
+                      console.debug(`[GTM] Sent feature_card_click for: ${title}`);
+
+                      // OPTIONAL: If you also want to send this specific event via Firebase Analytics SDK
+                      // You can do both, or choose one based on your strategy.
+                      // if (analytics) {
+                      //   logEvent(analytics, 'feature_card_click', {
+                      //     feature_title: title,
+                      //     feature_href: href,
+                      //   });
+                      //   console.debug(`[Firebase] Logged feature_card_click for: ${title}`);
+                      // }
+                    }}
+                  >
+                    View {title}
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -180,7 +274,7 @@ Past performance is not indicative of future results. Markets change constantly,
         </motion.div>
 
         {/* Connect & Support */}
-        <motion.div variants={fadeIn}>
+        <motion.div variants={fadeIn} id="connect-support">
           <Card className="shadow-md shadow-md p-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">Connect & Support</h2>
@@ -199,9 +293,10 @@ Past performance is not indicative of future results. Markets change constantly,
                 <p>
                 I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I'm more than happy — it makes it all worthwhile!
                 </p>
-                {/* Main donation dialog */}
-                <div className="mt-4">
+                {/* Main donation dialog and PDF export */}
+                <div className="mt-4 flex flex-wrap gap-3">
                   <DonationDialog />
+                  <PdfExportDialog />
                 </div>
                 
                 {/* Fallback donation options */}

@@ -54,9 +54,10 @@ interface TradeDataSummary {
 interface StatisticsHistogramProps {
   filters: StatsFilters;
   viewMode: "standard" | "normalized";
+  trades?: Trade[];
 }
 
-export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramProps) {
+export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: StatisticsHistogramProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [histogramData, setHistogramData] = useState<HistogramBucket[]>([]);
@@ -186,89 +187,27 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
   };
 
   useEffect(() => {
-    const fetchTradeData = async () => {
+    const processTradeData = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Build the where clause as an object (more reliable than URL params)
-        const whereClause: any = {};
-        
-        // Add ticker filter if selected
-        if (filters.tickerId) {
-          whereClause.ticker = { equals: filters.tickerId };
-        }
-        
-        // For status filter, we'll apply it client-side to ensure consistency
-        // But we can still optimize the API call by excluding 'open' trades if we only want closed
-        if (filters.statusFilter === "closed-only") {
-          whereClause.status = { equals: "closed" };
+
+        let allTrades: Trade[];
+
+        if (tradesProp) {
+          // Use trades passed from parent — already filtered by server
+          allTrades = tradesProp;
         } else {
-          // Fetch both closed and partial trades
-          whereClause.status = { in: ["closed", "partial"] };
+          // Fallback: fetch trades ourselves
+          const response = await apiClient.get(`/trades`);
+          if (!response.data?.docs) {
+            throw new Error("Unexpected response format");
+          }
+          allTrades = response.data.docs;
         }
-        
-        // For date filtering, fetch a wider range to capture trades that might have exits in target period
-        if (filters.timePeriod !== "all") {
-          const today = new Date();
-          let fetchStartDate;
-          
-          if (filters.timePeriod === "year") {
-            // Fetch from beginning of previous year to cover all possible exits in current year
-            fetchStartDate = new Date(today.getFullYear() - 1, 0, 1);
-          } else if (filters.timePeriod === "month") {
-            // Fetch from 3 months ago to cover trades that might exit this month
-            fetchStartDate = new Date(today.getFullYear(), today.getMonth() - 3, 1);
-          } else if (filters.timePeriod === "week") {
-            // Fetch from 1 month ago to cover trades that might exit this week
-            fetchStartDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-          } else if (filters.timePeriod === "custom" && filters.startDate) {
-            // For custom range, fetch from 3 months before start date
-            const customStart = new Date(filters.startDate);
-            fetchStartDate = new Date(customStart.getFullYear(), customStart.getMonth() - 3, 1);
-          }
-          
-          if (fetchStartDate) {
-            whereClause.entryDate = { 
-              greater_than_equal: fetchStartDate.toISOString().split("T")[0] 
-            };
-          }
-        }
-        
-        // Build query parameters
-        const params = new URLSearchParams();
-        params.append("limit", "1000");
-        params.append("depth", "1");
-        
-        // Convert where clause to URL parameters
-        const encodeWhereClause = (obj: any, prefix = "where") => {
-          for (const [key, value] of Object.entries(obj)) {
-            if (value && typeof value === "object") {
-              if (Array.isArray(value)) {
-                // Handle arrays (for 'in' operations)
-                params.append(`${prefix}[${key}][in]`, value.join(","));
-              } else {
-                // Handle nested objects
-                for (const [nestedKey, nestedValue] of Object.entries(value)) {
-                  params.append(`${prefix}[${key}][${nestedKey}]`, String(nestedValue));
-                }
-              }
-            } else {
-              params.append(`${prefix}[${key}]`, String(value));
-            }
-          }
-        };
-        
-        encodeWhereClause(whereClause);
-        
-        // Fetch trades
-        const response = await apiClient.get(`/trades`);
-        
-        if (response.data && response.data.docs) {
-          const allTrades: Trade[] = response.data.docs;
-          
-          // Apply comprehensive filtering (status + date)
-          const filteredTrades = filterTrades(allTrades, filters);
+
+        // Apply client-side filtering (status + date by completion date)
+        const filteredTrades = filterTrades(allTrades, filters);
           
           // Create buckets and populate with filtered trade data
           const buckets = createBuckets();
@@ -321,9 +260,6 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
           
           setHistogramData(buckets);
           setTradeDataSummary(summary);
-        } else {
-          throw new Error("Unexpected response format");
-        }
       } catch (error) {
         console.error("Error fetching trade data for histogram:", error);
         setError("Failed to load trade data for histogram. Please try again later.");
@@ -331,9 +267,9 @@ export function StatisticsHistogram({ filters, viewMode }: StatisticsHistogramPr
         setLoading(false);
       }
     };
-    
-    fetchTradeData();
-  }, [filters, viewMode]);
+
+    processTradeData();
+  }, [filters, viewMode, tradesProp]);
 
   // Custom tooltip for the histogram
   const CustomTooltip = ({ active, payload, label }: any) => {

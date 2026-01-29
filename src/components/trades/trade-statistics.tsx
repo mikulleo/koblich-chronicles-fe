@@ -89,6 +89,7 @@ export function TradeStatistics() {
   // State for statistics data
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [metadata, setMetadata] = useState<StatsMetadata | null>(null);
+  const [trades, setTrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -193,10 +194,11 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
         if (statsResponse.data && tradesResponse.data) {
           const backendStats = statsResponse.data.stats;
           const backendMetadata = statsResponse.data.metadata;
-          const trades = tradesResponse.data.docs;
+          const fetchedTrades = tradesResponse.data.docs;
+          setTrades(fetchedTrades);
 
           // Calculate client-side total P/L percentages
-          const clientPLCalculation = calculateTotalProfitLossPercent(trades);
+          const clientPLCalculation = calculateTotalProfitLossPercent(fetchedTrades);
           
           // Create enhanced stats with client-calculated P/L percentages
           const enhancedStats: TradeStats = {
@@ -288,10 +290,11 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
         statusFilter={filters.statusFilter}
       />
       
-      {/* Trade Distribution Histogram - NEW ADDITION */}
-      <StatisticsHistogram 
+      {/* Trade Distribution Histogram */}
+      <StatisticsHistogram
         filters={filters}
         viewMode={filters.viewMode}
+        trades={trades}
       />
       
       {/* Visualizations */}

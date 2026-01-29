@@ -18,15 +18,6 @@ import apiClient from "@/lib/api/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { TradeStats, StatsMetadata } from "./trade-statistics";
 
-// Trade interface for P/L calculation
-interface Trade {
-  profitLossPercent: number;
-  normalizedMetrics?: {
-    profitLossPercent: number;
-  };
-  status: 'open' | 'partial' | 'closed';
-}
-
 interface TimeperiodStats {
   period: string;
   periodLabel: string;
@@ -36,7 +27,7 @@ interface TimeperiodStats {
 
 interface StatisticsByTimeperiodProps {
   viewMode: "standard" | "normalized";
-  statusFilter: "all" | "closed-only"; // Add statusFilter prop
+  statusFilter: "all" | "closed-only";
   selectedYear?: number;
 }
 
@@ -46,43 +37,21 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
   const [yearlyStats, setYearlyStats] = useState<TimeperiodStats[]>([]);
   const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
   const [monthlyStats, setMonthlyStats] = useState<Record<string, TimeperiodStats[]>>({});
-  
+  const [loadingMonths, setLoadingMonths] = useState<Set<string>>(new Set());
+
   const currentYear = new Date().getFullYear();
   const year = selectedYear || currentYear;
-  
-  // Function to calculate total P/L percentage as simple sum
-  const calculateTotalProfitLossPercent = (trades: Trade[]) => {
-    // Filter trades to only include closed and partial (same as backend filter)
-    const relevantTrades = trades.filter(trade => 
-      trade.status === 'closed' || trade.status === 'partial'
-    );
 
-    // Standard total P/L % - simple sum
-    const standardTotal = relevantTrades.reduce((sum, trade) => {
-      return sum + (trade.profitLossPercent || 0);
-    }, 0);
-
-    // Normalized total P/L % - simple sum of normalized values
-    const normalizedTotal = relevantTrades.reduce((sum, trade) => {
-      return sum + (trade.normalizedMetrics?.profitLossPercent || trade.profitLossPercent || 0);
-    }, 0);
-
-    return {
-      standard: Number(standardTotal.toFixed(2)),
-      normalized: Number(normalizedTotal.toFixed(2))
-    };
-  };
-  
   // Format percentage values
   const formatPercent = (value: number): string => {
     return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
-  
+
   // Format ratio values
   const formatRatio = (value: number): string => {
     return value.toFixed(2);
   };
-  
+
   // Helper to get color class based on value
   const getColorClass = (value: number, threshold: number = 0): string => {
     if (value > threshold) return "text-green-600 font-medium";
@@ -90,71 +59,46 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
     return "";
   };
 
-  // Fetch yearly statistics
+  // Fetch yearly statistics — only /trades/stats, no /trades needed
   useEffect(() => {
     const fetchYearlyStats = async () => {
       try {
         setLoading(true);
-        
-        // Get current year and previous 2 years
+
         const thisYear = year;
-        
         // Temporarily exclude 2023 as requested
         const years = [thisYear, thisYear - 1].filter(y => y !== 2023);
-        
-        const yearlyStatsPromises = years.map(async (year) => {
-          const startDate = `${year}-01-01`;
-          const endDate = `${year}-12-31`;
-          
-          // Build query parameters
+
+        // Fetch yearly stats sequentially to avoid overwhelming the server
+        const results: TimeperiodStats[] = [];
+        for (const y of years) {
+          const startDate = `${y}-01-01`;
+          const endDate = `${y}-12-31`;
+
           const params = new URLSearchParams();
           params.append("startDate", startDate);
           params.append("endDate", endDate);
           params.append("statusFilter", statusFilter);
-          
-          // Fetch both statistics and individual trades for P/L calculation
-          const [statsResponse, tradesResponse] = await Promise.all([
-            apiClient.get(`/trades/stats?${params.toString()}`),
-            apiClient.get(`/trades?${params.toString()}`)
-          ]);
-          
-          const backendStats = statsResponse.data.stats;
-          const backendMetadata = statsResponse.data.metadata;
-          const trades = tradesResponse.data.docs;
 
-          // Calculate client-side total P/L percentages
-          const clientPLCalculation = calculateTotalProfitLossPercent(trades);
-          
-          // Create enhanced stats with client-calculated P/L percentages
-          const enhancedStats: TradeStats = {
-            ...backendStats,
-            totalProfitLossPercent: clientPLCalculation.standard,
-            normalized: {
-              ...backendStats.normalized,
-              totalProfitLossPercent: clientPLCalculation.normalized
-            }
-          };
-          
-          return {
-            period: year.toString(),
-            periodLabel: year.toString(),
-            stats: enhancedStats,
-            metadata: backendMetadata
-          };
-        });
-        
-        const results = await Promise.all(yearlyStatsPromises);
+          const statsResponse = await apiClient.get(`/trades/stats?${params.toString()}`);
+
+          results.push({
+            period: y.toString(),
+            periodLabel: y.toString(),
+            stats: statsResponse.data.stats,
+            metadata: statsResponse.data.metadata,
+          });
+        }
+
         setYearlyStats(results);
-        
+
         // Set the current year as expanded by default
         if (results.length > 0) {
           const defaultExpandedYear = results[0].period;
           setExpandedYears(new Set([defaultExpandedYear]));
-          
-          // Proactively fetch monthly data for the initially expanded year
           fetchMonthlyDataForYear(defaultExpandedYear);
         }
-        
+
       } catch (error) {
         console.error("Error fetching yearly statistics:", error);
         setError("Failed to load yearly statistics");
@@ -162,95 +106,109 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
         setLoading(false);
       }
     };
-    
+
     fetchYearlyStats();
-    
+
     // Clear monthly stats when statusFilter changes to force a refresh
     setMonthlyStats({});
-    
-  }, [year, statusFilter]); // Add statusFilter as dependency
 
-  // Function to fetch monthly data for a year
-  const fetchMonthlyDataForYear = async (year: string) => {
-    // Skip if we already have the data
-    if (monthlyStats[year]) return;
-    
+  }, [year, statusFilter]);
+
+  // Fetch stats for a single month. Returns null on failure.
+  const fetchSingleMonth = async (
+    year: string,
+    month: number
+  ): Promise<TimeperiodStats | null> => {
     try {
-      const months = Array.from({ length: 12 }, (_, i) => i);
-      
-      const monthlyStatsPromises = months.map(async (month) => {
-        const startDate = startOfMonth(new Date(parseInt(year), month));
-        const endDate = endOfMonth(new Date(parseInt(year), month));
-        
-        // Format dates as YYYY-MM-DD for API
-        const formattedStartDate = format(startDate, "yyyy-MM-dd");
-        const formattedEndDate = format(endDate, "yyyy-MM-dd");
-        
-        // Build query parameters
-        const params = new URLSearchParams();
-        params.append("startDate", formattedStartDate);
-        params.append("endDate", formattedEndDate);
-        params.append("statusFilter", statusFilter);
-        
-        // Fetch both statistics and individual trades for P/L calculation
-        const [statsResponse, tradesResponse] = await Promise.all([
-          apiClient.get(`/trades/stats?${params.toString()}`),
-          apiClient.get(`/trades?${params.toString()}&limit=10000`)
-        ]);
-        
-        const backendStats = statsResponse.data.stats;
-        const backendMetadata = statsResponse.data.metadata;
-        const trades = tradesResponse.data.docs;
+      const start = startOfMonth(new Date(parseInt(year), month));
+      const end = endOfMonth(new Date(parseInt(year), month));
 
-        // Calculate client-side total P/L percentages
-        const clientPLCalculation = calculateTotalProfitLossPercent(trades);
-        
-        // Create enhanced stats with client-calculated P/L percentages
-        const enhancedStats: TradeStats = {
-          ...backendStats,
-          totalProfitLossPercent: clientPLCalculation.standard,
-          normalized: {
-            ...backendStats.normalized,
-            totalProfitLossPercent: clientPLCalculation.normalized
-          }
-        };
-        
+      const params = new URLSearchParams();
+      params.append("startDate", format(start, "yyyy-MM-dd"));
+      params.append("endDate", format(end, "yyyy-MM-dd"));
+      params.append("statusFilter", statusFilter);
+
+      const statsResponse = await apiClient.get(
+        `/trades/stats?${params.toString()}`
+      );
+
+      return {
+        period: `${year}-${month + 1}`,
+        periodLabel: format(start, "MMMM"),
+        stats: statsResponse.data.stats,
+        metadata: statsResponse.data.metadata,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  // Fetch monthly data in small batches to avoid overwhelming the server
+  const fetchMonthlyDataForYear = async (year: string) => {
+    if (monthlyStats[year]) return;
+
+    setLoadingMonths((prev) => new Set(prev).add(year));
+
+    try {
+      const BATCH_SIZE = 3;
+      const months = Array.from({ length: 12 }, (_, i) => i);
+      const results: (TimeperiodStats | null)[] = new Array(12).fill(null);
+
+      // First pass — fetch in batches of BATCH_SIZE
+      for (let i = 0; i < months.length; i += BATCH_SIZE) {
+        const batch = months.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map((month) => fetchSingleMonth(year, month))
+        );
+        batchResults.forEach((r, idx) => {
+          results[i + idx] = r;
+        });
+      }
+
+      // Retry pass — any month that came back null gets one more attempt,
+      // run sequentially so the server isn't hit hard again
+      for (let i = 0; i < results.length; i++) {
+        if (results[i] === null) {
+          results[i] = await fetchSingleMonth(year, i);
+        }
+      }
+
+      // Use whatever succeeded (null entries become a zero-trade placeholder)
+      const finalResults: TimeperiodStats[] = results.map((r, i) => {
+        if (r) return r;
+        const start = startOfMonth(new Date(parseInt(year), i));
         return {
-          period: `${year}-${month + 1}`,
-          periodLabel: format(startDate, "MMMM"),
-          stats: enhancedStats,
-          metadata: backendMetadata
+          period: `${year}-${i + 1}`,
+          periodLabel: format(start, "MMMM"),
+          stats: { totalTrades: 0, winningTrades: 0, losingTrades: 0, breakEvenTrades: 0, battingAverage: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, averageRRatio: 0, profitFactor: 0, expectancy: 0, averageDaysHeldWinners: 0, averageDaysHeldLosers: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, totalProfitLoss: 0, totalProfitLossPercent: 0, tradeStatusCounts: { closed: 0, partial: 0 }, normalized: { totalProfitLoss: 0, totalProfitLossPercent: 0, averageRRatio: 0, profitFactor: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, expectancy: 0 } } as TradeStats,
+          metadata: { totalTrades: 0, closedTrades: 0, partialTrades: 0, statusFilter, dateRange: "", tickerFilter: false },
         };
       });
-      
-      const results = await Promise.all(monthlyStatsPromises);
-      
-      // Update monthly stats
-      setMonthlyStats(prev => ({
-        ...prev,
-        [year]: results
-      }));
-      
+
+      setMonthlyStats((prev) => ({ ...prev, [year]: finalResults }));
     } catch (error) {
       console.error(`Error fetching monthly statistics for ${year}:`, error);
+    } finally {
+      setLoadingMonths((prev) => {
+        const next = new Set(prev);
+        next.delete(year);
+        return next;
+      });
     }
   };
 
   // Toggle expanded year and fetch monthly data
   const toggleYearExpansion = async (year: string) => {
     const newExpanded = new Set(expandedYears);
-    
+
     if (expandedYears.has(year)) {
       newExpanded.delete(year);
       setExpandedYears(newExpanded);
       return;
     }
-    
-    // Add to expanded set
+
     newExpanded.add(year);
     setExpandedYears(newExpanded);
-    
-    // Fetch monthly data if needed
     fetchMonthlyDataForYear(year);
   };
 
@@ -304,26 +262,26 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                 <TableHead>Avg Win %</TableHead>
                 <TableHead>Avg Loss %</TableHead>
                 <TableHead>R-Ratio</TableHead>
-  
+
               </TableRow>
             </TableHeader>
             <TableBody>
               {yearlyStats.map((yearData) => (
                 <React.Fragment key={yearData.period}>
                   {/* Yearly Row */}
-                  <TableRow 
+                  <TableRow
                     className="hover:bg-muted/40 cursor-pointer"
                     onClick={() => toggleYearExpansion(yearData.period)}
                   >
                     <TableCell className="font-medium flex items-center">
-                      {expandedYears.has(yearData.period) ? 
-                        <ChevronDown className="h-4 w-4 mr-1" /> : 
+                      {expandedYears.has(yearData.period) ?
+                        <ChevronDown className="h-4 w-4 mr-1" /> :
                         <ChevronRight className="h-4 w-4 mr-1" />
                       }
                       {yearData.periodLabel}
                     </TableCell>
                     <TableCell>
-                      {yearData.metadata.totalTrades} 
+                      {yearData.metadata.totalTrades}
                       <span className="text-xs text-muted-foreground ml-1">
                         ({yearData.stats.winningTrades}/{yearData.stats.losingTrades})
                       </span>
@@ -332,9 +290,9 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                       {yearData.stats.battingAverage.toFixed(1)}%
                     </TableCell>
                     <TableCell className={getColorClass(
-                      viewMode === "normalized" 
-                        ? yearData.stats.normalized.winLossRatio 
-                        : yearData.stats.winLossRatio, 
+                      viewMode === "normalized"
+                        ? yearData.stats.normalized.winLossRatio
+                        : yearData.stats.winLossRatio,
                       1
                     )}>
                       {formatRatio(
@@ -370,11 +328,11 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                       )}
                     </TableCell>
                   </TableRow>
-                  
+
                   {/* Monthly Rows (when expanded) */}
                   {expandedYears.has(yearData.period) && (
                     <>
-                      {!monthlyStats[yearData.period] ? (
+                      {loadingMonths.has(yearData.period) || !monthlyStats[yearData.period] ? (
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="text-center py-4">
                             <div className="flex items-center justify-center">
@@ -393,8 +351,8 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                         monthlyStats[yearData.period]
                           .filter(monthData => monthData.metadata.totalTrades > 0)
                           .map(monthData => (
-                            <TableRow 
-                              key={monthData.period} 
+                            <TableRow
+                              key={monthData.period}
                               className="bg-muted/20 hover:bg-muted/30"
                             >
                               <TableCell className="pl-8 font-normal">
@@ -410,9 +368,9 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                                 {monthData.stats.battingAverage.toFixed(1)}%
                               </TableCell>
                               <TableCell className={getColorClass(
-                                viewMode === "normalized" 
-                                  ? monthData.stats.normalized.winLossRatio 
-                                  : monthData.stats.winLossRatio, 
+                                viewMode === "normalized"
+                                  ? monthData.stats.normalized.winLossRatio
+                                  : monthData.stats.winLossRatio,
                                 1
                               )}>
                                 {formatRatio(
@@ -454,7 +412,7 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                   )}
                 </React.Fragment>
               ))}
-              
+
               {yearlyStats.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
