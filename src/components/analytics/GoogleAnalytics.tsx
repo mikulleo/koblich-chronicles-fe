@@ -94,7 +94,7 @@ export default function GoogleAnalytics({ GA_MEASUREMENT_ID }: GoogleAnalyticsPr
 // Augment the window object so TS stops complaining
 declare global {
   interface Window {
-    dataLayer: any[];
+    dataLayer?: any[];
     gtag?: (...args: any[]) => void;
   }
 }
