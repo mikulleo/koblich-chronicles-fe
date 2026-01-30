@@ -1,7 +1,6 @@
 // app/page.tsx
 "use client"
 
-import { useEffect } from 'react';
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
@@ -11,15 +10,8 @@ import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
 import { PdfExportDialog } from "@/components/exports/pdf-export-dialog"
-import { usePathname, useSearchParams } from 'next/navigation';
-
 // Import sendGTMEvent for Data Layer pushes
 import { sendGTMEvent } from '@next/third-parties/google';
-
-// Import Firebase Analytics for screen_view and other direct Firebase events
-import { analytics } from '@/firebase/clientApp'; // Adjust path if needed for your project structure
-import { logEvent } from "firebase/analytics"; // Keep this import for logEvent
-
 
 // Animation variants
 const fadeIn = {
@@ -42,29 +34,6 @@ const staggerContainer = {
 }
 
 export default function Home() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // Effect for Firebase Analytics screen_view tracking on route changes
-  /*useEffect(() => {
-    if (analytics) {
-      const url = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-      console.debug('[Firebase] Logging screen_view for', url);
-
-      // Use 'screen_view' for SPA navigations
-      // The 'as "screen_view"' is a TypeScript assertion to bypass potential 'never' type errors
-      // if your Firebase Analytics types are being overly strict. It's often not needed
-      // if your Firebase setup and package versions are correct, but can be a quick fix.
-      logEvent(analytics, 'page_view', { 
-        screen_name: document.title, // Or a more dynamic name based on route
-        screen_class: pathname,      // Represents the path as a class
-        page_location: window.location.href, // Still useful
-        page_path: url // Still useful
-      });
-    }
-  }, [pathname, searchParams]); // Re-run whenever the URL path or query params change */
-
-
   return (
     <div className="space-y-8 pb-8">
 
@@ -173,16 +142,6 @@ export default function Home() {
                         // Add other relevant parameters if needed
                       });
                       console.debug(`[GTM] Sent feature_card_click for: ${title}`);
-
-                      // OPTIONAL: If you also want to send this specific event via Firebase Analytics SDK
-                      // You can do both, or choose one based on your strategy.
-                      // if (analytics) {
-                      //   logEvent(analytics, 'feature_card_click', {
-                      //     feature_title: title,
-                      //     feature_href: href,
-                      //   });
-                      //   console.debug(`[Firebase] Logged feature_card_click for: ${title}`);
-                      // }
                     }}
                   >
                     View {title}

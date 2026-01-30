@@ -1,12 +1,12 @@
 // src/firebase/clientApp.ts
-// This is a 'use client' file because it uses browser-specific Firebase SDK
 'use client';
 
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase config — these keys are safe to expose client-side (they identify
+// the project, they don't grant privileged access). Security is enforced via
+// Firebase Security Rules and backend validation.
 const firebaseConfig = {
   apiKey: "AIzaSyBk7r0_DFE8wpR2qK2Cm-0phTy31_396_U",
   authDomain: "koblich-chronicles.firebaseapp.com",
@@ -14,24 +14,33 @@ const firebaseConfig = {
   storageBucket: "koblich-chronicles.firebasestorage.app",
   messagingSenderId: "529550745014",
   appId: "1:529550745014:web:f7bd6d87990272f4653517",
-  measurementId: "G-75338WVJ8X"
+  measurementId: "G-75338WVJ8X",
 };
 
-// Initialize Firebase
-// Check if Firebase app is already initialized to prevent re-initialization in Next.js dev mode
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase App (re-initialization guard for Next.js HMR)
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Analytics and get a reference to the service
-let analytics: Analytics | null = null; // <-- Explicitly type analytics
-if (typeof window !== 'undefined') { // Only initialize analytics in the browser
-  isSupported().then(supported => {
-    if (supported) {
-      analytics = getAnalytics(app);
-      console.debug('[Firebase] Analytics initialized.');
-    } else {
-      console.warn('[Firebase] Analytics not supported in this environment.');
-    }
-  });
+// Analytics is browser-only and async — callers must await this promise.
+// Resolves to the Analytics instance when supported, or null otherwise.
+const analyticsPromise: Promise<Analytics | null> =
+  typeof window !== "undefined"
+    ? isSupported()
+        .then((supported) => {
+          if (supported) {
+            return getAnalytics(app);
+          }
+          return null;
+        })
+        .catch(() => null)
+    : Promise.resolve(null);
+
+/**
+ * Returns the Firebase Analytics instance once it's ready.
+ * Safe to call from any client component — returns null on the server
+ * or in environments where analytics isn't supported.
+ */
+export async function getFirebaseAnalytics(): Promise<Analytics | null> {
+  return analyticsPromise;
 }
 
-export { analytics };
+export { app };

@@ -35,11 +35,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // Get environment variables
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  console.debug('[RootLayout] NEXT_PUBLIC_GA_MEASUREMENT_ID =', gaMeasurementId);
   const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || '';
-  console.debug('[RootLayout] NEXT_PUBLIC_GTM_ID =', GTM_ID);
   
   return (
     <html lang="en" suppressHydrationWarning>
@@ -47,7 +44,7 @@ export default function RootLayout({
       {GTM_ID && <GoogleTagManager gtmId={GTM_ID} />}
       <body className={inter.className}>
         <ThemeProvider>
-          <AnalyticsProvider>
+          <AnalyticsProvider gaMeasurementId={gaMeasurementId}>
             <MainLayout>
               {children}
             </MainLayout>

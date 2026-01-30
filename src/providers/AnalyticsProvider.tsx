@@ -42,13 +42,7 @@ export function AnalyticsProvider({
     analytics: false,
     marketing: false,
   });
-  // DEBUG
-  console.debug(
-        '[AnalyticsProvider] render:',
-        'gaMeasurementId=', gaMeasurementId,
-        'consent=', consent
-      );
-  
+
   // State to control if provider is ready (prevents flash of content)
   const [isReady, setIsReady] = useState(false);
 
@@ -84,7 +78,6 @@ export function AnalyticsProvider({
   // Hydration safety - only show after client-side render
   useEffect(() => {
     setIsReady(true);
-    console.debug('[AnalyticsProvider] setIsReady(true)');
   }, []);
 
   // Skip rendering until client-side
