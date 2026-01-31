@@ -23,11 +23,9 @@ import { Spinner } from '@/components/ui/spinner';
 
 interface DonationFormProps {
   onSuccess?: () => void;
-  onShowPayment?: () => void;
-  onHidePayment?: () => void;
 }
 
-export function DonationForm({ onSuccess, onShowPayment, onHidePayment }: DonationFormProps) {
+export function DonationForm({ onSuccess }: DonationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customMode, setCustomMode] = useState(false);
   const [showPayPalButtons, setShowPayPalButtons] = useState(false);
@@ -98,9 +96,6 @@ export function DonationForm({ onSuccess, onShowPayment, onHidePayment }: Donati
 
     // Show PayPal buttons
     setShowPayPalButtons(true);
-    
-    // Notify parent component that payment UI is being shown
-    if (onShowPayment) onShowPayment();
   };
 
   const handleAmountInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,8 +109,16 @@ export function DonationForm({ onSuccess, onShowPayment, onHidePayment }: Donati
 
   const handlePayPalSuccess = async (details: any) => {
     setIsSubmitting(true);
+
+    // Track successful donation
+    analytics.trackEvent('donation_completed', {
+      payment_id: details.id,
+      currency: formData.currency,
+      value: formData.amount,
+    });
+
+    // Record the donation in backend (best-effort — payment already succeeded at PayPal)
     try {
-      // Record the donation in your system
       await apiClient.post('/donations', {
         amount: formData.amount,
         currency: formData.currency,
@@ -126,50 +129,30 @@ export function DonationForm({ onSuccess, onShowPayment, onHidePayment }: Donati
         status: 'completed',
         metadata: details,
       });
-
-      // Track successful donation
-      analytics.trackEvent('donation_completed', {
-        payment_id: details.id,
-        currency: formData.currency,
-        value: formData.amount,
-      });
-
-      toast.success('Thank you for your donation!');
-      
-      // Redirect to thank you page
-      window.location.href = `/donation/thank-you?orderId=${details.id}`;
-      
-      onSuccess?.();
     } catch (error) {
       console.error('Error recording donation:', error);
-      toast.error('Your donation was processed, but we had an error recording it. Please contact support.');
-    } finally {
-      setIsSubmitting(false);
     }
+
+    toast.success('Thank you for your donation!');
+    onSuccess?.();
+
+    // Always redirect — the payment was captured successfully regardless of backend recording
+    window.location.href = `/donation/thank-you?orderId=${details.id}`;
   };
 
   const handlePayPalError = (error: any) => {
     console.error('PayPal error:', error);
     toast.error('There was an error processing your donation. Please try again.');
     setShowPayPalButtons(false);
-    
-    // Notify parent that payment UI is being hidden
-    if (onHidePayment) onHidePayment();
   };
 
   const handlePayPalCancel = () => {
     toast.info('Donation cancelled');
     setShowPayPalButtons(false);
-    
-    // Notify parent that payment UI is being hidden
-    if (onHidePayment) onHidePayment();
   };
 
   const handleBackToForm = () => {
     setShowPayPalButtons(false);
-    
-    // Notify parent that payment UI is being hidden
-    if (onHidePayment) onHidePayment();
   };
 
   return (

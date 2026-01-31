@@ -1,7 +1,6 @@
-// src/donations/paypal-button.tsx
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 
 declare global {
@@ -18,6 +17,60 @@ interface PayPalButtonProps {
   onCancel: () => void
 }
 
+// Track which PayPal SDK script is currently loaded (globally, since only one can exist)
+let loadedPayPalCurrency: string | null = null
+
+function usePayPalScript(currency: string, clientId: string | undefined) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+
+  useEffect(() => {
+    if (!clientId) {
+      setStatus('error')
+      return
+    }
+
+    // If PayPal SDK is already loaded for the right currency, reuse it
+    if (loadedPayPalCurrency === currency && window.paypal) {
+      setStatus('ready')
+      return
+    }
+
+    // Remove any existing PayPal SDK script (only one instance supported)
+    const existingScripts = document.querySelectorAll('script[src*="paypal.com/sdk/js"]')
+    existingScripts.forEach((s) => s.remove())
+    // Clear the global PayPal object so stale references don't persist
+    delete window.paypal
+    loadedPayPalCurrency = null
+
+    const script = document.createElement('script')
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&enable-funding=card&disable-funding=credit,paylater&components=buttons`
+    script.async = true
+    script.setAttribute('data-sdk-integration-source', 'button-factory')
+
+    setStatus('loading')
+
+    const handleLoad = () => {
+      loadedPayPalCurrency = currency
+      setStatus('ready')
+    }
+    const handleError = () => {
+      loadedPayPalCurrency = null
+      setStatus('error')
+    }
+
+    script.addEventListener('load', handleLoad)
+    script.addEventListener('error', handleError)
+    document.body.appendChild(script)
+
+    return () => {
+      script.removeEventListener('load', handleLoad)
+      script.removeEventListener('error', handleError)
+    }
+  }, [currency, clientId])
+
+  return status
+}
+
 export default function PayPalButton({
   amount,
   currency,
@@ -25,141 +78,101 @@ export default function PayPalButton({
   onError,
   onCancel,
 }: PayPalButtonProps) {
-  const [buttonRendered, setButtonRendered] = useState(false)
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
+  const containerRef = useRef<HTMLDivElement>(null)
+  const buttonsInstanceRef = useRef<any>(null)
 
-  // Load the PayPal SDK script
-  const { status: scriptStatus, error: scriptError } = useScript(
-    `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}`
-  )
+  // Use refs for callbacks to avoid re-rendering PayPal buttons when parent re-renders
+  const onSuccessRef = useRef(onSuccess)
+  const onErrorRef = useRef(onError)
+  const onCancelRef = useRef(onCancel)
+  onSuccessRef.current = onSuccess
+  onErrorRef.current = onError
+  onCancelRef.current = onCancel
 
-  // Render PayPal buttons after script loads
+  const scriptStatus = usePayPalScript(currency, clientId)
+
+  // Render PayPal buttons when SDK is ready
   useEffect(() => {
-    if (scriptStatus !== 'ready' || buttonRendered) return
+    if (scriptStatus !== 'ready' || !window.paypal || !containerRef.current) return
 
-    try {
-      const renderButton = async () => {
-        // Clear previous buttons if they exist
-        const container = document.getElementById('paypal-button-container')
-        if (container) container.innerHTML = ''
-
-        // Render the PayPal button
-        window.paypal
-          .Buttons({
-            fundingSource: window.paypal.FUNDING.CARD,
-
-            style: {
-              layout: 'vertical',
-              color: 'black',
-              shape: 'rect',
-              label: 'paypal',
-            },
-            createOrder: (_data: any, actions: any) => {
-              return actions.order.create({
-                purchase_units: [
-                  {
-                    description: 'Donation to Koblich Chronicles',
-                    amount: {
-                      currency_code: currency,
-                      value: amount.toFixed(2),
-                    },
-                  },
-                ],
-                application_context: {
-                  shipping_preference: 'NO_SHIPPING',
-                },
-                redirect_urls: {
-                  return_url: window.location.origin + '/donation/thank-you',
-                  cancel_url: window.location.origin,
-},
-              })
-            },
-            onApprove: async (_data: any, actions: any) => {
-              try {
-                const details = await actions.order.capture()
-                onSuccess(details)
-              } catch (err) {
-                console.error('Error capturing PayPal order:', err)
-                onError(err)
-              }
-            },
-            onCancel: () => {
-              onCancel()
-            },
-            onError: (err: any) => {
-              console.error('PayPal error:', err)
-              onError(err)
-            },
-          })
-          .render('#paypal-button-container')
-          .then(() => {
-            setButtonRendered(true)
-          })
-      }
-
-      renderButton()
-    } catch (err) {
-      console.error('Error rendering PayPal button:', err)
-      onError(err)
+    // Clear previous buttons
+    if (buttonsInstanceRef.current) {
+      buttonsInstanceRef.current.close?.()
+      buttonsInstanceRef.current = null
     }
-  }, [scriptStatus, buttonRendered, amount, currency, onSuccess, onError, onCancel])
+    containerRef.current.innerHTML = ''
 
-  // Create a hook to create PayPal script loading
-  function useScript(src: string) {
-    const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
-      src ? 'loading' : 'idle'
+    const buttons = window.paypal.Buttons({
+      style: {
+        layout: 'vertical',
+        color: 'gold',
+        shape: 'rect',
+        label: 'donate',
+        tagline: false,
+      },
+      createOrder: (_data: any, actions: any) => {
+        return actions.order.create({
+          purchase_units: [
+            {
+              description: 'Donation to Koblich Chronicles',
+              amount: {
+                currency_code: currency,
+                value: amount.toFixed(2),
+              },
+            },
+          ],
+          application_context: {
+            shipping_preference: 'NO_SHIPPING',
+          },
+        })
+      },
+      onApprove: async (_data: any, actions: any) => {
+        try {
+          const details = await actions.order.capture()
+          onSuccessRef.current(details)
+        } catch (err) {
+          console.error('Error capturing PayPal order:', err)
+          onErrorRef.current(err)
+        }
+      },
+      onCancel: () => {
+        onCancelRef.current()
+      },
+      onError: (err: any) => {
+        console.error('PayPal error:', err)
+        onErrorRef.current(err)
+      },
+    })
+
+    buttonsInstanceRef.current = buttons
+
+    buttons.render(containerRef.current).catch((err: any) => {
+      // Ignore render errors if component unmounted (container removed)
+      if (containerRef.current) {
+        console.error('Error rendering PayPal buttons:', err)
+        onErrorRef.current(err)
+      }
+    })
+
+    return () => {
+      buttons.close?.()
+      buttonsInstanceRef.current = null
+    }
+  }, [scriptStatus, amount, currency])
+
+  if (!clientId) {
+    return (
+      <div className="text-destructive text-center py-4">
+        Payment system is not configured. Please contact support.
+      </div>
     )
-    const [error, setError] = useState<Error | null>(null)
-  
-    useEffect(() => {
-      if (!src) {
-        setStatus('idle')
-        return
-      }
-  
-      // Check if the script is already in the document
-      let script = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement
-  
-      if (!script) {
-        // Create script
-        script = document.createElement('script')
-        script.src = src
-        script.async = true
-        script.setAttribute('data-sdk-integration-source', 'button-factory')
-        document.body.appendChild(script)
-  
-        // Set status state
-        setStatus('loading')
-  
-        // Add event handlers
-        script.onload = () => setStatus('ready')
-        script.onerror = (err) => {
-          console.error('Script loading error:', err)
-          setError(new Error(`Failed to load script: ${src}`))
-          setStatus('error')
-        }
-      } else if (script.getAttribute('data-status') === 'ready') {
-        // Script is already loaded
-        setStatus('ready')
-      }
-  
-      // Cleanup function
-      return () => {
-        // Only remove the script if we created it
-        if (script && script.getAttribute('data-status') !== 'ready') {
-          document.body.removeChild(script)
-        }
-      }
-    }, [src])
-  
-    return { status, error }
   }
 
-  // Display appropriate UI based on script loading status
-  if (scriptStatus === 'loading') {
+  if (scriptStatus === 'loading' || scriptStatus === 'idle') {
     return (
       <div className="flex items-center justify-center py-4">
-        <Spinner className="mr-2" /> Loading PayPal...
+        <Spinner className="mr-2" /> Loading payment options...
       </div>
     )
   }
@@ -167,10 +180,10 @@ export default function PayPalButton({
   if (scriptStatus === 'error') {
     return (
       <div className="text-destructive text-center py-4">
-        Error loading PayPal. Please refresh the page or try again later.
+        Error loading payment system. Please refresh the page or try again later.
       </div>
     )
   }
 
-  return <div id="paypal-button-container" className="w-full min-h-[150px]"></div>
+  return <div ref={containerRef} className="w-full min-h-[200px]" />
 }
