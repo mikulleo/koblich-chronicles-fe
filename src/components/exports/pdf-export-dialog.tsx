@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { useFileDownload } from "@/hooks/use-file-download"
 import { PdfDownloadProgress } from "./pdf-download-progress"
+import { useAnalytics } from "@/hooks/use-analytics"
 
 const PDF_URL = "https://koblich-chronicles-be-production.up.railway.app/api/charts/export"
 const PDF_FILENAME = "stock-charts-2025-analysis.pdf"
@@ -22,27 +23,43 @@ export function PdfExportDialog() {
   const [open, setOpen] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const { progress, startDownload, cancelDownload, reset } = useFileDownload()
+  const analytics = useAnalytics()
 
   const isDownloading = progress.status === "preparing" || progress.status === "downloading"
 
   const handleStartDownload = useCallback(() => {
     setConfirmed(true)
+    analytics.trackEvent('pdf_download_started', { filename: PDF_FILENAME })
     startDownload(PDF_URL, PDF_FILENAME)
-  }, [startDownload])
+  }, [startDownload, analytics])
 
-  // Show toast notifications on completion/error
+  // Show toast notifications on completion/error and track analytics
   useEffect(() => {
     if (progress.status === "complete") {
       toast.success("PDF downloaded successfully!")
+      analytics.trackEvent('pdf_download_completed', {
+        filename: PDF_FILENAME,
+        bytes: progress.totalBytes,
+      })
     } else if (progress.status === "error") {
       toast.error(progress.error || "Download failed")
+      analytics.trackEvent('pdf_download_error', {
+        filename: PDF_FILENAME,
+        error: progress.error,
+      })
+    } else if (progress.status === "cancelled") {
+      analytics.trackEvent('pdf_download_cancelled', { filename: PDF_FILENAME })
     }
-  }, [progress.status, progress.error])
+  }, [progress.status, progress.error, progress.totalBytes, analytics])
 
   const handleOpenChange = (newOpen: boolean) => {
     // Prevent closing during active download
     if (!newOpen && isDownloading) {
       return
+    }
+
+    if (newOpen) {
+      analytics.trackEvent('pdf_button_click', { filename: PDF_FILENAME })
     }
 
     if (!newOpen) {
