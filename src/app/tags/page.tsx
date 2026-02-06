@@ -2,7 +2,7 @@ import { TagsShowcase } from "@/components/tags/tags-showcase";
 import { TagsStats } from "@/components/tags/tags-stats";
 import { Metadata } from "next";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tag, BarChart3 } from "lucide-react";
+import { Tag, TrendingUp } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Chart Tags | Koblich Chronicles",
@@ -25,8 +25,8 @@ export default function TagsPage() {
             Tag Showcase
           </TabsTrigger>
           <TabsTrigger value="statistics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Tag Statistics
+            <TrendingUp className="h-4 w-4" />
+            Tag Performance
           </TabsTrigger>
         </TabsList>
         <TabsContent value="showcase" className="mt-6">

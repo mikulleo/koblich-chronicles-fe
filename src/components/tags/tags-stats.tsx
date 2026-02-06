@@ -1,262 +1,341 @@
 "use client";
 
-import React from 'react';
-import { useEffect, useState } from 'react';
-import { Tag, Chart, PaginatedResponse } from '@/lib/types';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Tag, Chart, Trade } from '@/lib/types';
 import apiClient from '@/lib/api/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  ReferenceLine
 } from 'recharts';
-import { parseISO, format, startOfWeek, addWeeks, eachWeekOfInterval, endOfWeek, startOfMonth, endOfMonth, eachMonthOfInterval, addMonths, startOfQuarter, endOfQuarter, eachQuarterOfInterval } from 'date-fns';
+import {
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Award,
+  AlertTriangle,
+  InfoIcon,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
+} from 'lucide-react';
+import { parseISO, isWithinInterval, addDays } from 'date-fns';
 
-interface TagWithChartCount extends Tag {
-  actualChartCount: number;
-  // Track counts per month
-  monthlyUsage: {
-    [key: string]: number; // Format: "YYYY-MM"
-  };
-  // Track counts per week
-  weeklyUsage: {
-    [key: string]: number; // Format: "YYYY-WW" (ISO week)
-  };
-  // Track best 3-week window
-  bestWindow?: {
-    startWeek: string;
-    endWeek: string;
-    count: number;
-    period: string; // Human readable period
-  };
+// Types for tag performance metrics
+interface TagPerformance {
+  tag: Tag;
+  // Trade metrics
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  breakEvenTrades: number;
+  winRate: number;
+  // P/L metrics
+  avgProfitLossPercent: number;
+  totalProfitLossPercent: number;
+  avgRRatio: number;
+  // Best/Worst
+  bestTrade: { ticker: string; profitLossPercent: number } | null;
+  worstTrade: { ticker: string; profitLossPercent: number } | null;
+  // Chart count
+  chartCount: number;
 }
 
-// Extended color palette for more variety
-const EXTENDED_COLORS = [
-  '#FF5252', '#4CAF50', '#2196F3', '#FFEB3B', '#9C27B0', 
-  '#FF9800', '#009688', '#E91E63', '#9E9E9E', '#F44336',
-  '#4CAF50', '#03A9F4', '#FFCC02', '#673AB7', '#FF5722',
-  '#00BCD4', '#8BC34A', '#FFC107', '#795548', '#607D8B',
-  '#E91E63', '#3F51B5', '#00E676', '#FF6F00', '#7B1FA2',
-  '#D32F2F', '#388E3C', '#1976D2', '#F57C00', '#512DA8',
-  '#C2185B', '#7B1FA2', '#303F9F', '#388E3C', '#F57C00',
-  '#5D4037', '#455A64', '#E64A19', '#00796B', '#AFB42B'
-];
-
-// Function to get a unique color for each tag
-const getTagColor = (tag: Tag, index: number): string => {
-  // First try to use the tag's assigned color
-  if (tag.color && tag.color !== '#9E9E9E') {
-    return tag.color;
-  }
-  
-  // If no specific color or it's the default gray, use extended palette
-  return EXTENDED_COLORS[index % EXTENDED_COLORS.length];
+// Color utilities
+const getWinRateColor = (winRate: number): string => {
+  if (winRate >= 60) return '#22c55e'; // green-500
+  if (winRate >= 50) return '#84cc16'; // lime-500
+  if (winRate >= 40) return '#eab308'; // yellow-500
+  return '#ef4444'; // red-500
 };
 
-// Custom label component for better control
-const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }: any) => {
-  const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-  // Always show the tag name
-  const label = name;
+// Helper to get trade's end date (last exit or today if open)
+const getTradeEndDate = (trade: Trade): Date => {
+  if (trade.status === 'open') {
+    return new Date();
+  }
+  if (trade.exits && trade.exits.length > 0) {
+    const exitDates = trade.exits.map(e => parseISO(e.date));
+    return new Date(Math.max(...exitDates.map(d => d.getTime())));
+  }
+  return new Date();
+};
+
+// Helper to check if chart is related to a trade
+const isChartRelatedToTrade = (chart: Chart, trade: Trade): boolean => {
+  // Get ticker IDs
+  const chartTickerId = typeof chart.ticker === 'object' ? chart.ticker.id : chart.ticker;
+  const tradeTickerId = typeof trade.ticker === 'object' ? trade.ticker.id : trade.ticker;
+
+  if (chartTickerId !== tradeTickerId) return false;
+
+  const chartDate = parseISO(chart.timestamp);
+  const tradeStart = parseISO(trade.entryDate);
+  const tradeEnd = addDays(getTradeEndDate(trade), 7); // Add buffer for post-trade analysis charts
+
+  return isWithinInterval(chartDate, { start: addDays(tradeStart, -7), end: tradeEnd });
+};
+
+// Stats Card Component
+interface StatsCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  color?: 'green' | 'red' | 'yellow' | 'default';
+  tooltip?: string;
+}
+
+function StatsCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color = 'default',
+  tooltip
+}: StatsCardProps) {
+  const colorClasses = {
+    green: 'text-green-600',
+    red: 'text-red-500',
+    yellow: 'text-yellow-600',
+    default: 'text-foreground'
+  };
 
   return (
-    <text 
-      x={x} 
-      y={y} 
-      fill="white" 
-      textAnchor={x > cx ? 'start' : 'end'} 
-      dominantBaseline="central"
-      fontSize="12"
-      fontWeight="600"
-      style={{
-        textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
-        filter: 'drop-shadow(1px 1px 1px rgba(0,0,0,0.5))'
-      }}
-    >
-      {label}
-    </text>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+              {title}
+              {tooltip && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>{tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </p>
+            <p className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+            )}
+          </div>
+          {Icon && (
+            <Icon className={`h-8 w-8 ${colorClasses[color]} opacity-20`} />
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
+}
+
+// Performance Badge
+function PerformanceBadge({ value, type }: { value: number; type: 'winRate' | 'rRatio' | 'pl' }) {
+  let color: string;
+  let icon: React.ReactNode;
+
+  if (type === 'winRate') {
+    color = value >= 50 ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20';
+    icon = value >= 50 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
+  } else if (type === 'rRatio') {
+    color = value >= 1 ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20';
+    icon = <Target className="h-3 w-3" />;
+  } else {
+    color = value > 0 ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+            value < 0 ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+            'bg-gray-500/10 text-gray-500 border-gray-500/20';
+    icon = value > 0 ? <ArrowUpRight className="h-3 w-3" /> :
+           value < 0 ? <ArrowDownRight className="h-3 w-3" /> :
+           <Minus className="h-3 w-3" />;
+  }
+
+  return (
+    <Badge variant="outline" className={`${color} flex items-center gap-1`}>
+      {icon}
+      {type === 'winRate' ? `${value.toFixed(0)}%` :
+       type === 'rRatio' ? `${value.toFixed(2)}R` :
+       `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`}
+    </Badge>
+  );
+}
+
+// Custom tooltip for bar chart
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover border rounded-lg p-3 shadow-lg">
+        <p className="font-medium">{data.name}</p>
+        <div className="mt-2 space-y-1 text-sm">
+          <p>Win Rate: <span className="font-medium">{data.winRate.toFixed(1)}%</span></p>
+          <p>Trades: <span className="font-medium">{data.totalTrades}</span></p>
+          <p>Avg P/L: <span className={`font-medium ${data.avgPL >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            {data.avgPL >= 0 ? '+' : ''}{data.avgPL.toFixed(2)}%
+          </span></p>
+          <p>Avg R: <span className="font-medium">{data.avgR.toFixed(2)}R</span></p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom tooltip for scatter chart
+const CustomScatterTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-popover border rounded-lg p-3 shadow-lg">
+        <p className="font-medium">{data.name}</p>
+        <div className="mt-2 space-y-1 text-sm">
+          <p>Charts: <span className="font-medium">{data.x}</span></p>
+          <p>Win Rate: <span className="font-medium">{data.y.toFixed(1)}%</span></p>
+          <p>Trades: <span className="font-medium">{data.trades}</span></p>
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 export function TagsStats() {
-  const [tagsWithCounts, setTagsWithCounts] = useState<TagWithChartCount[]>([]);
+  const [tagPerformance, setTagPerformance] = useState<TagPerformance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  
-  // State for calendar expansions
-  const [expandedQuarters, setExpandedQuarters] = useState<Set<string>>(new Set());
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
-  
-  // Helper functions for expansion
-  const toggleQuarter = (quarterId: string) => {
-    const newExpanded = new Set(expandedQuarters);
-    if (newExpanded.has(quarterId)) {
-      newExpanded.delete(quarterId);
-      // Also collapse all months in this quarter
-      const newExpandedMonths = new Set(expandedMonths);
-      newExpandedMonths.forEach(monthId => {
-        if (monthId.startsWith(quarterId.substring(0, 4))) {
-          newExpandedMonths.delete(monthId);
-        }
-      });
-      setExpandedMonths(newExpandedMonths);
-    } else {
-      newExpanded.add(quarterId);
-    }
-    setExpandedQuarters(newExpanded);
-  };
-  
-  const toggleMonth = (monthId: string) => {
-    const newExpanded = new Set(expandedMonths);
-    if (newExpanded.has(monthId)) {
-      newExpanded.delete(monthId);
-    } else {
-      newExpanded.add(monthId);
-    }
-    setExpandedMonths(newExpanded);
-  };
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch all tags
-        const tagsResponse = await apiClient.get('/tags');
-        if (!tagsResponse.data || !tagsResponse.data.docs) {
-          throw new Error('Failed to fetch tags data');
-        }
-        
-        const tags: Tag[] = tagsResponse.data.docs;
-        
-        // Fetch all charts (with a high limit to get as many as possible)
-        const chartsResponse = await apiClient.get('/charts');
-        if (!chartsResponse.data) {
-          throw new Error('Failed to fetch charts data');
-        }
-        
-        const charts: PaginatedResponse<Chart> = chartsResponse.data;
-        
-        // Count charts per tag and track usage by month and week
-        const tagCounts: Record<string, number> = {};
-        const tagMonthlyUsage: Record<string, Record<string, number>> = {};
-        const tagWeeklyUsage: Record<string, Record<string, number>> = {};
-        
-        // Initialize counts and usage tracking for all tags to zero
-        tags.forEach(tag => {
-          tagCounts[tag.id] = 0;
-          tagMonthlyUsage[tag.id] = {};
-          tagWeeklyUsage[tag.id] = {};
-        });
-        
-        // Count charts for each tag by month and week
-        charts.docs.forEach(chart => {
-          if (chart.tags && Array.isArray(chart.tags)) {
-            const chartDate = parseISO(chart.timestamp);
-            const chartMonth = format(chartDate, 'yyyy-MM');
-            const chartWeek = format(startOfWeek(chartDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'); // Monday start
-            
-            chart.tags.forEach(tag => {
-              // Handle both populated and non-populated tags
-              const tagId = typeof tag === 'object' ? tag.id : tag;
-              if (tagId && tagCounts[tagId] !== undefined) {
-                // Increment total count
-                tagCounts[tagId]++;
-                
-                // Increment monthly count
-                if (!tagMonthlyUsage[tagId][chartMonth]) {
-                  tagMonthlyUsage[tagId][chartMonth] = 0;
-                }
-                tagMonthlyUsage[tagId][chartMonth]++;
-                
-                // Increment weekly count
-                if (!tagWeeklyUsage[tagId][chartWeek]) {
-                  tagWeeklyUsage[tagId][chartWeek] = 0;
-                }
-                tagWeeklyUsage[tagId][chartWeek]++;
+
+        // Fetch all data in parallel
+        const [tagsResponse, chartsResponse, tradesResponse] = await Promise.all([
+          apiClient.get('/tags'),
+          apiClient.get('/charts'),
+          apiClient.get('/trades')
+        ]);
+
+        const tags: Tag[] = tagsResponse.data?.docs || [];
+        const charts: Chart[] = chartsResponse.data?.docs || [];
+        const trades: Trade[] = tradesResponse.data?.docs || [];
+
+        // Only consider closed or partial trades for performance metrics
+        const completedTrades = trades.filter(t => t.status === 'closed' || t.status === 'partial');
+
+        // Calculate performance for each tag
+        const performance: TagPerformance[] = tags.map(tag => {
+          // Find charts with this tag
+          const chartsWithTag = charts.filter(chart => {
+            if (!chart.tags) return false;
+            return chart.tags.some(t => {
+              const tagId = typeof t === 'object' ? t.id : t;
+              return tagId === tag.id;
+            });
+          });
+
+          // Find trades related to these charts
+          const relatedTradeIds = new Set<string>();
+          const relatedTrades: Trade[] = [];
+
+          chartsWithTag.forEach(chart => {
+            completedTrades.forEach(trade => {
+              if (!relatedTradeIds.has(trade.id) && isChartRelatedToTrade(chart, trade)) {
+                relatedTradeIds.add(trade.id);
+                relatedTrades.push(trade);
               }
             });
+          });
+
+          // Calculate metrics
+          const winningTrades = relatedTrades.filter(t => (t.profitLossPercent ?? 0) > 0).length;
+          const losingTrades = relatedTrades.filter(t => (t.profitLossPercent ?? 0) < 0).length;
+          const breakEvenTrades = relatedTrades.filter(t => (t.profitLossPercent ?? 0) === 0).length;
+          const totalTrades = relatedTrades.length;
+
+          const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+          const avgProfitLossPercent = totalTrades > 0
+            ? relatedTrades.reduce((sum, t) => sum + (t.profitLossPercent ?? 0), 0) / totalTrades
+            : 0;
+
+          const totalProfitLossPercent = relatedTrades.reduce((sum, t) => sum + (t.profitLossPercent ?? 0), 0);
+
+          const tradesWithR = relatedTrades.filter(t => t.rRatio !== undefined && t.rRatio !== null);
+          const avgRRatio = tradesWithR.length > 0
+            ? tradesWithR.reduce((sum, t) => sum + (t.rRatio ?? 0), 0) / tradesWithR.length
+            : 0;
+
+          // Find best and worst trades
+          let bestTrade: TagPerformance['bestTrade'] = null;
+          let worstTrade: TagPerformance['worstTrade'] = null;
+
+          if (relatedTrades.length > 0) {
+            const sorted = [...relatedTrades].sort((a, b) => (b.profitLossPercent ?? 0) - (a.profitLossPercent ?? 0));
+            const best = sorted[0];
+            const worst = sorted[sorted.length - 1];
+
+            if (best) {
+              const ticker = typeof best.ticker === 'object' ? best.ticker.symbol : 'Unknown';
+              bestTrade = { ticker, profitLossPercent: best.profitLossPercent ?? 0 };
+            }
+            if (worst && worst !== best) {
+              const ticker = typeof worst.ticker === 'object' ? worst.ticker.symbol : 'Unknown';
+              worstTrade = { ticker, profitLossPercent: worst.profitLossPercent ?? 0 };
+            }
           }
-        });
-        
-        // Calculate best 3-week window for each tag
-        const tagBestWindows: Record<string, { startWeek: string, endWeek: string, count: number, period: string }> = {};
-        
-        Object.entries(tagWeeklyUsage).forEach(([tagId, weeklyData]) => {
-          // Get all weeks with usage, sorted chronologically
-          const weeks = Object.keys(weeklyData).sort();
-          
-          if (weeks.length < 3) {
-            // Not enough data for a 3-week window
-            return;
-          }
-          
-          let bestWindow = {
-            startWeek: weeks[0],
-            endWeek: weeks[0],
-            count: 0,
-            period: ''
+
+          return {
+            tag,
+            totalTrades,
+            winningTrades,
+            losingTrades,
+            breakEvenTrades,
+            winRate,
+            avgProfitLossPercent,
+            totalProfitLossPercent,
+            avgRRatio,
+            bestTrade,
+            worstTrade,
+            chartCount: chartsWithTag.length
           };
-          
-          // Check each possible 3-week window
-          for (let i = 0; i < weeks.length - 2; i++) {
-            const startWeek = weeks[i];
-            const endWeek = weeks[i + 2]; // 3-week window
-            
-            // Calculate total count in this window
-            let windowCount = 0;
-            for (let j = i; j <= i + 2; j++) {
-              windowCount += weeklyData[weeks[j]] || 0;
-            }
-            
-            if (windowCount > bestWindow.count) {
-              const startDate = parseISO(startWeek);
-              const endDate = parseISO(endWeek);
-              const endDatePlusWeek = addWeeks(endDate, 1);
-              
-              bestWindow = {
-                startWeek,
-                endWeek,
-                count: windowCount,
-                period: `${format(startDate, 'MMM d')} - ${format(endDatePlusWeek, 'MMM d, yyyy')}`
-              };
-            }
-          }
-          
-          if (bestWindow.count > 0) {
-            tagBestWindows[tagId] = bestWindow;
-          }
         });
-        
-        // Combine tags with their actual chart counts, monthly usage, weekly usage, and best windows
-        const tagsWithActualCounts: TagWithChartCount[] = tags
-          .map(tag => ({
-            ...tag,
-            actualChartCount: tagCounts[tag.id] || 0,
-            monthlyUsage: tagMonthlyUsage[tag.id] || {},
-            weeklyUsage: tagWeeklyUsage[tag.id] || {},
-            bestWindow: tagBestWindows[tag.id]
-          }))
-          .sort((a, b) => b.actualChartCount - a.actualChartCount);
-        
-        setTagsWithCounts(tagsWithActualCounts);
+
+        // Sort by total trades (most data first), then by win rate
+        performance.sort((a, b) => {
+          if (b.totalTrades !== a.totalTrades) return b.totalTrades - a.totalTrades;
+          return b.winRate - a.winRate;
+        });
+
+        setTagPerformance(performance);
         setError(null);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setError(error instanceof Error ? error : new Error('Failed to fetch data'));
+      } catch (err) {
+        console.error('Error fetching tag performance data:', err);
+        setError(err instanceof Error ? err : new Error('Failed to fetch data'));
       } finally {
         setLoading(false);
       }
@@ -265,27 +344,81 @@ export function TagsStats() {
     fetchData();
   }, []);
 
-  // Prepare data for bar chart - top 10 tags by chart count
-  const barChartData = tagsWithCounts.slice(0, 10).map((tag, index) => ({
-    name: tag.name,
-    value: tag.actualChartCount,
-    fill: getTagColor(tag, index)
-  }));
+  // Computed values
+  const tagsWithTrades = useMemo(() =>
+    tagPerformance.filter(tp => tp.totalTrades > 0),
+    [tagPerformance]
+  );
 
-  // Prepare data for pie chart - distribution of tags
-  // Only include tags with charts for the pie chart
-  const pieChartData = tagsWithCounts
-    .filter(tag => tag.actualChartCount > 0)
-    .map((tag, index) => ({
-      name: tag.name,
-      value: tag.actualChartCount,
-      fill: getTagColor(tag, index)
-    }));
+  const bestPerformingTag = useMemo(() => {
+    const withEnoughTrades = tagsWithTrades.filter(tp => tp.totalTrades >= 3);
+    if (withEnoughTrades.length === 0) return null;
+    return withEnoughTrades.reduce((best, current) =>
+      current.winRate > best.winRate ? current : best
+    );
+  }, [tagsWithTrades]);
+
+  const worstPerformingTag = useMemo(() => {
+    const withEnoughTrades = tagsWithTrades.filter(tp => tp.totalTrades >= 3);
+    if (withEnoughTrades.length === 0) return null;
+    return withEnoughTrades.reduce((worst, current) =>
+      current.winRate < worst.winRate ? current : worst
+    );
+  }, [tagsWithTrades]);
+
+  const mostProfitableTag = useMemo(() => {
+    const withTrades = tagsWithTrades.filter(tp => tp.totalTrades >= 2);
+    if (withTrades.length === 0) return null;
+    return withTrades.reduce((best, current) =>
+      current.totalProfitLossPercent > best.totalProfitLossPercent ? current : best
+    );
+  }, [tagsWithTrades]);
+
+  const totalTradesAnalyzed = useMemo(() =>
+    tagsWithTrades.reduce((sum, tp) => sum + tp.totalTrades, 0),
+    [tagsWithTrades]
+  );
+
+  // Chart data
+  const barChartData = useMemo(() =>
+    tagsWithTrades
+      .filter(tp => tp.totalTrades >= 2)
+      .slice(0, 12)
+      .map(tp => ({
+        name: tp.tag.name.length > 12 ? tp.tag.name.substring(0, 12) + '...' : tp.tag.name,
+        fullName: tp.tag.name,
+        winRate: tp.winRate,
+        totalTrades: tp.totalTrades,
+        avgPL: tp.avgProfitLossPercent,
+        avgR: tp.avgRRatio,
+        fill: getWinRateColor(tp.winRate)
+      })),
+    [tagsWithTrades]
+  );
+
+  const scatterData = useMemo(() =>
+    tagsWithTrades
+      .filter(tp => tp.totalTrades >= 1)
+      .map(tp => ({
+        name: tp.tag.name,
+        x: tp.chartCount,
+        y: tp.winRate,
+        z: tp.totalTrades,
+        trades: tp.totalTrades,
+        fill: getWinRateColor(tp.winRate)
+      })),
+    [tagsWithTrades]
+  );
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-[400px] w-full rounded-lg" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-[400px] rounded-lg" />
       </div>
     );
   }
@@ -293,18 +426,20 @@ export function TagsStats() {
   if (error) {
     return (
       <div className="bg-destructive/10 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-destructive mb-2">Error Loading Tag Statistics</h3>
+        <h3 className="text-lg font-medium text-destructive mb-2">Error Loading Tag Performance</h3>
         <p>{error.message}</p>
       </div>
     );
   }
 
-  if (tagsWithCounts.length === 0) {
+  if (tagsWithTrades.length === 0) {
     return (
       <div className="bg-muted p-6 rounded-lg text-center">
-        <h3 className="text-lg font-medium mb-2">No Tags Available</h3>
-        <p className="text-muted-foreground">
-          Create tags to see statistics on their usage.
+        <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No Tag Performance Data</h3>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          Tag performance is calculated by linking charts (with tags) to trades (with P/L).
+          Add tags to your charts that correspond to trade setups to see performance metrics.
         </p>
       </div>
     );
@@ -312,480 +447,272 @@ export function TagsStats() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Tags by Usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {barChartData.length > 0 && barChartData.some(item => item.value > 0) ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={barChartData}
-                    margin={{
-                      top: 5,
-                      right: 30,
-                      left: 20,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => value.length > 8 ? `${value.substring(0, 8)}...` : value}
-                    />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value, name, props) => [value, 'Charts']}
-                      labelFormatter={(label) => `Tag: ${label}`}
-                    />
-                    <Bar dataKey="value">
-                      {barChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground">No chart data available</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          title="Tags with Trades"
+          value={tagsWithTrades.length}
+          subtitle={`of ${tagPerformance.length} total tags`}
+          icon={Target}
+          tooltip="Number of tags that are linked to at least one completed trade"
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tag Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {pieChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieChartData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={CustomPieLabel}
-                      outerRadius={100}
-                      dataKey="value"
-                    >
-                      {pieChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value, name, props) => [value, 'Charts']}
-                      labelFormatter={(label) => `Tag: ${label}`}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-muted-foreground text-center">
-                    No charts associated with any tags
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {bestPerformingTag && (
+          <StatsCard
+            title="Best Win Rate"
+            value={`${bestPerformingTag.winRate.toFixed(0)}%`}
+            subtitle={`${bestPerformingTag.tag.name} (${bestPerformingTag.totalTrades} trades)`}
+            icon={Award}
+            color="green"
+            tooltip="Tag with highest win rate (minimum 3 trades)"
+          />
+        )}
+
+        {mostProfitableTag && (
+          <StatsCard
+            title="Most Profitable"
+            value={`+${mostProfitableTag.totalProfitLossPercent.toFixed(1)}%`}
+            subtitle={`${mostProfitableTag.tag.name} (${mostProfitableTag.totalTrades} trades)`}
+            icon={TrendingUp}
+            color="green"
+            tooltip="Tag with highest total P/L percentage"
+          />
+        )}
+
+        {worstPerformingTag && (
+          <StatsCard
+            title="Needs Improvement"
+            value={`${worstPerformingTag.winRate.toFixed(0)}%`}
+            subtitle={`${worstPerformingTag.tag.name} (${worstPerformingTag.totalTrades} trades)`}
+            icon={AlertTriangle}
+            color="yellow"
+            tooltip="Tag with lowest win rate (minimum 3 trades)"
+          />
+        )}
       </div>
-      
-      {/* Best 3-Week Windows for Tags */}
+
+      {/* Win Rate by Tag Bar Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>'Tag Most Utilized' 3-Week Windows</CardTitle>
+          <CardTitle>Win Rate by Tag</CardTitle>
+          <CardDescription>
+            Tags sorted by number of trades (minimum 2 trades to display)
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {(() => {
-            // Get top 3 tags with best windows, sorted by their best window count
-            const topTagsByWindow = tagsWithCounts
-              .filter(tag => tag.bestWindow && tag.bestWindow.count > 0)
-              .sort((a, b) => (b.bestWindow?.count || 0) - (a.bestWindow?.count || 0))
-              .slice(0, 3);
+          {barChartData.length > 0 ? (
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barChartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    interval={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `${value}%`}
+                  />
+                  <RechartsTooltip content={<CustomBarTooltip />} />
+                  <ReferenceLine y={50} stroke="#6b7280" strokeDasharray="5 5" label={{ value: '50%', position: 'right', fontSize: 10 }} />
+                  <Bar dataKey="winRate" radius={[4, 4, 0, 0]}>
+                    {barChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+              Need at least 2 trades per tag to display chart
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            if (topTagsByWindow.length === 0) {
-              return (
-                <div className="h-[200px] flex flex-col items-center justify-center bg-muted/20 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">No Data Available</h3>
-                  <p className="text-muted-foreground text-center max-w-md">
-                    Need at least 3 weeks of data to calculate best performance windows.
-                  </p>
-                </div>
-              );
-            }
+      {/* Scatter Plot: Frequency vs Win Rate */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tag Frequency vs Win Rate</CardTitle>
+          <CardDescription>
+            Bubble size indicates number of trades. Look for tags with high frequency AND high win rate.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scatterData.length > 0 ? (
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis
+                    type="number"
+                    dataKey="x"
+                    name="Charts"
+                    tick={{ fontSize: 12 }}
+                    label={{ value: 'Number of Charts', position: 'bottom', offset: 0, fontSize: 12 }}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="y"
+                    name="Win Rate"
+                    domain={[0, 100]}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `${value}%`}
+                    label={{ value: 'Win Rate', angle: -90, position: 'insideLeft', fontSize: 12 }}
+                  />
+                  <ZAxis type="number" dataKey="z" range={[50, 400]} name="Trades" />
+                  <RechartsTooltip content={<CustomScatterTooltip />} />
+                  <ReferenceLine y={50} stroke="#6b7280" strokeDasharray="5 5" />
+                  <Scatter data={scatterData}>
+                    {scatterData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.7} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[350px] flex items-center justify-center text-muted-foreground">
+              No data available
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {topTagsByWindow.map((tag, index) => (
-                  <div
-                    key={tag.id}
-                    className="relative p-4 rounded-lg border"
-                    style={{ backgroundColor: `${getTagColor(tag, index)}15` }}
+      {/* Detailed Performance Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tag Performance Details</CardTitle>
+          <CardDescription>
+            Complete breakdown of trading performance by tag
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-2 font-medium">Tag</th>
+                  <th className="text-center py-3 px-2 font-medium">Trades</th>
+                  <th className="text-center py-3 px-2 font-medium">Win Rate</th>
+                  <th className="text-center py-3 px-2 font-medium">Avg P/L</th>
+                  <th className="text-center py-3 px-2 font-medium">Avg R</th>
+                  <th className="text-center py-3 px-2 font-medium hidden md:table-cell">W/L/BE</th>
+                  <th className="text-left py-3 px-2 font-medium hidden lg:table-cell">Best Trade</th>
+                  <th className="text-left py-3 px-2 font-medium hidden lg:table-cell">Worst Trade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tagsWithTrades.map((tp, index) => (
+                  <tr
+                    key={tp.tag.id}
+                    className={`border-b last:border-0 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}
                   >
-                    {/* Ranking badge */}
-                    <div 
-                      className="absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                      style={{ backgroundColor: getTagColor(tag, index) }}
-                    >
-                      {index + 1}
-                    </div>
-                    
-                    {/* Tag info */}
-                    <div className="pt-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: getTagColor(tag, index) }}
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: tp.tag.color || '#6b7280' }}
                         />
-                        <h3 className="font-medium text-lg">{tag.name}</h3>
+                        <span className="font-medium truncate max-w-[150px]" title={tp.tag.name}>
+                          {tp.tag.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({tp.chartCount} charts)
+                        </span>
                       </div>
-                      
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Best Period:</span>
-                          <br />
-                          {tag.bestWindow?.period}
-                        </div>
-                        
-                        <div>
-                          <span className="font-medium">Charts in window:</span>
-                          <span className="ml-1 font-bold text-foreground">
-                            {tag.bestWindow?.count}
-                          </span>
-                        </div>
-                        
-                        <div>
-                          <span className="font-medium">Total charts:</span>
-                          <span className="ml-1">{tag.actualChartCount}</span>
-                        </div>
-                        
-                        {tag.bestWindow && (
-                          <div>
-                            <span className="font-medium">Window intensity:</span>
-                            <span className="ml-1">
-                              {Math.round((tag.bestWindow.count / tag.actualChartCount) * 100)}% of all usage
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    </td>
+                    <td className="py-3 px-2 text-center font-medium">
+                      {tp.totalTrades}
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <PerformanceBadge value={tp.winRate} type="winRate" />
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <PerformanceBadge value={tp.avgProfitLossPercent} type="pl" />
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <PerformanceBadge value={tp.avgRRatio} type="rRatio" />
+                    </td>
+                    <td className="py-3 px-2 text-center hidden md:table-cell">
+                      <span className="text-green-600">{tp.winningTrades}</span>
+                      <span className="text-muted-foreground mx-1">/</span>
+                      <span className="text-red-500">{tp.losingTrades}</span>
+                      <span className="text-muted-foreground mx-1">/</span>
+                      <span className="text-gray-500">{tp.breakEvenTrades}</span>
+                    </td>
+                    <td className="py-3 px-2 hidden lg:table-cell">
+                      {tp.bestTrade ? (
+                        <span className="text-green-600">
+                          {tp.bestTrade.ticker}: +{tp.bestTrade.profitLossPercent.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2 hidden lg:table-cell">
+                      {tp.worstTrade ? (
+                        <span className="text-red-500">
+                          {tp.worstTrade.ticker}: {tp.worstTrade.profitLossPercent.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            );
-          })()}
+              </tbody>
+            </table>
+          </div>
+
+          {tagsWithTrades.length === 0 && (
+            <div className="py-8 text-center text-muted-foreground">
+              No tags with associated trades found
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Hierarchical Tag Usage Calendar */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tag Usage Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            // Get all weeks that have any tag usage
-            const allWeeksWithUsage = new Set<string>();
-            tagsWithCounts.forEach(tag => {
-              Object.keys(tag.weeklyUsage).forEach(week => {
-                if (tag.weeklyUsage[week] > 0) {
-                  allWeeksWithUsage.add(week);
-                }
-              });
-            });
-
-            if (allWeeksWithUsage.size === 0) {
-              return (
-                <div className="h-[200px] flex flex-col items-center justify-center bg-muted/20 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">No Data Available</h3>
-                  <p className="text-muted-foreground text-center max-w-md">
-                    Upload some charts to see tag usage patterns.
-                  </p>
-                </div>
-              );
-            }
-
-            // Sort weeks chronologically and group by quarters and months
-            const sortedWeeks = Array.from(allWeeksWithUsage).sort().reverse();
-            
-            // Group data by quarters
-            const quarterData = new Map<string, {
-              quarterId: string;
-              quarterStart: Date;
-              quarterEnd: Date;
-              displayPeriod: string;
-              totalCharts: number;
-              topTags: any[];
-              months: Map<string, {
-                monthId: string;
-                monthStart: Date;
-                monthEnd: Date;
-                displayPeriod: string;
-                totalCharts: number;
-                topTags: any[];
-                weeks: any[];
-              }>;
-            }>();
-
-            sortedWeeks.forEach(week => {
-              const weekStart = parseISO(week);
-              const quarterStart = startOfQuarter(weekStart);
-              const quarterId = format(quarterStart, 'yyyy-QQ');
-              const monthStart = startOfMonth(weekStart);
-              const monthId = format(monthStart, 'yyyy-MM');
-              
-              // Initialize quarter if not exists
-              if (!quarterData.has(quarterId)) {
-                quarterData.set(quarterId, {
-                  quarterId,
-                  quarterStart,
-                  quarterEnd: endOfQuarter(quarterStart),
-                  displayPeriod: `Q${format(quarterStart, 'Q yyyy')} (${format(quarterStart, 'MMM')} - ${format(endOfQuarter(quarterStart), 'MMM yyyy')})`,
-                  totalCharts: 0,
-                  topTags: [],
-                  months: new Map()
-                });
-              }
-
-              const quarter = quarterData.get(quarterId)!;
-
-              // Initialize month if not exists
-              if (!quarter.months.has(monthId)) {
-                quarter.months.set(monthId, {
-                  monthId,
-                  monthStart,
-                  monthEnd: endOfMonth(monthStart),
-                  displayPeriod: format(monthStart, 'MMMM yyyy'),
-                  totalCharts: 0,
-                  topTags: [],
-                  weeks: []
-                });
-              }
-
-              const month = quarter.months.get(monthId)!;
-
-              // Add week data
-              const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-              const tagsInWeek = tagsWithCounts
-                .map(tag => ({
-                  ...tag,
-                  weekCount: tag.weeklyUsage[week] || 0
-                }))
-                .filter(tag => tag.weekCount > 0)
-                .sort((a, b) => b.weekCount - a.weekCount)
-                .slice(0, 3);
-
-              const weekTotalCharts = tagsInWeek.reduce((sum, tag) => sum + tag.weekCount, 0);
-
-              month.weeks.push({
-                week,
-                weekStart,
-                weekEnd,
-                displayPeriod: `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`,
-                topTags: tagsInWeek,
-                totalCharts: weekTotalCharts
-              });
-
-              month.totalCharts += weekTotalCharts;
-              quarter.totalCharts += weekTotalCharts;
-            });
-
-            // Calculate top tags for quarters and months
-            quarterData.forEach(quarter => {
-              const quarterTagCounts = new Map<string, number>();
-              quarter.months.forEach(month => {
-                const monthTagCounts = new Map<string, number>();
-                month.weeks.forEach(week => {
-                  week.topTags.forEach((tag: TagWithChartCount & { weekCount: number }) => {
-                    quarterTagCounts.set(tag.id, (quarterTagCounts.get(tag.id) || 0) + tag.weekCount);
-                    monthTagCounts.set(tag.id, (monthTagCounts.get(tag.id) || 0) + tag.weekCount);
-                  });
-                });
-                
-                // Set top tags for month
-                month.topTags = Array.from(monthTagCounts.entries())
-                  .map(([tagId, count]) => {
-                    const tag = tagsWithCounts.find(t => t.id === tagId);
-                    return { ...tag, weekCount: count };
-                  })
-                  .filter(tag => tag.id)
-                  .sort((a, b) => b.weekCount - a.weekCount)
-                  .slice(0, 3);
-              });
-              
-              // Set top tags for quarter
-              quarter.topTags = Array.from(quarterTagCounts.entries())
-                .map(([tagId, count]) => {
-                  const tag = tagsWithCounts.find(t => t.id === tagId);
-                  return { ...tag, weekCount: count };
-                })
-                .filter(tag => tag.id)
-                .sort((a, b) => b.weekCount - a.weekCount)
-                .slice(0, 3);
-            });
-
-            const sortedQuarters = Array.from(quarterData.values()).sort((a, b) => 
-              b.quarterStart.getTime() - a.quarterStart.getTime()
-            );
-
-            return (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {sortedQuarters.map((quarter) => (
-                  <div key={quarter.quarterId} className="border rounded-lg">
-                    {/* Quarter Header */}
-                    <div 
-                      className="p-4 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between"
-                      onClick={() => toggleQuarter(quarter.quarterId)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <button className="flex items-center gap-2 px-3 py-1 bg-primary/10 hover:bg-primary/20 rounded-md text-sm font-medium transition-colors">
-                          <span className="text-xs">
-                            {expandedQuarters.has(quarter.quarterId) ? '▼' : '▶'}
-                          </span>
-                          {expandedQuarters.has(quarter.quarterId) ? 'Hide Months' : 'Show Months'}
-                        </button>
-                        <div>
-                          <h3 className="font-medium">{quarter.displayPeriod}</h3>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {quarter.topTags.map((tag, tagIndex) => (
-                              <div
-                                key={tag.id}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs border"
-                                style={{ 
-                                  backgroundColor: `${getTagColor(tag, tagsWithCounts.indexOf(tag))}15`,
-                                  borderColor: `${getTagColor(tag, tagsWithCounts.indexOf(tag))}40`
-                                }}
-                              >
-                                <div 
-                                  className="w-1.5 h-1.5 rounded-full"
-                                  style={{ backgroundColor: getTagColor(tag, tagsWithCounts.indexOf(tag)) }}
-                                />
-                                <span>{tag.name}</span>
-                                <span 
-                                  className="text-xs px-1 rounded text-white font-medium"
-                                  style={{ backgroundColor: getTagColor(tag, tagsWithCounts.indexOf(tag)) }}
-                                >
-                                  {tag.weekCount}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                        {quarter.totalCharts} charts
-                      </span>
-                    </div>
-
-                    {/* Expanded Quarter Content */}
-                    {expandedQuarters.has(quarter.quarterId) && (
-                      <div className="border-t">
-                        {Array.from(quarter.months.values())
-                          .sort((a, b) => b.monthStart.getTime() - a.monthStart.getTime())
-                          .map((month) => (
-                          <div key={month.monthId} className="border-b last:border-b-0">
-                            {/* Month Header */}
-                            <div 
-                              className="p-3 pl-8 bg-muted/10 cursor-pointer hover:bg-muted/20 transition-colors flex items-center justify-between"
-                              onClick={() => toggleMonth(month.monthId)}
-                            >
-                              <div className="flex items-center gap-3">
-                                <button className="flex items-center gap-2 px-2 py-1 bg-secondary/10 hover:bg-secondary/20 rounded text-xs font-medium transition-colors">
-                                  <span className="text-xs">
-                                    {expandedMonths.has(month.monthId) ? '▼' : '▶'}
-                                  </span>
-                                  {expandedMonths.has(month.monthId) ? 'Hide Weeks' : 'Show Weeks'}
-                                </button>
-                                <div>
-                                  <h4 className="font-medium text-sm">{month.displayPeriod}</h4>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {month.topTags.map((tag) => (
-                                      <div
-                                        key={tag.id}
-                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
-                                        style={{ 
-                                          backgroundColor: `${getTagColor(tag, tagsWithCounts.indexOf(tag))}20`
-                                        }}
-                                      >
-                                        <span className="text-xs">{tag.name}</span>
-                                        <span 
-                                          className="text-xs px-1 rounded text-white"
-                                          style={{ backgroundColor: getTagColor(tag, tagsWithCounts.indexOf(tag)) }}
-                                        >
-                                          {tag.weekCount}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                                {month.totalCharts} charts
-                              </span>
-                            </div>
-
-                            {/* Expanded Month Content - Weeks */}
-                            {expandedMonths.has(month.monthId) && (
-                              <div className="p-2 pl-12 space-y-2 bg-background">
-                                {month.weeks
-                                  .sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime())
-                                  .map((week) => (
-                                  <div key={week.week} className="p-2 border rounded bg-card/50">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs font-medium">{week.displayPeriod}</span>
-                                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                        {week.totalCharts} charts
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                      {week.topTags.map((tag: TagWithChartCount & { weekCount: number }, tagIndex: number) => (
-                                        <div
-                                          key={tag.id}
-                                          className="flex items-center gap-1 px-2 py-1 rounded text-xs border"
-                                          style={{ 
-                                            backgroundColor: `${getTagColor(tag, tagsWithCounts.indexOf(tag))}15`,
-                                            borderColor: `${getTagColor(tag, tagsWithCounts.indexOf(tag))}30`
-                                          }}
-                                        >
-                                          <div 
-                                            className="w-1.5 h-1.5 rounded-full"
-                                            style={{ backgroundColor: getTagColor(tag, tagsWithCounts.indexOf(tag)) }}
-                                          />
-                                          <span>{tag.name}</span>
-                                          <span 
-                                            className="text-xs px-1 rounded text-white"
-                                            style={{ backgroundColor: getTagColor(tag, tagsWithCounts.indexOf(tag)) }}
-                                          >
-                                            {tag.weekCount}
-                                          </span>
-                                          {tagIndex === 0 && (
-                                            <span className="text-xs">👑</span>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+      {/* Tags without trades */}
+      {tagPerformance.filter(tp => tp.totalTrades === 0 && tp.chartCount > 0).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tags Without Trade Data</CardTitle>
+            <CardDescription>
+              These tags have charts but couldn&apos;t be linked to any completed trades
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {tagPerformance
+                .filter(tp => tp.totalTrades === 0 && tp.chartCount > 0)
+                .map(tp => (
+                  <Badge
+                    key={tp.tag.id}
+                    variant="outline"
+                    className="flex items-center gap-1"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: tp.tag.color || '#6b7280' }}
+                    />
+                    {tp.tag.name}
+                    <span className="text-muted-foreground ml-1">({tp.chartCount} charts)</span>
+                  </Badge>
                 ))}
-              </div>
-            );
-          })()}
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

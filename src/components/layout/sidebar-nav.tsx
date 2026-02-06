@@ -48,9 +48,9 @@ export default function SidebarNav() {
         
         <SidebarMenuItem>
           <Link href="/tags" passHref>
-            <SidebarMenuButton isActive={pathname === "/tags"} tooltip="Tags">
+            <SidebarMenuButton isActive={pathname === "/tags"} tooltip="Tag Performance">
               <TagIcon className="h-5 w-5" />
-              <span>Tags</span>
+              <span>Tag Performance</span>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
