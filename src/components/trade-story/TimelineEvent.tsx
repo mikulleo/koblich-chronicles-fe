@@ -37,6 +37,18 @@ interface TimelineEventProps {
   }
 }
 
+/** Safely convert a value that might be a {day,month,year} object into a string */
+const safeStr = (v: unknown): string => {
+  if (v == null) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'number') return String(v)
+  if (typeof v === 'object' && v !== null && 'year' in v && 'month' in v && 'day' in v) {
+    const o = v as { year: number; month: number; day: number }
+    return `${o.year}-${String(o.month).padStart(2, '0')}-${String(o.day).padStart(2, '0')}`
+  }
+  return String(v)
+}
+
 export default function TimelineEvent({ event }: TimelineEventProps) {
   const getEventIcon = () => {
     switch (event.type) {
@@ -71,12 +83,12 @@ export default function TimelineEvent({ event }: TimelineEventProps) {
           {getEventIcon()}
         </div>
         <span className="text-xs">
-          {format(new Date(event.date), 'MMM dd')}
+          {format(new Date(safeStr(event.date)), 'MMM dd')}
         </span>
       </div>
       
       <h4 className="font-medium text-sm mb-1">{event.title}</h4>
-      <p className="text-xs text-muted-foreground mb-2">{event.description}</p>
+      <p className="text-xs text-muted-foreground mb-2">{safeStr(event.description)}</p>
       
       <div className="text-xs space-y-1">
         {event.type === 'entry' && event.details && (
@@ -99,7 +111,7 @@ export default function TimelineEvent({ event }: TimelineEventProps) {
             <p>To: ${event.details.newStop}</p>
             {event.details.notes && (
   <p className="italic mt-1 whitespace-normal break-words">
-    {event.details.notes}
+    {safeStr(event.details.notes)}
   </p>
 )}
 
@@ -126,11 +138,11 @@ export default function TimelineEvent({ event }: TimelineEventProps) {
               </p>
             )}
             {event.details.reason && (
-              <p>Reason: {event.details.reason}</p>
+              <p>Reason: {safeStr(event.details.reason)}</p>
             )}
             {event.details.notes && (
               <p className="text-xs italic mt-1 whitespace-normal break-words">
-                {event.details.notes}
+                {safeStr(event.details.notes)}
               </p>
             )}
           </>

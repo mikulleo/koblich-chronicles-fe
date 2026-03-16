@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { 
-  Home, 
-  BarChart3, 
-  LineChart, 
-  Tag as TagIcon, 
-  ListFilter, 
-  Hash 
+import {
+  Home,
+  BarChart3,
+  LineChart,
+  Tag as TagIcon,
+  ListFilter,
+  Hash,
+  Dumbbell
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -88,6 +89,17 @@ export default function SidebarNav() {
             <SidebarMenuButton isActive={pathname === "/tickers"} tooltip="Tickers">
               <Hash className="h-5 w-5" />
               <span>Tickers</span>
+            </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
+
+        <Separator className="my-2" />
+
+        <SidebarMenuItem>
+          <Link href="/gym" passHref>
+            <SidebarMenuButton isActive={pathname === "/gym"} tooltip="Trading Gym">
+              <Dumbbell className="h-5 w-5" />
+              <span>Trading Gym</span>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>

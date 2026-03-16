@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Ticker } from '@/lib/types';
 import apiClient from '@/lib/api/client';
@@ -64,8 +64,8 @@ export function TickersShowcase() {
     const fetchTickers = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get('/tickers');
-        
+        const response = await apiClient.get('/tickers', { params: { depth: 0, limit: 500 } });
+
         if (response.data && response.data.docs) {
           setTickers(response.data.docs);
         }
@@ -128,27 +128,25 @@ export function TickersShowcase() {
     }
   }, [tickers, groupingMethod]);
   
-  // Filter tickers based on search term
-  const filterTickers = () => {
+  // Filter tickers based on search term — memoized to avoid recomputing on every render
+  const filteredGroupedTickers = useMemo(() => {
     if (!searchTerm) return groupedTickers;
-    
+
     const filtered: GroupedTickers = {};
-    
+
     Object.keys(groupedTickers).forEach(key => {
-      filtered[key] = groupedTickers[key].filter(ticker => 
+      filtered[key] = groupedTickers[key].filter(ticker =>
         ticker.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ticker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (ticker.sector && ticker.sector.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     });
-    
+
     // Only keep groups with matching tickers
     return Object.fromEntries(
       Object.entries(filtered).filter(([_, tickers]) => tickers.length > 0)
     );
-  };
-  
-  const filteredGroupedTickers = filterTickers();
+  }, [searchTerm, groupedTickers]);
   
   // Toggle group expansion
   const toggleGroup = (group: string) => {
@@ -177,9 +175,9 @@ export function TickersShowcase() {
       setLoadingTrades(true);
       
       // Fetch trades for this ticker
-      const endpoint = `/trades?where[ticker][equals]=${ticker.id}`;
-      
-      const response = await apiClient.get(endpoint);
+      const response = await apiClient.get('/trades', {
+        params: { 'where[ticker][equals]': ticker.id, depth: 1, limit: 500 }
+      });
       
       if (response.data && response.data.docs) {
         // Transform the data to match the columns Trade type

@@ -29,6 +29,7 @@ import StoryModeViewer from './StoryModeViewer'
 import Image from 'next/image'
 import { Media, Ticker } from '@/lib/types'
 
+
 /* animation + gesture libs (Updated for R3F) */
 import { useSprings, animated, config } from '@react-spring/web' // Still needed for dot indicators or other non-3D elements
 import { useSpring as useSpring3d, animated as animated3d } from '@react-spring/three' // For 3D animations
@@ -129,6 +130,48 @@ interface TimelineGroup {
 interface TradeStoryTimelineProps {
   tradeId: string
   onClose?: () => void
+}
+
+/**
+ * Normalise a date that may arrive from the API as either an ISO string
+ * or a structured object like `{ day, month, year }`.  Always returns an
+ * ISO-ish date string (YYYY-MM-DD or full ISO).
+ */
+const normalizeDate = (d: unknown): string => {
+  if (!d) return ''
+  if (typeof d === 'string') return d
+  if (typeof d === 'object' && d !== null && 'year' in d && 'month' in d && 'day' in d) {
+    const obj = d as { year: number; month: number; day: number }
+    const mm = String(obj.month).padStart(2, '0')
+    const dd = String(obj.day).padStart(2, '0')
+    return `${obj.year}-${mm}-${dd}`
+  }
+  // Fallback: try coercing through Date
+  try {
+    return new Date(d as any).toISOString()
+  } catch {
+    return String(d)
+  }
+}
+
+/**
+ * Recursively walk an object / array and convert any `{day, month, year}`
+ * date objects into YYYY-MM-DD strings so they never leak into React children.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const deepNormalizeDates = (val: any): any => {
+  if (val == null || typeof val !== 'object') return val
+  // Detect {day, month, year} date objects (regardless of extra keys)
+  if ('year' in val && 'month' in val && 'day' in val
+      && typeof val.year === 'number' && typeof val.month === 'number' && typeof val.day === 'number') {
+    return normalizeDate(val)
+  }
+  if (Array.isArray(val)) return val.map(deepNormalizeDates)
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(val)) {
+    out[k] = deepNormalizeDates(val[k])
+  }
+  return out
 }
 
 /* ------------------------------------------------------------------ */
@@ -748,6 +791,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
     null,
   ])
 
+
   /* fetch data ------------------------------------------------------ */
   const fetchTradeStory = useCallback(async () => {
     setLoading(true)
@@ -826,6 +870,14 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
           };
         })(),
       }))
+
+      /* Normalise ALL date-like objects in timeline & charts (API returns {day,month,year}) */
+      if (d.timeline?.length) {
+        d.timeline = d.timeline.map((evt: any) => deepNormalizeDates(evt))
+      }
+      if (d.charts?.length) {
+        d.charts = d.charts.map((c: any) => ({ ...c, timestamp: normalizeDate(c.timestamp) }))
+      }
 
       /* timeline fallback - comprehensive event construction */
       // Clean up existing timeline data and calculate missing P/L percentages
@@ -970,7 +1022,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
 
         // Add entry event with full details
         const entryEvent = {
-          date: t.entryDate,
+          date: normalizeDate(t.entryDate),
           type: 'entry' as const,
           title: 'Trade Entry',
           description: '',
@@ -988,7 +1040,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
         // Add modified stop events with full details
         ;(t.modifiedStops ?? []).forEach((s: ModifiedStop) => {
           const stopEvent = {
-            date: s.date,
+            date: normalizeDate(s.date),
             type: 'stopModified' as const,
             title: 'Stop Loss Modified',
             description: `Stop moved to ${s.price}`,
@@ -1013,7 +1065,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
           const normalizedProfitLossPercent = profitLossPercent * normalizationFactor;
 
           const exitEvent = {
-            date: x.date,
+            date: normalizeDate(x.date),
             type: 'exit' as const,
             title: 'Position Exit',
             description: '', // Override any API description to avoid showing shares
@@ -1036,8 +1088,11 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
       }
 
       console.log('✅ FINAL STORY DATA:', JSON.stringify(d, null, 2));
-      setStory(d)
-      if (d.charts.length) setSelectedChart(d.charts[0])
+
+      // Deep-normalise the entire story to eliminate any remaining {day,month,year} objects
+      const sanitised = deepNormalizeDates(d) as typeof d
+      setStory(sanitised)
+      if (sanitised.charts.length) setSelectedChart(sanitised.charts[0])
     } catch (e) {
       console.error('❌ FETCH ERROR:', e)
     } finally {
@@ -1076,7 +1131,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
       map.get(k)!.charts.push(c)
     })
     story.timeline.forEach((e) => {
-      const k = format(new Date(e.date), 'yyyy-MM-dd')
+      const k = format(new Date(normalizeDate(e.date)), 'yyyy-MM-dd')
       if (!map.has(k)) map.set(k, { charts: [], events: [] })
       map.get(k)!.events.push(e)
     })
@@ -1103,6 +1158,29 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
   if (!story) return <div>Unable to load trade story.</div>
 
   const { metadata } = story
+
+
+  if (storyMode && story) {
+    return (
+      <StoryModeViewer
+        storyData={{
+          ...story,
+          charts: story.charts.map((c) => ({
+            ...c,
+            tradeStory: c.tradeStory
+              ? {
+                  ...c.tradeStory,
+                  chartRole: typeof c.tradeStory.chartRole === 'string' && c.tradeStory.chartRole
+                    ? c.tradeStory.chartRole
+                    : 'chart',
+                }
+              : { chartRole: 'chart' },
+          })),
+        }}
+        onClose={() => setStoryMode(false)}
+      />
+    )
+  }
 
   return (
     <>
@@ -1319,27 +1397,6 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
           </Card>
         )}
       </div>
-
-      {/* overlay story-mode viewer */}
-      {storyMode && story && (
-        <StoryModeViewer
-          storyData={{
-            ...story,
-            charts: story.charts.map((c) => ({
-              ...c,
-              tradeStory: c.tradeStory
-                ? {
-                    ...c.tradeStory,
-                    chartRole: typeof c.tradeStory.chartRole === 'string' && c.tradeStory.chartRole
-                      ? c.tradeStory.chartRole
-                      : 'chart',
-                  }
-                : { chartRole: 'chart' },
-            })),
-          }}
-          onClose={() => setStoryMode(false)}
-        />
-      )}
     </>
   )
 }

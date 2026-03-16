@@ -199,7 +199,7 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
           allTrades = tradesProp;
         } else {
           // Fallback: fetch trades ourselves
-          const response = await apiClient.get(`/trades`);
+          const response = await apiClient.get('/trades', { params: { limit: 2000 } });
           if (!response.data?.docs) {
             throw new Error("Unexpected response format");
           }

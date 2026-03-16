@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import apiClient from "@/lib/api/client";
+import { cachedFetch } from "@/lib/prefetch-cache";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { TradeStats, StatsMetadata } from "./trade-statistics";
 
@@ -59,8 +59,12 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
     return "";
   };
 
-  // Fetch yearly statistics — only /trades/stats, no /trades needed
+  const emptyStats: TradeStats = { totalTrades: 0, winningTrades: 0, losingTrades: 0, breakEvenTrades: 0, battingAverage: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, averageRRatio: 0, profitFactor: 0, expectancy: 0, averageDaysHeldWinners: 0, averageDaysHeldLosers: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, totalProfitLoss: 0, totalProfitLossPercent: 0, tradeStatusCounts: { closed: 0, partial: 0 }, normalized: { totalProfitLoss: 0, totalProfitLossPercent: 0, averageRRatio: 0, profitFactor: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, expectancy: 0 } } as TradeStats;
+
+  // Fetch yearly statistics — both years in parallel, using cache
   useEffect(() => {
+    let cancelled = false;
+
     const fetchYearlyStats = async () => {
       try {
         setLoading(true);
@@ -69,132 +73,106 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
         // Temporarily exclude 2023 as requested
         const years = [thisYear, thisYear - 1].filter(y => y !== 2023);
 
-        // Fetch yearly stats sequentially to avoid overwhelming the server
-        const results: TimeperiodStats[] = [];
-        for (const y of years) {
-          const startDate = `${y}-01-01`;
-          const endDate = `${y}-12-31`;
+        // Fetch both years in parallel (cached if prefetched)
+        const results = await Promise.all(
+          years.map(async (y) => {
+            const params = new URLSearchParams();
+            params.append("startDate", `${y}-01-01`);
+            params.append("endDate", `${y}-12-31`);
+            if (statusFilter !== "all") params.append("statusFilter", statusFilter);
 
-          const params = new URLSearchParams();
-          params.append("startDate", startDate);
-          params.append("endDate", endDate);
-          params.append("statusFilter", statusFilter);
+            const data = await cachedFetch<{ stats: TradeStats; metadata: StatsMetadata }>("/trades/stats", params);
+            return {
+              period: y.toString(),
+              periodLabel: y.toString(),
+              stats: data.stats,
+              metadata: data.metadata,
+            } as TimeperiodStats;
+          })
+        );
 
-          const statsResponse = await apiClient.get(`/trades/stats?${params.toString()}`);
-
-          results.push({
-            period: y.toString(),
-            periodLabel: y.toString(),
-            stats: statsResponse.data.stats,
-            metadata: statsResponse.data.metadata,
-          });
-        }
-
+        if (cancelled) return;
         setYearlyStats(results);
 
-        // Set the current year as expanded by default
+        // Auto-expand current year and start loading its months
         if (results.length > 0) {
           const defaultExpandedYear = results[0].period;
           setExpandedYears(new Set([defaultExpandedYear]));
           fetchMonthlyDataForYear(defaultExpandedYear);
         }
-
       } catch (error) {
+        if (cancelled) return;
         console.error("Error fetching yearly statistics:", error);
         setError("Failed to load yearly statistics");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchYearlyStats();
-
     // Clear monthly stats when statusFilter changes to force a refresh
     setMonthlyStats({});
+    fetchYearlyStats();
 
+    return () => { cancelled = true; };
   }, [year, statusFilter]);
 
-  // Fetch stats for a single month. Returns null on failure.
-  const fetchSingleMonth = async (
-    year: string,
-    month: number
-  ): Promise<TimeperiodStats | null> => {
-    try {
-      const start = startOfMonth(new Date(parseInt(year), month));
-      const end = endOfMonth(new Date(parseInt(year), month));
+  // Fetch all 12 months in parallel, streaming results progressively
+  const fetchMonthlyDataForYear = async (yearStr: string) => {
+    if (monthlyStats[yearStr]) return;
+
+    setLoadingMonths((prev) => new Set(prev).add(yearStr));
+
+    const yearNum = parseInt(yearStr);
+
+    // Fire all 12 months in parallel — each uses cachedFetch (instant if prefetched)
+    const monthPromises = Array.from({ length: 12 }, (_, month) => {
+      const start = startOfMonth(new Date(yearNum, month));
+      const end = endOfMonth(new Date(yearNum, month));
 
       const params = new URLSearchParams();
       params.append("startDate", format(start, "yyyy-MM-dd"));
       params.append("endDate", format(end, "yyyy-MM-dd"));
-      params.append("statusFilter", statusFilter);
+      if (statusFilter !== "all") params.append("statusFilter", statusFilter);
 
-      const statsResponse = await apiClient.get(
-        `/trades/stats?${params.toString()}`
-      );
-
-      return {
-        period: `${year}-${month + 1}`,
-        periodLabel: format(start, "MMMM"),
-        stats: statsResponse.data.stats,
-        metadata: statsResponse.data.metadata,
-      };
-    } catch {
-      return null;
-    }
-  };
-
-  // Fetch monthly data in small batches to avoid overwhelming the server
-  const fetchMonthlyDataForYear = async (year: string) => {
-    if (monthlyStats[year]) return;
-
-    setLoadingMonths((prev) => new Set(prev).add(year));
-
-    try {
-      const BATCH_SIZE = 3;
-      const months = Array.from({ length: 12 }, (_, i) => i);
-      const results: (TimeperiodStats | null)[] = new Array(12).fill(null);
-
-      // First pass — fetch in batches of BATCH_SIZE
-      for (let i = 0; i < months.length; i += BATCH_SIZE) {
-        const batch = months.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(
-          batch.map((month) => fetchSingleMonth(year, month))
-        );
-        batchResults.forEach((r, idx) => {
-          results[i + idx] = r;
-        });
-      }
-
-      // Retry pass — any month that came back null gets one more attempt,
-      // run sequentially so the server isn't hit hard again
-      for (let i = 0; i < results.length; i++) {
-        if (results[i] === null) {
-          results[i] = await fetchSingleMonth(year, i);
-        }
-      }
-
-      // Use whatever succeeded (null entries become a zero-trade placeholder)
-      const finalResults: TimeperiodStats[] = results.map((r, i) => {
-        if (r) return r;
-        const start = startOfMonth(new Date(parseInt(year), i));
-        return {
-          period: `${year}-${i + 1}`,
+      return cachedFetch<{ stats: TradeStats; metadata: StatsMetadata }>("/trades/stats", params)
+        .then((data) => ({
+          period: `${yearStr}-${month + 1}`,
           periodLabel: format(start, "MMMM"),
-          stats: { totalTrades: 0, winningTrades: 0, losingTrades: 0, breakEvenTrades: 0, battingAverage: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, averageRRatio: 0, profitFactor: 0, expectancy: 0, averageDaysHeldWinners: 0, averageDaysHeldLosers: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, totalProfitLoss: 0, totalProfitLossPercent: 0, tradeStatusCounts: { closed: 0, partial: 0 }, normalized: { totalProfitLoss: 0, totalProfitLossPercent: 0, averageRRatio: 0, profitFactor: 0, maxGainPercent: 0, maxLossPercent: 0, maxGainLossRatio: 0, averageWinPercent: 0, averageLossPercent: 0, winLossRatio: 0, adjustedWinLossRatio: 0, expectancy: 0 } } as TradeStats,
+          stats: data.stats,
+          metadata: data.metadata,
+        } as TimeperiodStats))
+        .catch(() => ({
+          period: `${yearStr}-${month + 1}`,
+          periodLabel: format(start, "MMMM"),
+          stats: emptyStats,
           metadata: { totalTrades: 0, closedTrades: 0, partialTrades: 0, statusFilter, dateRange: "", tickerFilter: false },
-        };
-      });
+        } as TimeperiodStats));
+    });
 
-      setMonthlyStats((prev) => ({ ...prev, [year]: finalResults }));
-    } catch (error) {
-      console.error(`Error fetching monthly statistics for ${year}:`, error);
-    } finally {
-      setLoadingMonths((prev) => {
-        const next = new Set(prev);
-        next.delete(year);
-        return next;
+    // Stream results: update state as each month resolves
+    const results: TimeperiodStats[] = new Array(12);
+    let resolved = 0;
+
+    monthPromises.forEach((p, idx) => {
+      p.then((result) => {
+        results[idx] = result;
+        resolved++;
+
+        // Update state progressively — every few results or when all done
+        if (resolved % 4 === 0 || resolved === 12) {
+          const snapshot = [...results];
+          setMonthlyStats((prev) => ({ ...prev, [yearStr]: snapshot }));
+        }
+
+        if (resolved === 12) {
+          setLoadingMonths((prev) => {
+            const next = new Set(prev);
+            next.delete(yearStr);
+            return next;
+          });
+        }
       });
-    }
+    });
   };
 
   // Toggle expanded year and fetch monthly data
@@ -332,7 +310,7 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                   {/* Monthly Rows (when expanded) */}
                   {expandedYears.has(yearData.period) && (
                     <>
-                      {loadingMonths.has(yearData.period) || !monthlyStats[yearData.period] ? (
+                      {!monthlyStats[yearData.period] ? (
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="text-center py-4">
                             <div className="flex items-center justify-center">
@@ -341,15 +319,18 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                             </div>
                           </TableCell>
                         </TableRow>
-                      ) : monthlyStats[yearData.period].every(m => m.metadata.totalTrades === 0) ? (
+                      ) : monthlyStats[yearData.period].filter(Boolean).length > 0 &&
+                          monthlyStats[yearData.period].filter(Boolean).every(m => m.metadata.totalTrades === 0) &&
+                          !loadingMonths.has(yearData.period) ? (
                         <TableRow className="bg-muted/20">
                           <TableCell colSpan={8} className="text-center text-muted-foreground py-4">
                             No trades recorded for this year
                           </TableCell>
                         </TableRow>
                       ) : (
-                        monthlyStats[yearData.period]
-                          .filter(monthData => monthData.metadata.totalTrades > 0)
+                        <>
+                        {monthlyStats[yearData.period]
+                          .filter((monthData) => monthData && monthData.metadata.totalTrades > 0)
                           .map(monthData => (
                             <TableRow
                               key={monthData.period}
@@ -406,7 +387,18 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                                 )}
                               </TableCell>
                             </TableRow>
-                          ))
+                          ))}
+                        {loadingMonths.has(yearData.period) && (
+                          <TableRow className="bg-muted/20">
+                            <TableCell colSpan={8} className="text-center py-2">
+                              <div className="flex items-center justify-center">
+                                <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                                <span className="text-muted-foreground text-xs">Loading remaining months...</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        </>
                       )}
                     </>
                   )}

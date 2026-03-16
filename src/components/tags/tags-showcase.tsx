@@ -94,15 +94,15 @@ export function TagsShowcase() {
         setLoading(true);
         
         // Fetch all tags
-        const tagsResponse = await apiClient.get('/tags');
+        const tagsResponse = await apiClient.get('/tags', { params: { limit: 500 } });
         if (!tagsResponse.data || !tagsResponse.data.docs) {
           throw new Error('Failed to fetch tags data');
         }
-        
+
         const tags: Tag[] = tagsResponse.data.docs;
-        
+
         // Fetch all charts (with a high limit to get as many as possible)
-        const chartsResponse = await apiClient.get('/charts');
+        const chartsResponse = await apiClient.get('/charts', { params: { limit: 2000 } });
         if (!chartsResponse.data) {
           throw new Error('Failed to fetch charts data');
         }

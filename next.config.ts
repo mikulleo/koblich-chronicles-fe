@@ -2,11 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Reduce production bundle size — no source maps for end users
+  productionBrowserSourceMaps: false,
   images: {
-    domains: ['localhost', 'via.placeholder.com', 'koblich-chronicles-be-production.up.railway.app'],
     remotePatterns: [
       {
         protocol: 'http',
@@ -23,6 +21,16 @@ const nextConfig: NextConfig = {
         hostname: 'koblich-chronicles-be-production.up.railway.app',
         pathname: '/api/media/**',
       },
+    ],
+  },
+  experimental: {
+    // Tree-shake large packages — only import what's actually used
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      'date-fns',
+      '@radix-ui/react-icons',
+      'framer-motion',
     ],
   },
 };

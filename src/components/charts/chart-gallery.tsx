@@ -115,7 +115,7 @@ export function ChartGallery() {
     const fetchTickers = async () => {
       try {
         setTickersLoading(true)
-        const response = await apiClient.get('/tickers')
+        const response = await apiClient.get('/tickers', { params: { depth: 0, limit: 500 } })
         setTickers(response.data.docs)
         setTickersError(null)
       } catch (error) {
@@ -136,7 +136,9 @@ export function ChartGallery() {
         setChartsLoading(true)
         const response = await apiClient.get('/charts', {
         params: {
-          sort: '-timestamp',  // The minus sign indicates descending order
+          sort: '-timestamp',
+          depth: 1,
+          limit: 1000,
         }
       })
         

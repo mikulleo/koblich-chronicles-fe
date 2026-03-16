@@ -1,6 +1,7 @@
 // src/app/(frontend)/trades/page.tsx
+import { Suspense } from "react";
 import { Metadata } from "next";
-import { ListFilter, Target, BarChart3 } from "lucide-react";
+import { ListFilter, Target, BarChart3, Loader2 } from "lucide-react";
 import { TradesTabView } from "@/components/trades/trades-tab-view";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function TradesPage() {
           Comprehensive trading management with trade logs, position exposure visualization, and performance analytics.
         </p>
       </div>
-      
+
       {/* Feature Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="p-4 border rounded-lg bg-card">
@@ -48,8 +49,15 @@ export default function TradesPage() {
           </p>
         </div>
       </div>
-      
-      <TradesTabView defaultTab="log" />
+
+      <Suspense fallback={
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="ml-2 text-muted-foreground">Loading trades...</span>
+        </div>
+      }>
+        <TradesTabView defaultTab="log" />
+      </Suspense>
     </div>
   );
 }

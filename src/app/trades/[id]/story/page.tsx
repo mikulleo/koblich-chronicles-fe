@@ -1,14 +1,13 @@
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import TradeStoryTimeline from '@/components/trade-story/TradeStoryTimeline'
+import TradeStoryClient from './TradeStoryClient'
 
 export default async function TradeStoryPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  // unwrap the promise
   const { id: tradeId } = await params
 
   return (
@@ -22,7 +21,7 @@ export default async function TradeStoryPage({
         </Button>
       </div>
 
-      <TradeStoryTimeline tradeId={tradeId} />
+      <TradeStoryClient tradeId={tradeId} />
     </div>
   )
 }

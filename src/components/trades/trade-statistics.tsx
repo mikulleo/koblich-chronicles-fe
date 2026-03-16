@@ -9,7 +9,7 @@ import { StatisticsCharts } from "./statistics-charts";
 import { StatisticsByTimeperiod } from "./statistics-by-timeperiod";
 import { StatisticsHistogram } from "./statistics-histogram"; // Add this import
 import { MetricCalculationsInfo } from "./metric-calculation-info";
-import apiClient from "@/lib/api/client";
+import { cachedFetch, invalidateCache } from "@/lib/prefetch-cache";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,10 +90,12 @@ export function TradeStatistics() {
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [metadata, setMetadata] = useState<StatsMetadata | null>(null);
   const [trades, setTrades] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [tradesLoading, setTradesLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [tradesError, setTradesError] = useState<string | null>(null);
 
-  
+
   // State for filters
   const [filters, setFilters] = useState<StatsFilters>({
     timePeriod: "month",
@@ -139,179 +141,215 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
     };
   };
 
-  // Fetch statistics data based on filters
+  // Build query params from current filters
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    params.append("depth", "0"); // Stats don't need populated relationships
+
+    if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
+      params.append("startDate", toLocalISODate(parseLocalDate(filters.startDate)));
+      params.append("endDate", toLocalISODate(parseLocalEndDate(filters.endDate)));
+    } else if (filters.timePeriod !== "all") {
+      const today = new Date();
+      let start: Date | undefined;
+
+      if (filters.timePeriod === "year") {
+        start = new Date(today.getFullYear(), 0, 1);
+      } else if (filters.timePeriod === "month") {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+      } else if (filters.timePeriod === "week") {
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+        start = new Date(today.getFullYear(), today.getMonth(), diff);
+      }
+
+      if (start) {
+        params.append("startDate", toLocalISODate(start));
+      }
+      params.append("endDate", toLocalISODate(today));
+    }
+
+    if (filters.tickerId) {
+      params.append("tickerId", filters.tickerId);
+    }
+
+    if (filters.statusFilter === "closed-only") {
+      params.append("statusFilter", "closed-only");
+    }
+
+    return params;
+  };
+
+  // Fetch stats independently (uses prefetch cache — instant if already loaded)
   useEffect(() => {
-    const fetchStatistics = async () => {
+    let cancelled = false;
+    const fetchStats = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
-        // Build query parameters
-        const params = new URLSearchParams();
-        
-        // Handle time period filters
-        if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
-          // use local parsing
-          params.append("startDate", toLocalISODate(parseLocalDate(filters.startDate)));
-          params.append("endDate", toLocalISODate(parseLocalEndDate(filters.endDate)));
-        } else if (filters.timePeriod !== "all") {
-          const today = new Date();
-          let start: Date | undefined;
-
-          if (filters.timePeriod === "year") {
-            start = new Date(today.getFullYear(), 0, 1);
-          } else if (filters.timePeriod === "month") {
-            start = new Date(today.getFullYear(), today.getMonth(), 1);
-          } else if (filters.timePeriod === "week") {
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            start = new Date(today.getFullYear(), today.getMonth(), diff);
-          }
-
-          if (start) {
-            params.append("startDate", toLocalISODate(start));
-          }
-          // endDate = today at local-midnight
-          params.append("endDate", toLocalISODate(today));
-        }
-        
-        // Add ticker filter if selected
-        if (filters.tickerId) {
-          params.append("tickerId", filters.tickerId);
-        }
-        
-        // Add status filter
-        if (filters.statusFilter === "closed-only") {
-          params.append("statusFilter", "closed-only");
-        }
-        
-        // Fetch both statistics and individual trades for P/L calculation
-        const [statsResponse, tradesResponse] = await Promise.all([
-          apiClient.get(`/trades/stats?${params.toString()}`),
-          apiClient.get(`/trades?${params.toString()}`) // Get all relevant trades
-        ]);
-        
-        if (statsResponse.data && tradesResponse.data) {
-          const backendStats = statsResponse.data.stats;
-          const backendMetadata = statsResponse.data.metadata;
-          const fetchedTrades = tradesResponse.data.docs;
-          setTrades(fetchedTrades);
-
-          // Calculate client-side total P/L percentages
-          const clientPLCalculation = calculateTotalProfitLossPercent(fetchedTrades);
-          
-          // Create enhanced stats with client-calculated P/L percentages
-          const enhancedStats: TradeStats = {
-            ...backendStats,
-            totalProfitLossPercent: clientPLCalculation.standard,
-            normalized: {
-              ...backendStats.normalized,
-              totalProfitLossPercent: clientPLCalculation.normalized
-            }
-          };
-
-          setStats(enhancedStats);
-          setMetadata(backendMetadata);
+        setStatsLoading(true);
+        setStatsError(null);
+        const params = buildQueryParams();
+        const data = await cachedFetch<{ stats: TradeStats; metadata: StatsMetadata }>("/trades/stats", params);
+        if (cancelled) return;
+        if (data) {
+          setStats(data.stats);
+          setMetadata(data.metadata);
         } else {
           throw new Error("Unexpected response format");
         }
       } catch (error) {
+        if (cancelled) return;
         console.error("Error fetching statistics:", error);
-        setError("Failed to load statistics data. Please try again later.");
+        setStatsError("Failed to load statistics data.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setStatsLoading(false);
       }
     };
-    
-    fetchStatistics();
+    fetchStats();
+    return () => { cancelled = true; };
   }, [filters]);
 
-  // Handle filter changes
+  // Fetch trades independently (uses prefetch cache — instant if already loaded)
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTrades = async () => {
+      try {
+        setTradesLoading(true);
+        setTradesError(null);
+        const params = buildQueryParams();
+        const data = await cachedFetch<{ docs: any[] }>("/trades", params);
+        if (cancelled) return;
+        if (data) {
+          setTrades(data.docs);
+        } else {
+          throw new Error("Unexpected response format");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Error fetching trades:", error);
+        setTradesError("Failed to load trade data.");
+      } finally {
+        if (!cancelled) setTradesLoading(false);
+      }
+    };
+    fetchTrades();
+    return () => { cancelled = true; };
+  }, [filters]);
+
+  // Enhance stats with client-side P/L calculation once both are available
+  const enhancedStats = React.useMemo(() => {
+    if (!stats || trades.length === 0) return stats;
+    const clientPL = calculateTotalProfitLossPercent(trades);
+    return {
+      ...stats,
+      totalProfitLossPercent: clientPL.standard,
+      normalized: {
+        ...stats.normalized,
+        totalProfitLossPercent: clientPL.normalized,
+      },
+    };
+  }, [stats, trades]);
+
+  // Handle filter changes — invalidate only stats cache, not the main trades list
   const handleFilterChange = (newFilters: Partial<StatsFilters>) => {
+    invalidateCache("/trades/stats");
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading statistics...</span>
-      </div>
-    );
-  }
+  // Section loading placeholder
+  const SectionLoader = ({ label }: { label: string }) => (
+    <Card>
+      <CardContent className="flex items-center justify-center py-8">
+        <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+        <span className="text-muted-foreground text-sm">{label}</span>
+      </CardContent>
+    </Card>
+  );
 
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
+  const displayStats = enhancedStats || stats;
+  const hasStatsError = statsError && tradesError;
 
-  if (!stats || !metadata) {
-    return (
-      <Card className="bg-muted/40">
-        <CardHeader>
-          <CardTitle>No Data Available</CardTitle>
-          <CardDescription>
-            No trade statistics are available for the selected filters.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>Try changing your filter settings or add some trades to get started.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Show stats or no data message
   return (
     <div className="space-y-6">
-
-
-      {/* Filters */}
-      <StatisticsFilters 
-        filters={filters} 
-        onFilterChange={handleFilterChange} 
+      {/* Filters - always visible immediately */}
+      <StatisticsFilters
+        filters={filters}
+        onFilterChange={handleFilterChange}
       />
-      
+
+      {/* Full error only if both requests failed */}
+      {hasStatsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>Failed to load statistics data. Please try again later.</AlertDescription>
+        </Alert>
+      )}
+
       {/* Summary statistics */}
-      <StatisticsSummary 
-        stats={stats} 
-        metadata={metadata}
-        viewMode={filters.viewMode}
-      />
-      
-      {/* Time-period based statistics */}
-      <StatisticsByTimeperiod 
+      {statsLoading ? (
+        <SectionLoader label="Loading summary..." />
+      ) : !displayStats || !metadata ? (
+        !hasStatsError && (
+          <Card className="bg-muted/40">
+            <CardHeader>
+              <CardTitle>No Data Available</CardTitle>
+              <CardDescription>
+                No trade statistics are available for the selected filters.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Try changing your filter settings or add some trades to get started.</p>
+            </CardContent>
+          </Card>
+        )
+      ) : (
+        <StatisticsSummary
+          stats={displayStats}
+          metadata={metadata}
+          viewMode={filters.viewMode}
+        />
+      )}
+
+      {/* Time-period based statistics - fetches its own data independently */}
+      <StatisticsByTimeperiod
         viewMode={filters.viewMode}
         statusFilter={filters.statusFilter}
       />
-      
+
       {/* Trade Distribution Histogram */}
-      <StatisticsHistogram
-        filters={filters}
-        viewMode={filters.viewMode}
-        trades={trades}
-      />
-      
+      {tradesLoading ? (
+        <SectionLoader label="Loading trade distribution..." />
+      ) : trades.length > 0 ? (
+        <StatisticsHistogram
+          filters={filters}
+          viewMode={filters.viewMode}
+          trades={trades}
+        />
+      ) : null}
+
       {/* Visualizations */}
-      <StatisticsCharts 
-        stats={stats} 
-        metadata={metadata}
-        viewMode={filters.viewMode}
-      />
-      
+      {statsLoading ? (
+        <SectionLoader label="Loading charts..." />
+      ) : displayStats && metadata ? (
+        <StatisticsCharts
+          stats={displayStats}
+          metadata={metadata}
+          viewMode={filters.viewMode}
+        />
+      ) : null}
+
       {/* Detailed statistics */}
-      <StatisticsDetails 
-        stats={stats} 
-        metadata={metadata}
-        viewMode={filters.viewMode}
-      />
-      
-      {/* Calculation formulas info */}
+      {statsLoading ? (
+        <SectionLoader label="Loading details..." />
+      ) : displayStats && metadata ? (
+        <StatisticsDetails
+          stats={displayStats}
+          metadata={metadata}
+          viewMode={filters.viewMode}
+        />
+      ) : null}
+
+      {/* Calculation formulas info - always visible */}
       <MetricCalculationsInfo />
     </div>
   );

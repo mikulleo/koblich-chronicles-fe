@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown } from "lucide-react"
+import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown, Dumbbell } from "lucide-react"
 import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
@@ -105,7 +105,7 @@ export default function Home() {
 
       {/* Feature Cards */}
       <motion.div
-        className="grid gap-6 md:grid-cols-3 mt-4"
+        className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4"
         initial="hidden"
         animate="visible"
         variants={staggerContainer}
@@ -113,7 +113,8 @@ export default function Home() {
         {[
           { icon: LineChart, title: 'Charts', desc: 'Browse through the model book, filter by ticker or tag to find specific chart patterns.', href: '/charts', color: 'blue' },
           { icon: ListFilter, title: 'Trades', desc: 'View trade logs with detailed metrics, and jump to specific charts when needed.', href: '/trades', color: 'green' },
-          { icon: BarChart3, title: 'Statistics', desc: 'Get insights on trading statistics that can be used to improve performance and strategy.', href: '/statistics', color: 'purple' }
+          { icon: BarChart3, title: 'Statistics', desc: 'Explore trading statistics and performance breakdowns to sharpen your strategy.', href: '/statistics', color: 'purple' },
+          { icon: Dumbbell, title: 'Trading Gym', desc: 'Replay real trades candle-by-candle, make your own calls, and compare with what actually happened.', href: '/gym', color: 'orange' },
         ].map(({ icon: Icon, title, desc, href, color }) => ( // `title`, `desc`, `href`, `color` are available here
           <motion.div
             key={title}
@@ -186,10 +187,13 @@ export default function Home() {
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">What Is This Page?</h2>
               <p className="mb-4">
-                  The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> - cause "no hindsight trading allowed"!. The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting in some sense) as each proper model-book should have those.
+                  The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> — no hindsight trading allowed! The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting) as each proper model-book should have those.
+                </p>
+                <p className="mb-4">
+                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. A PDF export of the annotated charts is already available in the <em>Connect & Support</em> section below.
                 </p>
                 <p>
-                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. Who knows... maybe in the future one feature could be an "export" to an actual PDF/book.
+                  Beyond the model-book, the site now also features a <strong>Trading Gym</strong> — an experimental section where you can replay real trades candle-by-candle, test your own decisions, and compare with what actually happened. More features (including mindset & mental edge tools) are on the way.
                 </p>
             </CardContent>
           </Card>

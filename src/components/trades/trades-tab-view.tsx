@@ -1,7 +1,7 @@
 // src/components/trades/trades-tab-view.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ListFilter, BarChart3, Target } from "lucide-react";
 import { TradesTable } from "@/components/trades/trades-table";
@@ -13,8 +13,10 @@ interface TradesTabViewProps {
 }
 
 export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
   return (
-    <Tabs defaultValue={defaultTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="log" className="flex items-center gap-2">
           <ListFilter className="h-4 w-4" />
@@ -29,7 +31,7 @@ export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
           Statistics
         </TabsTrigger>
       </TabsList>
-      
+
       <TabsContent value="log" className="mt-6">
         <div className="space-y-4">
           <div>
@@ -38,23 +40,23 @@ export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
               Complete history of all trades with detailed metrics and performance data.
             </p>
           </div>
-          <TradesTable />
+          {activeTab === "log" && <TradesTable />}
         </div>
       </TabsContent>
-      
+
       <TabsContent value="exposure" className="mt-6">
         <div className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold mb-2">Position Exposure Management</h2>
             <p className="text-muted-foreground text-sm mb-4">
-              Visual representation of current position exposure across organized buckets. 
+              Visual representation of current position exposure across organized buckets.
               Standard target: 400% total exposure = 100% of equity, distributed across 4 buckets (100% each).
             </p>
           </div>
-          <ExposureBuckets />
+          {activeTab === "exposure" && <ExposureBuckets />}
         </div>
       </TabsContent>
-      
+
       <TabsContent value="statistics" className="mt-6">
         <div className="space-y-4">
           <div>
@@ -63,7 +65,7 @@ export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
               Comprehensive statistics and performance metrics for all completed and partial trades.
             </p>
           </div>
-          <TradeStatistics />
+          {activeTab === "statistics" && <TradeStatistics />}
         </div>
       </TabsContent>
     </Tabs>

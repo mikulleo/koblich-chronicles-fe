@@ -73,6 +73,21 @@ export const useAnalytics = () => {
     });
   };
 
+  /**
+   * Track trade replay events
+   */
+  const trackReplayStart = (ticker: string) => {
+    trackEvent('replay_start', {
+      ticker: ticker,
+    });
+  };
+
+  const trackReplayComplete = (ticker: string) => {
+    trackEvent('replay_complete', {
+      ticker: ticker,
+    });
+  };
+
   return {
     trackEvent,
     trackChartView,
@@ -81,6 +96,8 @@ export const useAnalytics = () => {
     trackTradeView,
     trackStatsFilter,
     trackDonation,
+    trackReplayStart,
+    trackReplayComplete,
   };
 };
 

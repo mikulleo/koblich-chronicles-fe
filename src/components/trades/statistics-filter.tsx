@@ -53,7 +53,7 @@ export function StatisticsFilters({ filters, onFilterChange }: StatisticsFilters
     const fetchTickers = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get("/tickers");
+        const response = await apiClient.get("/tickers", { params: { limit: 500 } });
         if (response.data && response.data.docs) {
           setTickers(response.data.docs);
         }

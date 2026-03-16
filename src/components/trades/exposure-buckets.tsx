@@ -67,15 +67,14 @@ export function ExposureBuckets() {
       
       const response = await apiClient.get('/trades', {
         params: {
-          limit: 1000,
-          depth: 1
+          limit: 200,
+          depth: 1,
+          'where[status][in]': 'open,partial',
         }
       })
-      
+
       if (response.data && response.data.docs) {
-        const openTrades = response.data.docs.filter((trade: any) => 
-          trade.status === 'open' || trade.status === 'partial'
-        )
+        const openTrades = response.data.docs
         
         const tradesData = openTrades.map(calculateTradePercentages)
         setTrades(tradesData)

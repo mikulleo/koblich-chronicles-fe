@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner"
 import MainLayout from "@/components/layout/main-layout"
 import AnalyticsProvider from "@/providers/AnalyticsProvider"
 import { ThemeProvider } from "@/providers/ThemeProviders"
+import { PrefetchInitializer } from "@/components/prefetch-initializer"
 import { GoogleTagManager } from '@next/third-parties/google'
 
 // Load fonts with display: swap for better performance
@@ -48,6 +49,7 @@ export default function RootLayout({
             <MainLayout>
               {children}
             </MainLayout>
+            <PrefetchInitializer />
             <Toaster />
           </AnalyticsProvider>
         </ThemeProvider>

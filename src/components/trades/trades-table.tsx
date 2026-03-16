@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-import apiClient from '@/lib/api/client'
+import { cachedFetch } from '@/lib/prefetch-cache'
 
 export function TradesTable() {
   const router = useRouter()
@@ -26,10 +26,13 @@ export function TradesTable() {
     const fetchTrades = async () => {
       try {
         setLoading(true)
-        const response = await apiClient.get('/trades')
-        
-        if (response.data && response.data.docs) {
-          setTrades(response.data.docs)
+        const params = new URLSearchParams();
+        params.append('limit', '1000');
+        params.append('depth', '1');
+        const data = await cachedFetch<{ docs: Trade[] }>('/trades', params)
+
+        if (data && data.docs) {
+          setTrades(data.docs)
           setError(null)
         } else {
           setError('Unexpected response format from API')
@@ -41,7 +44,7 @@ export function TradesTable() {
         setLoading(false)
       }
     }
-    
+
     fetchTrades()
   }, [])
 

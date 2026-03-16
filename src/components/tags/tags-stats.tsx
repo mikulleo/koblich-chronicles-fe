@@ -235,9 +235,9 @@ export function TagsStats() {
 
         // Fetch all data in parallel
         const [tagsResponse, chartsResponse, tradesResponse] = await Promise.all([
-          apiClient.get('/tags'),
-          apiClient.get('/charts'),
-          apiClient.get('/trades')
+          apiClient.get('/tags', { params: { limit: 500 } }),
+          apiClient.get('/charts', { params: { limit: 2000 } }),
+          apiClient.get('/trades', { params: { limit: 2000 } })
         ]);
 
         const tags: Tag[] = tagsResponse.data?.docs || [];
