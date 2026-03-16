@@ -114,7 +114,7 @@ export default function Home() {
           { icon: LineChart, title: 'Charts', desc: 'Browse through the model book, filter by ticker or tag to find specific chart patterns.', href: '/charts', color: 'blue' },
           { icon: ListFilter, title: 'Trades', desc: 'View trade logs with detailed metrics, and jump to specific charts when needed.', href: '/trades', color: 'green' },
           { icon: BarChart3, title: 'Statistics', desc: 'Explore trading statistics and performance breakdowns to sharpen your strategy.', href: '/statistics', color: 'purple' },
-          { icon: Dumbbell, title: 'Trading Gym', desc: 'Replay real trades candle-by-candle, make your own calls, and compare with what actually happened.', href: '/gym', color: 'orange' },
+          { icon: Dumbbell, title: 'Trading Gym', desc: 'No pain, no gain! Replay real trades, make your own calls, and compare with what actually happened.', href: '/gym', color: 'orange' },
         ].map(({ icon: Icon, title, desc, href, color }) => ( // `title`, `desc`, `href`, `color` are available here
           <motion.div
             key={title}

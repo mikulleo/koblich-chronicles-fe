@@ -214,7 +214,7 @@ export default function TradingGym() {
               Trading Gym
             </h1>
             <p className="text-sm text-muted-foreground">
-              Replay real trades candle-by-candle and test your decisions
+              No pain, no gain — but first, develop the feel for the technical action
             </p>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function TradingGym() {
             Experimental
           </Badge>
           <p className="text-xs text-muted-foreground">
-            This section currently includes <strong className="text-foreground/70">Trade Replay</strong> — pick a trade, make your own calls, and compare with what actually happened. More Trading Gym features (mindset tracking, mental edge tools) are coming soon.
+            <strong className="text-foreground/70">Trade Replay</strong> is pumping — replay real trades candle-by-candle to build that feel for the technical action. Coming next: <strong className="text-foreground/70">Mindset</strong> tools to gain with your mental edge, not just your entries.
           </p>
         </div>
       </div>
