@@ -1,23 +1,23 @@
 // app/page.tsx
 "use client"
 
+import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown, Dumbbell } from "lucide-react"
+import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown, Dumbbell, ExternalLink } from "lucide-react"
 import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
 import { PdfExportDialog } from "@/components/exports/pdf-export-dialog"
-// Import sendGTMEvent for Data Layer pushes
-import { sendGTMEvent } from '@next/third-parties/google';
+import { sendGTMEvent } from '@next/third-parties/google'
 
 // Animation variants
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     transition: { duration: 0.6 }
   }
@@ -31,6 +31,76 @@ const staggerContainer = {
       staggerChildren: 0.2
     }
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* 3D perspective-tilt feature card                                     */
+/* ------------------------------------------------------------------ */
+
+function Feature3DCard({ icon: Icon, title, desc, href, color }: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  desc: string
+  href: string
+  color: string
+}) {
+  const [rotateX, setRotateX] = useState(0)
+  const [rotateY, setRotateY] = useState(0)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  function handleMouse(e: React.MouseEvent) {
+    if (!cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width - 0.5
+    const y = (e.clientY - rect.top) / rect.height - 0.5
+    setRotateY(x * 12)
+    setRotateX(-y * 12)
+  }
+
+  function resetTilt() {
+    setRotateX(0)
+    setRotateY(0)
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      onMouseMove={handleMouse}
+      onMouseLeave={resetTilt}
+      className="[perspective:800px] group h-full"
+    >
+      <Card
+        className="h-full shadow-md transition-shadow duration-300 hover:shadow-xl"
+        style={{
+          transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+          transition: "transform 0.15s ease-out",
+        }}
+      >
+        <CardContent className="p-5 flex flex-col h-full">
+          <div className={`w-10 h-10 rounded-full bg-${color}-100 flex items-center justify-center mb-3`}>
+            <Icon className={`h-5 w-5 text-${color}-600`} />
+          </div>
+          <h3 className="text-lg font-medium mb-2">{title}</h3>
+          <p className="text-gray-600 mb-4 flex-grow text-sm">{desc}</p>
+          <Button asChild className="mt-auto w-full">
+            <Link
+              href={href}
+              onClick={() => {
+                sendGTMEvent({
+                  event: 'feature_card_click',
+                  feature_title: title,
+                  feature_href: href,
+                })
+              }}
+            >
+              View {title}
+              <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export default function Home() {
@@ -103,7 +173,7 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* Feature Cards */}
+      {/* Feature Cards — 3D tilt on hover */}
       <motion.div
         className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4"
         initial="hidden"
@@ -114,42 +184,10 @@ export default function Home() {
           { icon: LineChart, title: 'Charts', desc: 'Browse through the model book, filter by ticker or tag to find specific chart patterns.', href: '/charts', color: 'blue' },
           { icon: ListFilter, title: 'Trades', desc: 'View trade logs with detailed metrics, and jump to specific charts when needed.', href: '/trades', color: 'green' },
           { icon: BarChart3, title: 'Statistics', desc: 'Explore trading statistics and performance breakdowns to sharpen your strategy.', href: '/statistics', color: 'purple' },
-          { icon: Dumbbell, title: 'Trading Gym', desc: 'No pain, no gain! Replay real trades, make your own calls, and compare with what actually happened.', href: '/gym', color: 'orange' },
-        ].map(({ icon: Icon, title, desc, href, color }) => ( // `title`, `desc`, `href`, `color` are available here
-          <motion.div
-            key={title}
-            variants={fadeIn}
-            whileHover={{
-              y: -10,
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-            transition={{ type: 'spring', stiffness: 300 }}
-          >
-            <Card className="h-full shadow-md">
-              <CardContent className="p-5 flex flex-col h-full">
-                <div className={`w-10 h-10 rounded-full bg-${color}-100 flex items-center justify-center mb-3`}>
-                  <Icon className={`h-5 w-5 text-${color}-600`} />
-                </div>
-                <h3 className="text-lg font-medium mb-2">{title}</h3>
-                <p className="text-gray-600 mb-4 flex-grow text-sm">{desc}</p>
-                <Button asChild className="mt-auto w-full">
-                  <Link 
-                    href={href} 
-                    onClick={() => { // Move onClick here to access `href` and `title`
-                      sendGTMEvent({
-                        event: 'feature_card_click', // Your custom event name for GTM
-                        feature_title: title, // Parameter from current map iteration
-                        feature_href: href,   // Parameter from current map iteration
-                        // Add other relevant parameters if needed
-                      });
-                      console.debug(`[GTM] Sent feature_card_click for: ${title}`);
-                    }}
-                  >
-                    View {title}
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+          { icon: Dumbbell, title: 'Trading Gym', desc: 'No pain, no gain! Replay real trades & make your own calls, plus track your mindset and build discipline.', href: '/gym', color: 'orange' },
+        ].map(({ icon, title, desc, href, color }) => (
+          <motion.div key={title} variants={fadeIn}>
+            <Feature3DCard icon={icon} title={title} desc={desc} href={href} color={color} />
           </motion.div>
         ))}
       </motion.div>
@@ -169,13 +207,13 @@ export default function Home() {
               About me
             </h2>
             <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
-              For those who don't know me – my name is Leoš Mikulka – I'm primarily a Swing trader/shorter-term trader heavily influenced by the CANSLIM methodology and some of the brightest minds revolving around this style. I have learned a lot from the Investors Business Daily, gotten a solid foundation from Mark Minervini and been fine-tuned in my style by Leif Soreide. All of these factors helped me place third 🥉 in the 2024 United States Investing Championship.
+              For those who don&apos;t know me – my name is Leos Mikulka – I&apos;m primarily a Swing trader/shorter-term trader heavily influenced by the CANSLIM methodology and some of the brightest minds revolving around this style. I have learned a lot from the Investors Business Daily, gotten a solid foundation from Mark Minervini and been fine-tuned in my style by Leif Soreide. All of these factors helped me place third in the 2024 United States Investing Championship.
             </p>
             <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
-              Personally, I've always been an avid athlete – currently playing ice-hockey as a goalie and competed as a football player (cornerback) for the national team, having a chance to play across multiple European countries and grabbing some championship rings in 🇨🇿 and 🇬🇧.
+              Personally, I&apos;ve always been an avid athlete – currently playing ice-hockey as a goalie and competed as a football player (cornerback) for the national team, having a chance to play across multiple European countries and grabbing some championship rings in the Czech Republic and United Kingdom.
             </p>
             <p className="text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
-              I'm from the Czech Republic – if anyone wants to visit Prague, feel free to get in touch when you're coming and let's have a beer or two together!
+              I&apos;m from the Czech Republic – if anyone wants to visit Prague, feel free to get in touch when you&apos;re coming and let&apos;s have a beer or two together!
             </p>
           </CardContent>
           </Card>
@@ -190,10 +228,10 @@ export default function Home() {
                   The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> — no hindsight trading allowed! The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting) as each proper model-book should have those.
                 </p>
                 <p className="mb-4">
-                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. A PDF export of the annotated charts is already available in the <em>Connect & Support</em> section below.
+                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. A PDF export of the annotated charts is already available in the <em>Connect &amp; Support</em> section below.
                 </p>
                 <p>
-                  Beyond the model-book, the site now also features a <strong>Trading Gym</strong> — an experimental section where you can replay real trades candle-by-candle, test your own decisions, and compare with what actually happened. More features (including mindset & mental edge tools) are on the way.
+                  Beyond the model-book, the site now also features a <strong>Trading Gym</strong> — an experimental section where you can replay real trades candle-by-candle, test your own decisions, and compare with what actually happened. The Gym also includes <strong>Mental Edge</strong> tools to track your trading psychology, identify emotional traps, and build discipline.
                 </p>
             </CardContent>
           </Card>
@@ -240,7 +278,7 @@ Past performance is not indicative of future results. Markets change constantly,
         <motion.div variants={fadeIn} id="connect-support">
           <Card className="shadow-md shadow-md p-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-6">
-              <h2 className="text-xl font-medium mb-4 text-gray-800">Connect & Support</h2>
+              <h2 className="text-xl font-medium mb-4 text-gray-800">Connect &amp; Support</h2>
               <div className="flex items-center gap-2 mb-4">
                 <p className="font-medium">Follow me on:</p>
                 <Link href="https://x.com/mikulkal" target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:text-primary/80 transition-colors">
@@ -251,35 +289,35 @@ Past performance is not indicative of future results. Markets change constantly,
               </div>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>
-                  Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you're finding value here, your donations can help keep this project alive.
+                  Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you&apos;re finding value here, your donations can help keep this project alive.
                 </p>
                 <p>
-                I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I'm more than happy — it makes it all worthwhile!
+                I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I&apos;m more than happy — it makes it all worthwhile!
                 </p>
                 {/* Main donation dialog and PDF export */}
                 <div className="mt-4 flex flex-wrap gap-3">
                   <DonationDialog />
                   <PdfExportDialog />
                 </div>
-                
+
                 {/* Fallback donation options */}
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
                   <p className="text-sm text-gray-700 mb-3">
-                    <strong>In case the donation via "Donate" button is not working, you can donate via PayPal directly:</strong>
+                    <strong>In case the donation via &quot;Donate&quot; button is not working, you can donate via PayPal directly:</strong>
                   </p>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                     {/* PayPal Link */}
                     <Button asChild variant="outline" size="sm">
-                      <Link 
-                        href="https://www.paypal.com/donate/?hosted_button_id=HD7Z22B88AYNL" 
-                        target="_blank" 
+                      <Link
+                        href="https://www.paypal.com/donate/?hosted_button_id=HD7Z22B88AYNL"
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2"
                       >
                         PayPal Direct Link
                       </Link>
                     </Button>
-                    
+
                     {/* QR Code */}
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-600">or scan:</span>

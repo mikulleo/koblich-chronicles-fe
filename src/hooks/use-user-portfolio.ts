@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type {
   TradeLot,
   ClosedPortion,
@@ -55,14 +55,40 @@ const sizePctLabel = (shares: number): string => {
   return `${pct}%`
 }
 
+const MAX_UNDO_HISTORY = 20
+
 export function useUserPortfolio() {
   const [state, setState] = useState<PortfolioState>(initialState)
   const lotCounter = useRef(0)
+  const undoStack = useRef<PortfolioState[]>([])
+
+  // Keep a ref synced with state for synchronous undo snapshot
+  const stateRef = useRef<PortfolioState>(initialState)
+  useEffect(() => { stateRef.current = state }, [state])
+
+  /** Push current state to undo stack before making a change */
+  const pushUndo = useCallback(() => {
+    undoStack.current.push(structuredClone(stateRef.current))
+    if (undoStack.current.length > MAX_UNDO_HISTORY) undoStack.current.shift()
+  }, [])
+
+  /** Undo last action — restores previous portfolio state */
+  const undo = useCallback(() => {
+    const prev = undoStack.current.pop()
+    if (prev) {
+      setState({ ...prev, phase: 'idle' })
+    }
+  }, [])
 
   // ── Entry flow ──
 
   const promptEntry = useCallback((tradeType: 'long' | 'short') => {
     setState(prev => ({ ...prev, phase: 'entry_prompt', tradeType }))
+  }, [])
+
+  /** Skip the buy/pass prompt — go straight to sizing (used by "Buy Now") */
+  const promptEntrySizing = useCallback((tradeType: 'long' | 'short') => {
+    setState(prev => ({ ...prev, phase: 'entry_sizing', tradeType }))
   }, [])
 
   const confirmBuy = useCallback(() => {
@@ -84,6 +110,7 @@ export function useUserPortfolio() {
 
   /** User clicked chart for stop. Entry price already in pendingEntryPrice. */
   const confirmEntryStop = useCallback((stopPrice: number, date: string) => {
+    pushUndo()
     setState(prev => {
       const lot: TradeLot = {
         id: `lot-${++lotCounter.current}`,
@@ -145,6 +172,7 @@ export function useUserPortfolio() {
 
   /** If pendingStopPrice is set (stop-hit sell), auto-executes at that price. */
   const confirmSellAmount = useCallback((percent: number, date?: string) => {
+    pushUndo()
     setState(prev => {
       // Auto-execute at stop price if this is a stop-hit sell
       if (prev.pendingStopPrice != null && date) {
@@ -192,6 +220,7 @@ export function useUserPortfolio() {
   }, [])
 
   const confirmSellPrice = useCallback((exitPrice: number, date: string) => {
+    pushUndo()
     setState(prev => {
       const totalShares = prev.lots.reduce((s, l) => s + l.remainingShares, 0)
       let sharesToSell = Math.round(totalShares * (prev.pendingSellPercent / 100))
@@ -242,6 +271,7 @@ export function useUserPortfolio() {
   }, [])
 
   const confirmAddStop = useCallback((stopPrice: number, date: string) => {
+    pushUndo()
     setState(prev => {
       const lot: TradeLot = {
         id: `lot-${++lotCounter.current}`,
@@ -266,6 +296,7 @@ export function useUserPortfolio() {
   // ── Move stop ──
 
   const confirmMoveStop = useCallback((newStop: number) => {
+    pushUndo()
     setState(prev => ({
       ...prev,
       lots: prev.lots.map(l => ({ ...l, currentStop: newStop })),
@@ -324,6 +355,7 @@ export function useUserPortfolio() {
 
   const reset = useCallback(() => {
     lotCounter.current = 0
+    undoStack.current = []
     setState(initialState)
   }, [])
 
@@ -381,6 +413,8 @@ export function useUserPortfolio() {
     [state.lots, state.isActive, state.tradeType, state.phase],
   )
 
+  const canUndo = undoStack.current.length > 0
+
   const isPricePickMode =
     state.phase === 'entry_price' ||
     state.phase === 'entry_stop' ||
@@ -416,7 +450,9 @@ export function useUserPortfolio() {
     closedPnl,
     userPriceLines,
     isPricePickMode,
+    canUndo,
     promptEntry,
+    promptEntrySizing,
     confirmBuy,
     declineEntry,
     setEntrySize,
@@ -438,6 +474,7 @@ export function useUserPortfolio() {
     continueFromReveal,
     cancelAction,
     reset,
+    undo,
     getOpenPnl,
     checkStopHit,
   }

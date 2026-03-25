@@ -250,18 +250,101 @@ export interface WeeklySummary {
   }[];
 }
 
+export interface CheckInTrendDay {
+  date: string;
+  preMarket: Record<string, number>;
+  postMarket: Record<string, number>;
+  behaviors: Record<string, boolean>;
+  stateConsistency?: number;
+  intentionAdherence?: number;
+  riskPredictionAccuracy?: boolean | null;
+  traps: string[];
+  contextFlags: string[];
+  driftPatterns: string[];
+}
+
 export interface CheckInTrends {
   totalDays: number;
-  trends: {
-    date: string;
-    preMarket: Record<string, number>;
-    postMarket: Record<string, number>;
+  trends: CheckInTrendDay[];
+}
+
+// ===== Deterministic Insights Types =====
+
+export interface MetricExplanation {
+  label: string;
+  description: string;
+  currentAverage: number | null;
+  currentInterpretation: string | null;
+}
+
+export interface ConditionalInsight {
+  condition: string;
+  outcome: string;
+  rate: number;
+  occurrences: number;
+  total: number;
+}
+
+export interface DeterministicInsights {
+  totalDays: number;
+  completeDays: number;
+  latestDate: string | null;
+  oldestDate: string | null;
+  todayInsights: {
+    strengths: string[];
+    issues: string[];
+  };
+  recurringPatterns: {
+    issues: string[];
+    strengths: string[];
+  };
+  trendInsights: string[];
+  conditionalInsights: ConditionalInsight[];
+  metrics: {
+    stateConsistency: MetricExplanation;
+    intentionAdherence: MetricExplanation;
+  };
+}
+
+// ===== Mindset Evaluation Types =====
+
+export type EvaluationType = 'daily_post_market' | 'weekly_summary' | 'on_demand';
+export type EvaluationStatus = 'pending' | 'completed' | 'failed' | 'rate_limited';
+
+export interface MindsetEvaluation {
+  id: string;
+  user: string;
+  date: string;
+  evaluationType: EvaluationType;
+  inputSnapshot?: {
+    checkInId?: string;
+    disciplineLogId?: string;
+    dataHash?: string;
+  };
+  deterministicAnalysis?: {
     stateConsistency?: number;
     intentionAdherence?: number;
-    traps: string[];
-    contextFlags: string[];
-    driftPatterns: string[];
-  }[];
+    riskPredictionAccuracy?: boolean;
+    emotionalDrift?: string[];
+  };
+  aiAnalysis?: {
+    coachingFeedback?: string;
+    patternsIdentified?: string[];
+    actionableInsights?: string[];
+    riskAlerts?: string[];
+    strengthsHighlighted?: string[];
+    focusForTomorrow?: string;
+    overallScore?: number;
+  };
+  tokenUsage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    estimatedCost?: number;
+  };
+  status: EvaluationStatus;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TradeStats {

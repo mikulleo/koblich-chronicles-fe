@@ -77,6 +77,14 @@ export interface ReplayEvent {
   reason: string
   plPct: number | null
   normPlPct: number | null
+  /** Shares exited (exit events only, 0 otherwise) */
+  shares: number
+  /** 1-based exit number (0 for non-exit events) */
+  exitNumber: number
+  /** % of total position sold in this exit (null for non-exit events) */
+  soldPct: number | null
+  /** % of position remaining after this exit (null for non-exit events) */
+  remainingPct: number | null
 }
 
 export interface ReplayChart {
@@ -85,6 +93,12 @@ export interface ReplayChart {
   imageUrl: string
   annotatedUrl: string
   role: string
+  notes: {
+    setupEntry: string
+    trend: string
+    fundamentals: string
+    other: string
+  }
 }
 
 export interface ReplayTrade {
@@ -93,6 +107,7 @@ export interface ReplayTrade {
   stopLoss: number
   type: string
   symbol: string
+  totalShares: number
   stops: Array<{ date: string; price: number; notes: string }>
   exits: Array<{ date: string; price: number; shares: number; reason: string; notes: string }>
   /** Subsequent buys on the same ticker detected as add-ons */
@@ -101,6 +116,7 @@ export interface ReplayTrade {
     price: number
     stopLoss: number
     normalizationFactor: number
+    totalShares: number
     exits: Array<{ date: string; price: number; shares: number; reason: string; notes: string }>
     stops: Array<{ date: string; price: number; notes: string }>
   }>
@@ -203,6 +219,12 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
         imageUrl: absUrl(c.image?.url),
         annotatedUrl: c.annotatedImage?.url ? absUrl(c.annotatedImage.url) : '',
         role: str(c.tradeStory?.chartRole || 'chart'),
+        notes: {
+          setupEntry: str(c.notes?.setupEntry),
+          trend: str(c.notes?.trend),
+          fundamentals: str(c.notes?.fundamentals),
+          other: str(c.notes?.other),
+        },
       }))
 
       /* ── Extract trade details (flat) ── */
@@ -215,6 +237,7 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
           stopLoss: num(tradeRaw.initialStopLoss),
           type: str(tradeRaw.type),
           symbol: tickerSymbol,
+          totalShares: num(tradeRaw.shares),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           stops: (tradeRaw.modifiedStops ?? []).map((s: any) => ({
             date: toDate(s.date),
@@ -261,6 +284,7 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
                   price: num(otherTrade.entryPrice),
                   stopLoss: num(otherTrade.initialStopLoss),
                   normalizationFactor: num(otherTrade.normalizationFactor),
+                  totalShares: num(otherTrade.shares),
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   exits: (otherTrade.exits ?? []).map((x: any) => ({
                     date: toDate(x.date),
@@ -308,6 +332,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
             reason: str(det.reason),
             plPct: numOrNull(det.profitLossPercent),
             normPlPct: numOrNull(det.normalizedProfitLossPercent),
+            shares: num(det.shares),
+            exitNumber: 0,
+            soldPct: null,
+            remainingPct: null,
           }
         })
 
@@ -372,6 +400,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
           reason: '',
           plPct: null,
           normPlPct: null,
+          shares: 0,
+          exitNumber: 0,
+          soldPct: null,
+          remainingPct: null,
         })
 
         // Stop modification events
@@ -390,6 +422,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
             reason: '',
             plPct: null,
             normPlPct: null,
+            shares: 0,
+            exitNumber: 0,
+            soldPct: null,
+            remainingPct: null,
           })
         })
 
@@ -419,6 +455,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
             reason: str(x.reason),
             plPct: Number(plPct.toFixed(2)),
             normPlPct: Number(normPlPct.toFixed(2)),
+            shares: num(x.shares),
+            exitNumber: 0,
+            soldPct: null,
+            remainingPct: null,
           })
         })
 
@@ -448,6 +488,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
             reason: '',
             plPct: null,
             normPlPct: null,
+            shares: 0,
+            exitNumber: 0,
+            soldPct: null,
+            remainingPct: null,
           })
 
           for (const st of add.stops) {
@@ -465,6 +509,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
               reason: '',
               plPct: null,
               normPlPct: null,
+              shares: 0,
+              exitNumber: 0,
+              soldPct: null,
+              remainingPct: null,
             })
           }
 
@@ -489,10 +537,71 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
               reason: x.reason,
               plPct: Number(addPlPct.toFixed(2)),
               normPlPct: Number((addPlPct * addNorm).toFixed(2)),
+              shares: num(x.shares),
+              exitNumber: 0,
+              soldPct: null,
+              remainingPct: null,
             })
           }
         }
         flatEvents.sort((a, b) => +new Date(a.date) - +new Date(b.date))
+      }
+
+      /* ── Post-process exits: numbering + remaining % ── */
+      const mainTotalShares = flatTrade?.totalShares ?? 0
+      // Build a map of add-on total shares by their entry date
+      const addSharesMap = new Map<string, number>()
+      if (flatTrade?.adds) {
+        for (const add of flatTrade.adds) {
+          addSharesMap.set(add.date.split('T')[0], add.totalShares)
+        }
+      }
+
+      let mainExitNum = 0
+      let mainExitedSoFar = 0
+      let addExitNum = 0
+      let addExitedSoFar = 0
+      // Track which add-on's exits we're counting
+      let currentAddTotalShares = 0
+
+      for (const evt of flatEvents) {
+        if (evt.type !== 'exit') continue
+
+        const isAddExit = evt.title === 'Add Exit'
+        if (isAddExit) {
+          addExitNum++
+          // Find the add-on trade this exit belongs to (best effort)
+          if (currentAddTotalShares === 0 && flatTrade?.adds) {
+            for (const add of flatTrade.adds) {
+              if (add.exits.some(x => x.date === evt.date && x.price === evt.price)) {
+                currentAddTotalShares = add.totalShares
+                break
+              }
+            }
+          }
+          evt.exitNumber = addExitNum
+          if (currentAddTotalShares > 0) {
+            evt.soldPct = Math.round((evt.shares / currentAddTotalShares) * 100)
+          }
+          addExitedSoFar += evt.shares
+          if (currentAddTotalShares > 0) {
+            evt.remainingPct = Math.round(Math.max(0, ((currentAddTotalShares - addExitedSoFar) / currentAddTotalShares) * 100))
+          }
+          const isLast = evt.remainingPct === 0
+          evt.title = isLast ? `Add Sell #${addExitNum}` : `Add Sell #${addExitNum} · Partial`
+        } else {
+          mainExitNum++
+          evt.exitNumber = mainExitNum
+          if (mainTotalShares > 0) {
+            evt.soldPct = Math.round((evt.shares / mainTotalShares) * 100)
+          }
+          mainExitedSoFar += evt.shares
+          if (mainTotalShares > 0) {
+            evt.remainingPct = Math.round(Math.max(0, ((mainTotalShares - mainExitedSoFar) / mainTotalShares) * 100))
+          }
+          const isLast = evt.remainingPct === 0
+          evt.title = isLast ? `Sell #${mainExitNum}` : `Sell #${mainExitNum} · Partial`
+        }
       }
 
       setMeta(flatMeta)

@@ -97,7 +97,7 @@ export default function SidebarNav() {
 
         <SidebarMenuItem>
           <Link href="/gym" passHref>
-            <SidebarMenuButton isActive={pathname === "/gym"} tooltip="Trading Gym">
+            <SidebarMenuButton isActive={pathname === "/gym" || pathname.startsWith("/gym/")} tooltip="Trading Gym">
               <Dumbbell className="h-5 w-5" />
               <span>Trading Gym</span>
             </SidebarMenuButton>

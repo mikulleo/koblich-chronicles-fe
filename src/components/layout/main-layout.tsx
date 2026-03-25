@@ -36,7 +36,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </SidebarContent>
             <SidebarFooter className="border-t p-4">
               <div className="text-xs text-muted-foreground">
-                Koblich Chronicles v1.0
+                Koblich Chronicles v1.2
               </div>
             </SidebarFooter>
           </Sidebar>

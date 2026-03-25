@@ -21,6 +21,11 @@ import {
   RotateCcw,
   CandlestickChart as CandlestickIcon,
   Loader2,
+  Undo2,
+  ShoppingCart,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -185,6 +190,8 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const [showControls, setShowControls] = useState(true)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
   const [revealedDecisionKeys, setRevealedDecisionKeys] = useState<string[]>([])
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
+  const [showChartNotes, setShowChartNotes] = useState(false)
   const controlsTimer = useRef<NodeJS.Timeout | null>(null)
   const { trackEvent } = useAnalytics()
 
@@ -838,6 +845,8 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     setPhase('intro')
     setShowSetupPrompt(false)
     setRevealedDecisionKeys([])
+    setExpandedNotes(new Set())
+    setShowChartNotes(false)
     setStopHitAnimating(false)
     stopHitAnimatingRef.current = false
     setLastCandleOverride(null)
@@ -923,6 +932,16 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     if (!currentCandleDate) return null
     const visible = charts.filter((c) => c.date.split('T')[0] <= currentCandleDate)
     return visible.length > 0 ? visible[visible.length - 1] : null
+  }, [charts, currentCandleDate])
+
+  /** Chart notes from all visible charts (for the notes panel) */
+  const visibleChartNotes = useMemo(() => {
+    if (!currentCandleDate) return []
+    return charts.filter((c) => {
+      if (c.date.split('T')[0] > currentCandleDate) return false
+      const n = c.notes
+      return n.setupEntry || n.trend || n.fundamentals || n.other
+    })
   }, [charts, currentCandleDate])
 
   const currentDateDisplay = useMemo(() => {
@@ -1133,8 +1152,24 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                       />
                     </div>
 
-                    {/* Top-right: date + add action button */}
+                    {/* Top-right: date + action buttons */}
                     <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                      {/* Buy Now: allow buying before entry candle — skips buy/pass, goes straight to sizing */}
+                      {predictions && !portfolio.isActive && !portfolio.hasDeclinedEntry && portfolio.phase === 'idle' && candleIdx >= 0 && candleIdx < entryCandleIdx && !stopHitAnimating && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            entryPromptedRef.current = true
+                            setPlaying(false)
+                            portfolio.promptEntrySizing(tradeDetails?.type as 'long' | 'short' ?? 'long')
+                          }}
+                          className="bg-black/60 backdrop-blur-sm text-green-400 hover:text-green-300 hover:bg-black/80 h-7 text-[11px] px-2"
+                        >
+                          <ShoppingCart className="h-3 w-3 mr-1" />Buy Now
+                        </Button>
+                      )}
+                      {/* Add Action: when position is open */}
                       {predictions && portfolio.isActive && portfolio.phase === 'idle' && !stopHitAnimating && (
                         <Button
                           variant="ghost"
@@ -1143,6 +1178,18 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                           className="bg-black/60 backdrop-blur-sm text-blue-400 hover:text-blue-300 hover:bg-black/80 h-7 text-[11px] px-2"
                         >
                           + Add Action
+                        </Button>
+                      )}
+                      {/* Undo: revert last portfolio action */}
+                      {predictions && portfolio.canUndo && portfolio.phase === 'idle' && !stopHitAnimating && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={portfolio.undo}
+                          className="bg-black/60 backdrop-blur-sm text-yellow-400 hover:text-yellow-300 hover:bg-black/80 h-7 text-[11px] px-2"
+                          title="Undo last action"
+                        >
+                          <Undo2 className="h-3 w-3 mr-1" />Undo
                         </Button>
                       )}
                       {currentDateDisplay && (
@@ -1184,6 +1231,86 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                         </button>
                       )}
                     </div>
+
+                    {/* Chart notes — prominent floating button (bottom-left) */}
+                    <AnimatePresence>
+                      {visibleChartNotes.length > 0 && !showChartNotes && !portfolioBusy && (
+                        <motion.div
+                          key="chart-notes-btn"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute bottom-4 left-4 z-15"
+                        >
+                          <button
+                            onClick={() => setShowChartNotes(true)}
+                            className="bg-purple-600/90 hover:bg-purple-500 text-white rounded-full px-4 py-2 text-xs font-medium backdrop-blur-sm shadow-lg shadow-purple-900/30 flex items-center gap-1.5 transition-colors"
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            View Trade Notes
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Chart notes panel */}
+                    <AnimatePresence>
+                      {showChartNotes && visibleChartNotes.length > 0 && (
+                        <motion.div
+                          key="chart-notes"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 20 }}
+                          className="absolute bottom-4 left-4 z-20 w-80 max-h-[55vh] overflow-y-auto bg-gray-900/95 backdrop-blur-md rounded-xl border border-purple-500/30 p-4 shadow-xl shadow-black/40"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4 text-purple-400" />
+                              <p className="text-sm font-semibold text-purple-300">Trade Notes</p>
+                            </div>
+                            <button onClick={() => setShowChartNotes(false)} className="text-gray-500 hover:text-gray-300 p-1 rounded hover:bg-gray-800">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="space-y-3">
+                            {visibleChartNotes.map((chart) => (
+                              <div key={chart.id} className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={cn('border text-[9px] py-0', getRoleBadgeColor(chart.role))}>{s(chart.role)}</Badge>
+                                  <span className="text-[10px] text-gray-500">
+                                    {(() => { try { return format(new Date(chart.date), 'MMM dd') } catch { return chart.date.split('T')[0] } })()}
+                                  </span>
+                                </div>
+                                {chart.notes.setupEntry && (
+                                  <div className="bg-gray-800/50 rounded px-2 py-1">
+                                    <p className="text-[10px] text-green-400 font-medium">Setup / Entry</p>
+                                    <p className="text-[11px] text-gray-300 whitespace-pre-wrap">{chart.notes.setupEntry}</p>
+                                  </div>
+                                )}
+                                {chart.notes.trend && (
+                                  <div className="bg-gray-800/50 rounded px-2 py-1">
+                                    <p className="text-[10px] text-blue-400 font-medium">Trend</p>
+                                    <p className="text-[11px] text-gray-300 whitespace-pre-wrap">{chart.notes.trend}</p>
+                                  </div>
+                                )}
+                                {chart.notes.fundamentals && (
+                                  <div className="bg-gray-800/50 rounded px-2 py-1">
+                                    <p className="text-[10px] text-yellow-400 font-medium">Fundamentals</p>
+                                    <p className="text-[11px] text-gray-300 whitespace-pre-wrap">{chart.notes.fundamentals}</p>
+                                  </div>
+                                )}
+                                {chart.notes.other && (
+                                  <div className="bg-gray-800/50 rounded px-2 py-1">
+                                    <p className="text-[10px] text-gray-400 font-medium">Other</p>
+                                    <p className="text-[11px] text-gray-300 whitespace-pre-wrap">{chart.notes.other}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {predictions && (
                       <UserActionOverlay
@@ -1457,16 +1584,65 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                         )}
                         {evt.type === 'exit' && (
                           <>
-                            <p>Price: <span className="text-gray-200">${s(evt.price)}</span></p>
+                            <p>Price: <span className="text-gray-200">${s(evt.price)}</span>
+                              {evt.soldPct != null && evt.soldPct > 0 && <span className="text-gray-500 ml-1">({s(evt.soldPct)}% of position)</span>}
+                            </p>
                             {evt.plPct != null && (
                               <p className={cn('font-medium', Number(evt.plPct) >= 0 ? 'text-green-400' : 'text-red-400')}>
                                 {Number(evt.plPct) >= 0 ? '+' : ''}{s(evt.plPct)}%
                               </p>
                             )}
+                            {evt.remainingPct != null && (
+                              <p className="text-gray-500">
+                                {evt.remainingPct === 0
+                                  ? 'Full exit'
+                                  : `${s(evt.remainingPct)}% remaining`}
+                              </p>
+                            )}
                             {evt.reason && <p className="capitalize text-gray-500">{s(evt.reason)}</p>}
                           </>
                         )}
-                        {evt.notes && <p className="italic text-gray-500 mt-1 line-clamp-2">{s(evt.notes)}</p>}
+                        {evt.notes && (() => {
+                          const noteKey = `${evt.type}-${evtDateStr}-${evt.price}-${evt.newStop}`
+                          const isExpanded = expandedNotes.has(noteKey)
+                          const isLong = evt.notes.length > 80
+                          return (
+                            <div className="mt-1">
+                              <p
+                                className={cn(
+                                  'italic text-gray-500',
+                                  !isExpanded && isLong && 'line-clamp-2',
+                                  isLong && 'cursor-pointer hover:text-gray-400',
+                                )}
+                                onClick={isLong ? () => {
+                                  setExpandedNotes(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(noteKey)) next.delete(noteKey)
+                                    else next.add(noteKey)
+                                    return next
+                                  })
+                                } : undefined}
+                              >
+                                {s(evt.notes)}
+                              </p>
+                              {isLong && (
+                                <button
+                                  onClick={() => {
+                                    setExpandedNotes(prev => {
+                                      const next = new Set(prev)
+                                      if (next.has(noteKey)) next.delete(noteKey)
+                                      else next.add(noteKey)
+                                      return next
+                                    })
+                                  }}
+                                  className="text-[10px] text-blue-400 hover:text-blue-300 mt-0.5 flex items-center gap-0.5"
+                                >
+                                  {isExpanded ? <><ChevronUp className="h-2.5 w-2.5" /> less</> : <><ChevronDown className="h-2.5 w-2.5" /> more</>}
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </motion.div>
                   )

@@ -7,6 +7,7 @@ import MainLayout from "@/components/layout/main-layout"
 import AnalyticsProvider from "@/providers/AnalyticsProvider"
 import { ThemeProvider } from "@/providers/ThemeProviders"
 import { PrefetchInitializer } from "@/components/prefetch-initializer"
+import { AuthProvider } from "@/providers/auth-provider"
 import { GoogleTagManager } from '@next/third-parties/google'
 
 // Load fonts with display: swap for better performance
@@ -45,13 +46,15 @@ export default function RootLayout({
       {GTM_ID && <GoogleTagManager gtmId={GTM_ID} />}
       <body className={inter.className}>
         <ThemeProvider>
-          <AnalyticsProvider gaMeasurementId={gaMeasurementId}>
-            <MainLayout>
-              {children}
-            </MainLayout>
-            <PrefetchInitializer />
-            <Toaster />
-          </AnalyticsProvider>
+          <AuthProvider>
+            <AnalyticsProvider gaMeasurementId={gaMeasurementId}>
+              <MainLayout>
+                {children}
+              </MainLayout>
+              <PrefetchInitializer />
+              <Toaster />
+            </AnalyticsProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

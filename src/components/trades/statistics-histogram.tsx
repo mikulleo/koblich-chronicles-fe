@@ -18,6 +18,7 @@ import {
   Cell,
 } from "recharts";
 import apiClient from "@/lib/api/client";
+import { useChartColors } from "@/hooks/use-chart-colors";
 import { StatsFilters } from "./trade-statistics";
 
 interface Trade {
@@ -58,6 +59,7 @@ interface StatisticsHistogramProps {
 }
 
 export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: StatisticsHistogramProps) {
+  const chartColors = useChartColors();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [histogramData, setHistogramData] = useState<HistogramBucket[]>([]);
@@ -378,19 +380,19 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
               data={histogramData}
               margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
             >
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis 
-                dataKey="range" 
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+              <XAxis
+                dataKey="range"
                 angle={-45}
                 textAnchor="end"
                 height={80}
                 interval={0}
                 fontSize={10}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: chartColors.text }}
               />
-              <YAxis 
-                label={{ value: 'Number of Trades', angle: -90, position: 'insideLeft' }}
-                tick={{ fontSize: 12 }}
+              <YAxis
+                label={{ value: 'Number of Trades', angle: -90, position: 'insideLeft', fill: chartColors.text }}
+                tick={{ fontSize: 12, fill: chartColors.text }}
               />
               <RechartsTooltip content={<CustomTooltip />} />
               

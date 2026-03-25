@@ -33,6 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useChartColors, tooltipStyle as makeTooltipStyle } from "@/hooks/use-chart-colors";
 
 interface StatisticsChartsProps {
   stats: TradeStats;
@@ -44,6 +45,7 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
   const isNormalized = viewMode === "normalized";
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("winloss");
+  const chartColors = useChartColors();
 
   // Modern color palette
   const colors = {
@@ -64,6 +66,8 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
       fill: "#14b8a6",        // Teal
     }
   };
+
+  const ttStyle = makeTooltipStyle(chartColors);
 
   // Validate data to avoid chart errors
   const validateData = () => {
@@ -264,7 +268,7 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <RechartsTooltip />
+                      <RechartsTooltip contentStyle={ttStyle} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -290,10 +294,10 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     layout="vertical"
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                    <XAxis type="number" tick={{ fill: chartColors.text }} />
                     <YAxis dataKey="name" type="category" hide />
-                    <RechartsTooltip formatter={percentFormatter} />
+                    <RechartsTooltip formatter={percentFormatter} contentStyle={ttStyle} />
                     <Legend />
                     <Bar dataKey="Avg Win %" name="Avg Win %" fill={metricColors["Avg Win %"]} />
                     <Bar dataKey="Avg Loss %" name="Avg Loss %" fill={metricColors["Avg Loss %"]} />
@@ -333,9 +337,9 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
               <div className="w-full h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={strategyMetrics}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="metric" />
-                    <PolarRadiusAxis domain={[0, 100]} />
+                    <PolarGrid stroke={chartColors.grid} />
+                    <PolarAngleAxis dataKey="metric" tick={{ fill: chartColors.text }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={{ fill: chartColors.text }} />
                     <Radar
                       name="Strategy Performance"
                       dataKey="value"
@@ -343,7 +347,8 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                       fill={colors.radar.fill}
                       fillOpacity={0.4}
                     />
-                    <RechartsTooltip 
+                    <RechartsTooltip
+                      contentStyle={ttStyle}
                       formatter={(value: any, name: string, props: any) => {
                         const metric = props.payload.metric;
                         let displayValue = value;

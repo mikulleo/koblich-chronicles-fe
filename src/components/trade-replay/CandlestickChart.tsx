@@ -203,12 +203,25 @@ export default function CandlestickChart({
       ]
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    series.setData(visibleCandles as any)
+    // Deduplicate by time — lightweight-charts requires strictly ascending timestamps.
+    // Keep the last entry for each timestamp (most up-to-date data).
+    const seen = new Set<string>()
+    const deduped: typeof visibleCandles = []
+    for (let i = visibleCandles.length - 1; i >= 0; i--) {
+      const t = String(visibleCandles[i].time)
+      if (!seen.has(t)) {
+        seen.add(t)
+        deduped.push(visibleCandles[i])
+      }
+    }
+    deduped.reverse()
 
-    // Volume
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    series.setData(deduped as any)
+
+    // Volume — use deduped candles to stay in sync
     if (volumeSeriesRef.current) {
-      const volumeData = visibleCandles
+      const volumeData = deduped
         .filter(c => c.volume != null && c.volume > 0)
         .map(c => ({
           time: c.time,
@@ -219,11 +232,11 @@ export default function CandlestickChart({
       volumeSeriesRef.current.setData(volumeData as any)
     }
 
-    // Moving averages
+    // Moving averages — use deduped to avoid duplicate-time assertion
     const maConfigs = interval === '1wk' ? WEEKLY_MA : DAILY_MA
     maSeriesRefs.current.forEach((maSeries, idx) => {
       if (idx < maConfigs.length) {
-        const maData = computeSMA(visibleCandles, maConfigs[idx].period)
+        const maData = computeSMA(deduped, maConfigs[idx].period)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         maSeries.setData(maData as any)
       }
@@ -231,12 +244,12 @@ export default function CandlestickChart({
 
     // Markers
     if (markersPluginRef.current) {
-      const visibleTimes = new Set(visibleCandles.map((c) => c.time))
+      const visibleTimes = new Set(deduped.map((c) => c.time))
 
       const snapToCandle = (time: string): string | null => {
         if (visibleTimes.has(time)) return time
         let best: string | null = null
-        for (const c of visibleCandles) {
+        for (const c of deduped) {
           if (c.time <= time) best = c.time
           else break
         }
