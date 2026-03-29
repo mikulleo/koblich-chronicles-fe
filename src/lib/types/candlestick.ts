@@ -60,6 +60,8 @@ export interface PredictionState {
   score: { aligned: number; total: number }
 }
 
+export type ChartStyle = 'candlestick' | 'ohlc' | 'hlc'
+
 export interface CandlestickChartProps {
   candles: CandleData[]
   revealCount: number
@@ -74,6 +76,10 @@ export interface CandlestickChartProps {
   height?: number
   /** '1d' or '1wk' — controls which moving average periods are shown */
   interval?: '1d' | '1wk'
+  /** Chart rendering style — candlestick (default), OHLC bars, or HLC bars */
+  chartStyle?: ChartStyle
+  /** Ticker symbol displayed on the chart */
+  symbol?: string
 }
 
 // ── User Portfolio System ──

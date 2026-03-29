@@ -37,7 +37,7 @@ import type { ReplayEvent, ReplayChart } from '@/hooks/use-trade-replay-data'
 import CandlestickChart from './CandlestickChart'
 import UserActionOverlay from './UserActionOverlay'
 import PerformanceSummary from './PerformanceSummary'
-import type { TradeDetails, TradeMarker, PriceLine, DecisionPoint, CandleData } from '@/lib/types/candlestick'
+import type { TradeDetails, TradeMarker, PriceLine, DecisionPoint, CandleData, ChartStyle } from '@/lib/types/candlestick'
 
 /* ------------------------------------------------------------------ */
 /* Safe-string helper: wraps EVERY dynamic value rendered as JSX child */
@@ -187,6 +187,7 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const [predictions, setPredictions] = useState(true)  // prediction mode toggle
   const [candlestickView, setCandlestickView] = useState(true)
   const [chartInterval, setChartInterval] = useState<'1d' | '1wk'>('1d')
+  const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick')
   const [showControls, setShowControls] = useState(true)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
   const [revealedDecisionKeys, setRevealedDecisionKeys] = useState<string[]>([])
@@ -1149,6 +1150,8 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                         lastCandleOverride={lastCandleOverride}
                         height={Math.min(700, typeof window !== 'undefined' ? window.innerHeight * 0.75 : 700)}
                         interval={chartInterval}
+                        chartStyle={chartStyle}
+                        symbol={tradeDetails?.tickerSymbol}
                       />
                     </div>
 
@@ -1199,7 +1202,7 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                       )}
                     </div>
 
-                    {/* Top-left: interval toggle + static view */}
+                    {/* Top-left: interval toggle + chart style toggle + static view */}
                     <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
                       <div className="bg-gray-800/80 rounded-md flex overflow-hidden">
                         <button
@@ -1219,6 +1222,39 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                           )}
                         >
                           W
+                        </button>
+                      </div>
+                      {/* Chart style toggle */}
+                      <div className="bg-gray-800/80 rounded-md flex overflow-hidden">
+                        <button
+                          onClick={() => setChartStyle('candlestick')}
+                          className={cn(
+                            'px-2 py-1 text-[10px] transition-colors',
+                            chartStyle === 'candlestick' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white',
+                          )}
+                          title="Candlestick chart"
+                        >
+                          Candle
+                        </button>
+                        <button
+                          onClick={() => setChartStyle('ohlc')}
+                          className={cn(
+                            'px-2 py-1 text-[10px] transition-colors',
+                            chartStyle === 'ohlc' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white',
+                          )}
+                          title="OHLC bar chart"
+                        >
+                          OHLC
+                        </button>
+                        <button
+                          onClick={() => setChartStyle('hlc')}
+                          className={cn(
+                            'px-2 py-1 text-[10px] transition-colors',
+                            chartStyle === 'hlc' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white',
+                          )}
+                          title="HLC bar chart (no open)"
+                        >
+                          HLC
                         </button>
                       </div>
                       {latestChart && (

@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react'
 import {
   createChart,
   CandlestickSeries,
+  BarSeries,
   HistogramSeries,
   LineSeries,
   createSeriesMarkers,
@@ -65,10 +66,13 @@ export default function CandlestickChart({
   lastCandleOverride,
   height = 500,
   interval = '1d',
+  chartStyle = 'candlestick',
+  symbol,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const seriesRef = useRef<ISeriesApi<any> | null>(null)
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const maSeriesRefs = useRef<ISeriesApi<'Line'>[]>([])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,14 +121,25 @@ export default function CandlestickChart({
       },
     })
 
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderUpColor: '#22c55e',
-      borderDownColor: '#ef4444',
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
-    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let series: ISeriesApi<any>
+    if (chartStyle === 'candlestick') {
+      series = chart.addSeries(CandlestickSeries, {
+        upColor: '#22c55e',
+        downColor: '#ef4444',
+        borderUpColor: '#22c55e',
+        borderDownColor: '#ef4444',
+        wickUpColor: '#22c55e',
+        wickDownColor: '#ef4444',
+      })
+    } else {
+      series = chart.addSeries(BarSeries, {
+        upColor: '#22c55e',
+        downColor: '#ef4444',
+        openVisible: chartStyle === 'ohlc',
+        thinBars: true,
+      })
+    }
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
       color: '#4b5563',
@@ -186,7 +201,7 @@ export default function CandlestickChart({
       priceLineMap.current.clear()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [height, interval])
+  }, [height, interval, chartStyle])
 
   // ── Data + markers + price lines + MAs: single coordinated effect ──
   useEffect(() => {
@@ -345,6 +360,12 @@ export default function CandlestickChart({
   return (
     <div className="relative w-full">
       <div ref={containerRef} className="w-full rounded-lg overflow-hidden" />
+      {/* Symbol watermark */}
+      {symbol && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+          <span className="text-gray-600/50 font-mono text-2xl font-bold tracking-wider select-none">{symbol}</span>
+        </div>
+      )}
       {/* MA Legend */}
       <div className="absolute bottom-6 left-2 z-20 flex items-center gap-2.5 bg-black/70 backdrop-blur-sm rounded px-2.5 py-1 pointer-events-none">
         {maConfigs.map((cfg, i) => (
