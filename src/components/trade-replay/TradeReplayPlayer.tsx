@@ -1157,8 +1157,8 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
 
                     {/* Top-right: date + action buttons */}
                     <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-                      {/* Buy Now: allow buying before entry candle — skips buy/pass, goes straight to sizing */}
-                      {predictions && !portfolio.isActive && !portfolio.hasDeclinedEntry && portfolio.phase === 'idle' && candleIdx >= 0 && candleIdx < entryCandleIdx && !stopHitAnimating && (
+                      {/* Buy Now: allow buying before entry candle OR after user passed on Leoš's entry */}
+                      {predictions && !portfolio.isActive && portfolio.phase === 'idle' && candleIdx >= 0 && (candleIdx < entryCandleIdx || portfolio.hasDeclinedEntry) && !stopHitAnimating && (
                         <Button
                           variant="ghost"
                           size="sm"
