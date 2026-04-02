@@ -219,7 +219,7 @@ export function DailyCheckIn() {
       </div>
 
       {/* Analysis summary (if available) */}
-      {analysis && (analysis.intentionAdherence !== undefined || analysis.stateConsistency !== undefined) && (
+      {analysis && (analysis.intentionAdherence !== undefined || analysis.stateConsistency !== undefined || analysis.riskPredictionAccuracy != null) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">{isToday ? "Today's" : "Day's"} Analysis</CardTitle>
@@ -260,18 +260,47 @@ export function DailyCheckIn() {
                   </p>
                 </div>
               )}
-              {analysis.riskPredictionAccuracy !== undefined && (
-                <div className="text-center">
-                  <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                  <div className="text-2xl font-bold">
-                    {analysis.riskPredictionAccuracy ? "Yes" : "No"}
+              {analysis.riskPredictionAccuracy != null && analysis.riskPredictionAccuracy !== false && (() => {
+                // Handle legacy boolean values from old data
+                const raw = analysis.riskPredictionAccuracy;
+                const outcome: string = raw === true ? "accurate" : String(raw);
+                const config: Record<string, { label: string; color: string; desc: string }> = {
+                  accurate: {
+                    label: "Accurate",
+                    color: "text-green-500",
+                    desc: "You predicted the right risk and it showed up — strong self-awareness.",
+                  },
+                  inaccurate: {
+                    label: "Inaccurate",
+                    color: "text-red-500",
+                    desc: "You predicted a risk, but a different trap occurred — fine-tune your awareness.",
+                  },
+                  worry_not_fulfilled: {
+                    label: "Worry Not Fulfilled",
+                    color: "text-blue-500",
+                    desc: "You identified a risk but no traps occurred — you were prepared for a challenge that didn't come.",
+                  },
+                  emotionally_set: {
+                    label: "Emotionally Set",
+                    color: "text-green-500",
+                    desc: "No risks predicted, no traps encountered — you were emotionally grounded.",
+                  },
+                  blind_spot: {
+                    label: "Blind Spot",
+                    color: "text-orange-500",
+                    desc: "Traps occurred that you didn't predict — review your pre-market risk awareness.",
+                  },
+                };
+                const c = config[outcome] || { label: outcome, color: "text-muted-foreground", desc: "" };
+                return (
+                  <div className="text-center">
+                    <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <div className={`text-lg font-bold ${c.color}`}>{c.label}</div>
+                    <div className="text-xs font-medium text-muted-foreground">Risk Prediction</div>
+                    <p className="text-[10px] text-muted-foreground/70 mt-1">{c.desc}</p>
                   </div>
-                  <div className="text-xs font-medium text-muted-foreground">Risk Predicted</div>
-                  <p className="text-[10px] text-muted-foreground/70 mt-1">
-                    Did the &quot;Biggest Risk&quot; you identified pre-market actually show up in your traps? Tracks your self-awareness.
-                  </p>
-                </div>
-              )}
+                );
+              })()}
               {analysis.emotionalDrift && analysis.emotionalDrift.length > 0 && (
                 <div className="text-center">
                   <div className="flex flex-wrap gap-1 justify-center mt-1">

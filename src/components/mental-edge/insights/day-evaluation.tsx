@@ -62,8 +62,20 @@ function evaluateDay(day: CheckInTrendDay): {
     strengths.push(
       `You followed through on ${day.intentionAdherence}% of your stated intentions`
     );
-  if (day.riskPredictionAccuracy === true)
+  // Handle both new string values and legacy boolean values
+  const riskOutcome = day.riskPredictionAccuracy === true ? "accurate"
+    : day.riskPredictionAccuracy === false ? "inaccurate"
+    : day.riskPredictionAccuracy;
+  if (riskOutcome === "accurate")
     strengths.push("Your risk prediction was accurate — good self-awareness");
+  if (riskOutcome === "emotionally_set")
+    strengths.push("No risks predicted and no traps encountered — you were emotionally grounded");
+  if (riskOutcome === "worry_not_fulfilled")
+    strengths.push("Your predicted risk didn't materialize — you were prepared for a challenge that didn't come");
+  if (riskOutcome === "blind_spot")
+    issues.push("Traps occurred that you didn't predict pre-market — review your risk awareness");
+  if (riskOutcome === "inaccurate")
+    issues.push("You predicted a different risk than what actually happened — fine-tune your self-awareness");
 
   if (day.stateConsistency !== undefined && day.stateConsistency !== null) {
     const abs = Math.abs(day.stateConsistency);

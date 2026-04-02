@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, XCircle, ClipboardCheck } from "lucide-react";
+import { CheckCircle2, XCircle, ClipboardCheck, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import apiClient from "@/lib/api/client";
 import { toast } from "sonner";
 import type { DisciplineRule, DisciplineLogEntry, ViolationMentalState } from "@/lib/types";
@@ -41,27 +41,59 @@ interface EntryState {
   mentalStateAtViolation?: ViolationMentalState;
 }
 
+function getDateString(date: Date): string {
+  return date.toISOString().split("T")[0]!;
+}
+
+function addTradingDays(dateStr: string, direction: number): string {
+  const date = new Date(dateStr + "T12:00:00");
+  do {
+    date.setDate(date.getDate() + direction);
+  } while (date.getDay() === 0 || date.getDay() === 6);
+  return getDateString(date);
+}
+
+function snapToWeekday(dateStr: string): string {
+  const date = new Date(dateStr + "T12:00:00");
+  const day = date.getDay();
+  if (day === 0) date.setDate(date.getDate() - 2);
+  if (day === 6) date.setDate(date.getDate() - 1);
+  return getDateString(date);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function DailyCompliance({ rules }: DailyComplianceProps) {
-  const [todayLog, setTodayLog] = useState<DisciplineLogEntry | null>(null);
+  const today = snapToWeekday(getDateString(new Date()));
+  const [selectedDate, setSelectedDate] = useState(today);
+  const isToday = selectedDate === today;
+
+  const [dayLog, setDayLog] = useState<DisciplineLogEntry | null>(null);
   const [entries, setEntries] = useState<EntryState[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const today = new Date().toISOString().split("T")[0];
   const activeRules = rules.filter((r) => r.isActive);
 
-  const fetchTodayLog = useCallback(async () => {
+  const fetchDayLog = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await apiClient.get("/discipline-log", {
         params: {
-          where: { date: { equals: today } },
+          where: { date: { equals: selectedDate } },
           limit: 1,
         },
       });
       const docs = response.data.docs;
       if (docs.length > 0) {
-        setTodayLog(docs[0]);
-        // Restore entries from existing log
+        setDayLog(docs[0]);
         const existingEntries = docs[0].entries || [];
         setEntries(
           activeRules.map((rule) => {
@@ -80,6 +112,7 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
           })
         );
       } else {
+        setDayLog(null);
         setEntries(
           activeRules.map((rule) => ({
             rule: rule.id,
@@ -89,19 +122,19 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
         );
       }
     } catch {
-      toast.error("Failed to load today's compliance log");
+      toast.error("Failed to load compliance log");
     } finally {
       setLoading(false);
     }
-  }, [today, activeRules.length]);
+  }, [selectedDate, activeRules.length]);
 
   useEffect(() => {
     if (activeRules.length > 0) {
-      fetchTodayLog();
+      fetchDayLog();
     } else {
       setLoading(false);
     }
-  }, [activeRules.length]);
+  }, [selectedDate, activeRules.length]);
 
   const updateEntry = (index: number, updates: Partial<EntryState>) => {
     setEntries((prev) =>
@@ -113,7 +146,7 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
     setSubmitting(true);
     try {
       const payload = {
-        date: today,
+        date: selectedDate,
         entries: entries.map((e) => ({
           rule: e.rule,
           status: e.status,
@@ -123,27 +156,19 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
         })),
       };
 
-      if (todayLog) {
-        await apiClient.patch(`/discipline-log/${todayLog.id}`, payload);
+      if (dayLog) {
+        await apiClient.patch(`/discipline-log/${dayLog.id}`, payload);
       } else {
         await apiClient.post("/discipline-log", payload);
       }
       toast.success("Compliance log saved");
-      await fetchTodayLog();
+      await fetchDayLog();
     } catch {
       toast.error("Failed to save compliance log");
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
 
   if (activeRules.length === 0) {
     return (
@@ -155,11 +180,85 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {/* Date nav shown even while loading */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSelectedDate(addTradingDays(selectedDate, -1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{formatDate(selectedDate)}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSelectedDate(addTradingDays(selectedDate, 1))}
+            disabled={isToday}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isToday && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedDate(today)}>
+              Today
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
   const respected = entries.filter((e) => e.status === "respected").length;
   const complianceRate = Math.round((respected / entries.length) * 100);
 
   return (
     <div className="space-y-4">
+      {/* Date navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSelectedDate(addTradingDays(selectedDate, -1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{formatDate(selectedDate)}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSelectedDate(addTradingDays(selectedDate, 1))}
+            disabled={isToday}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isToday && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedDate(today)}>
+              Today
+            </Button>
+          )}
+        </div>
+        <Badge variant={dayLog ? "default" : "outline"}>
+          {dayLog ? "Logged" : "Not Logged"}
+        </Badge>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -167,7 +266,7 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
             Daily Compliance
           </CardTitle>
           <CardDescription>
-            Track which rules you respected and violated today
+            Track which rules you respected and violated{isToday ? " today" : ` on ${formatDate(selectedDate)}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -261,7 +360,11 @@ export function DailyCompliance({ rules }: DailyComplianceProps) {
       </div>
 
       <Button onClick={handleSubmit} disabled={submitting} className="w-full">
-        {submitting ? "Saving..." : todayLog ? "Update Compliance Log" : "Save Compliance Log"}
+        {submitting
+          ? "Saving..."
+          : dayLog
+            ? `Update Log for ${formatDate(selectedDate)}`
+            : `Save Log for ${formatDate(selectedDate)}`}
       </Button>
     </div>
   );

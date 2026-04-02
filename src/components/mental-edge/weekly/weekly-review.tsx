@@ -126,7 +126,7 @@ export function WeeklyReview() {
                 <CardContent className="py-4 text-center">
                   <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-yellow-500" />
                   <div className="text-3xl font-bold">{summary.riskPredictionRate}%</div>
-                  <div className="text-xs text-muted-foreground">Risk Prediction Rate</div>
+                  <div className="text-xs text-muted-foreground">Positive Risk Outcomes</div>
                 </CardContent>
               </Card>
             )}

@@ -126,6 +126,7 @@ export type PostMarketRatingKey = 'planAdherence' | 'emotionalStability' | 'sele
 export type ContextFlag = 'recent_loss' | 'recent_win' | 'winning_streak' | 'losing_streak' | 'slept_poorly' | 'personal_stress' | 'market_volatile' | 'account_at_high' | 'account_at_low' | 'big_news_day' | 'end_of_week' | 'end_of_month';
 export type Intention = 'avoid_forcing' | 'stay_patient' | 'stick_to_plan' | 'manage_risk' | 'avoid_fomo' | 'stay_calm' | 'be_selective' | 'protect_gains';
 export type EmotionalTrap = 'overtrading' | 'fomo_entries' | 'revenge_trading' | 'moving_stops' | 'oversizing' | 'not_taking_setups' | 'chasing' | 'impatience';
+export type RiskPredictionOutcome = 'accurate' | 'inaccurate' | 'worry_not_fulfilled' | 'emotionally_set' | 'blind_spot';
 export type RuleCategory = 'risk_management' | 'entry_rules' | 'exit_rules' | 'position_sizing' | 'emotional' | 'routine';
 export type JournalEntryType = 'pre_market_note' | 'post_market_reflection' | 'mistake_review' | 'trigger_review' | 'weekly_review' | 'rule_violation_review';
 export type ViolationMentalState = 'frustrated' | 'overconfident' | 'fearful' | 'impatient' | 'revenge_trading' | 'fomo' | 'bored' | 'tired';
@@ -162,7 +163,8 @@ export interface MentalCheckIn {
   analysis?: {
     stateConsistency?: number;
     intentionAdherence?: number;
-    riskPredictionAccuracy?: boolean;
+    /** New: string enum. Legacy data may still have boolean true/false. */
+    riskPredictionAccuracy?: RiskPredictionOutcome | boolean;
     emotionalDrift?: string[];
   };
   createdAt: string;
@@ -257,7 +259,8 @@ export interface CheckInTrendDay {
   behaviors: Record<string, boolean>;
   stateConsistency?: number;
   intentionAdherence?: number;
-  riskPredictionAccuracy?: boolean | null;
+  /** New: string enum. Legacy data may still have boolean true/false. */
+  riskPredictionAccuracy?: RiskPredictionOutcome | boolean | null;
   traps: string[];
   contextFlags: string[];
   driftPatterns: string[];
@@ -324,7 +327,7 @@ export interface MindsetEvaluation {
   deterministicAnalysis?: {
     stateConsistency?: number;
     intentionAdherence?: number;
-    riskPredictionAccuracy?: boolean;
+    riskPredictionAccuracy?: RiskPredictionOutcome | boolean;
     emotionalDrift?: string[];
   };
   aiAnalysis?: {
