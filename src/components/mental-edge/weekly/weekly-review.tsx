@@ -1,15 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, Calendar, Target, AlertTriangle, TrendingUp, Brain, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Target, AlertTriangle, TrendingUp, Brain, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import apiClient from "@/lib/api/client";
 import type { WeeklySummary, MindsetEvaluation } from "@/lib/types";
 import { useMindsetEvaluation } from "@/hooks/use-mindset-evaluation";
+
+interface RemainingInfo {
+  used: number;
+  limit: number;
+  remaining: number;
+}
 
 function getWeekStart(date: Date): string {
   const d = new Date(date);
@@ -23,7 +29,14 @@ export function WeeklyReview() {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [summary, setSummary] = useState<WeeklySummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const { evaluation: weeklyEvaluation, generating: weeklyGenerating, error: weeklyError, fetchLatestEvaluation, generate: generateWeekly } = useMindsetEvaluation();
+  const { evaluation: weeklyEvaluation, generating: weeklyGenerating, deleting: weeklyDeleting, error: weeklyError, fetchLatestEvaluation, generate: generateWeekly, deleteEvaluation: deleteWeekly } = useMindsetEvaluation();
+  const [remaining, setRemaining] = useState<RemainingInfo | null>(null);
+
+  const refreshRemaining = useCallback((date: string) => {
+    apiClient.get("/mindset-evaluations/remaining", { params: { date } })
+      .then((res) => setRemaining(res.data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -41,7 +54,27 @@ export function WeeklyReview() {
     };
     fetchSummary();
     fetchLatestEvaluation(weekStart);
-  }, [weekStart, fetchLatestEvaluation]);
+    refreshRemaining(weekStart);
+  }, [weekStart, fetchLatestEvaluation, refreshRemaining]);
+
+  const canRegenerate = !remaining || remaining.remaining > 0;
+
+  const handleGenerateWeekly = async () => {
+    await generateWeekly("weekly_summary", weekStart);
+    refreshRemaining(weekStart);
+  };
+
+  const handleRegenerateWeekly = async () => {
+    if (remaining && remaining.remaining <= 0) return;
+    await generateWeekly("weekly_summary", weekStart, true);
+    refreshRemaining(weekStart);
+  };
+
+  const handleDeleteWeekly = async () => {
+    if (!weeklyEvaluation) return;
+    const success = await deleteWeekly(weeklyEvaluation.id);
+    if (success) refreshRemaining(weekStart);
+  };
 
   const navigateWeek = (direction: number) => {
     const d = new Date(weekStart);
@@ -244,23 +277,30 @@ export function WeeklyReview() {
                 {weeklyError && (
                   <p className="text-sm text-destructive">{weeklyError}</p>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => generateWeekly("weekly_summary", weekStart)}
-                  disabled={weeklyGenerating}
-                >
-                  {weeklyGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Get AI Weekly Summary
-                    </>
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerateWeekly}
+                    disabled={weeklyGenerating || !canRegenerate}
+                  >
+                    {weeklyGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Get AI Weekly Summary
+                      </>
+                    )}
+                  </Button>
+                  {remaining && (
+                    <p className="text-xs text-muted-foreground">
+                      {remaining.remaining}/{remaining.limit} generations remaining for this week
+                    </p>
                   )}
-                </Button>
+                </div>
               </CardContent>
             </Card>
           ) : weeklyEvaluation.aiAnalysis ? (
@@ -308,6 +348,44 @@ export function WeeklyReview() {
                     <span className="font-medium">Focus for next week: </span>
                     {weeklyEvaluation.aiAnalysis.focusForTomorrow}
                   </div>
+                )}
+                <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRegenerateWeekly}
+                    disabled={weeklyGenerating || !canRegenerate}
+                    className="text-xs"
+                  >
+                    {weeklyGenerating ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    {weeklyGenerating ? "Regenerating..." : "Regenerate"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteWeekly}
+                    disabled={weeklyDeleting}
+                    className="text-xs text-destructive hover:text-destructive"
+                  >
+                    {weeklyDeleting ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3 mr-1" />
+                    )}
+                    {weeklyDeleting ? "Deleting..." : "Delete"}
+                  </Button>
+                  {remaining && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {remaining.remaining}/{remaining.limit} regenerations left
+                    </span>
+                  )}
+                </div>
+                {weeklyError && (
+                  <p className="text-xs text-destructive">{weeklyError}</p>
                 )}
               </CardContent>
             </Card>
