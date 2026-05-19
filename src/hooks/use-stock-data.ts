@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { CandleData } from '@/lib/types/candlestick'
+import type { CandleData, SplitEvent } from '@/lib/types/candlestick'
 
 interface UseStockDataOptions {
   symbol: string
@@ -14,6 +14,7 @@ interface UseStockDataOptions {
 
 interface UseStockDataResult {
   candles: CandleData[]
+  splits: SplitEvent[]
   isLoading: boolean
   error: string | null
 }
@@ -27,6 +28,7 @@ export function useStockData({
   enabled = true,
 }: UseStockDataOptions): UseStockDataResult {
   const [candles, setCandles] = useState<CandleData[]>([])
+  const [splits, setSplits] = useState<SplitEvent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -60,6 +62,7 @@ export function useStockData({
       .then((json) => {
         if (json.error) throw new Error(json.error)
         setCandles(json.data)
+        setSplits(Array.isArray(json.splits) ? json.splits : [])
         setIsLoading(false)
       })
       .catch((err) => {
@@ -71,5 +74,5 @@ export function useStockData({
     return () => controller.abort()
   }, [symbol, startDate, endDate, buffer, interval, enabled])
 
-  return { candles, isLoading, error }
+  return { candles, splits, isLoading, error }
 }

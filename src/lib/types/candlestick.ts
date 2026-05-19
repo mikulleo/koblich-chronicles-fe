@@ -9,6 +9,16 @@ export interface CandleData {
   volume?: number
 }
 
+/** Stock split event from data provider. Used to back-adjust historical prices to match split-adjusted chart data. */
+export interface SplitEvent {
+  /** Split date in YYYY-MM-DD format */
+  date: string
+  /** Ratio numerator (e.g. 2 for a 2:1 split) */
+  numerator: number
+  /** Ratio denominator (e.g. 1 for a 2:1 split) */
+  denominator: number
+}
+
 export interface TradeMarker {
   time: string
   position: 'aboveBar' | 'belowBar' | 'inBar'

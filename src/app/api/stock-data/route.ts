@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { CandleData } from '@/lib/types/candlestick'
+import type { CandleData, SplitEvent } from '@/lib/types/candlestick'
 
 // In-memory cache: key → { data, timestamp }
-const cache = new Map<string, { data: CandleData[]; timestamp: number }>()
+const cache = new Map<string, { data: CandleData[]; splits: SplitEvent[]; timestamp: number }>()
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 
 // Singleton yahoo-finance2 v3 instance (created lazily)
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
   // Check cache
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return NextResponse.json({ data: cached.data })
+    return NextResponse.json({ data: cached.data, splits: cached.splits })
   }
 
   try {
@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       period1: bufferedStartDate,
       period2: bufferedEndDate,
       interval,
+      events: 'split',
     })
 
     const quotes = result?.quotes
@@ -98,10 +99,29 @@ export async function GET(request: NextRequest) {
     // Sort by date ascending
     candles.sort((a, b) => a.time.localeCompare(b.time))
 
-    // Store in cache
-    cache.set(cacheKey, { data: candles, timestamp: Date.now() })
+    // Extract splits. yahoo-finance2 returns either an array or a keyed object depending on version.
+    const splitsRaw = result?.events?.splits
+    const splitsArr: unknown[] = Array.isArray(splitsRaw)
+      ? splitsRaw
+      : splitsRaw && typeof splitsRaw === 'object'
+        ? Object.values(splitsRaw)
+        : []
+    const splits: SplitEvent[] = splitsArr
+      .map((raw) => raw as { date?: unknown; numerator?: unknown; denominator?: unknown })
+      .filter((s) => s.numerator && s.denominator && s.date)
+      .map((s) => ({
+        date: s.date instanceof Date
+          ? s.date.toISOString().split('T')[0]
+          : new Date(s.date as string | number).toISOString().split('T')[0],
+        numerator: Number(s.numerator),
+        denominator: Number(s.denominator),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date))
 
-    return NextResponse.json({ data: candles })
+    // Store in cache
+    cache.set(cacheKey, { data: candles, splits, timestamp: Date.now() })
+
+    return NextResponse.json({ data: candles, splits })
   } catch (error: any) {
     const msg = error?.message ?? 'Unknown error'
     console.error(`Failed to fetch stock data for ${symbol}:`, msg)

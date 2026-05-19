@@ -33,11 +33,12 @@ import { useAnalytics } from '@/hooks/use-analytics'
 import { useStockData } from '@/hooks/use-stock-data'
 import { useUserPortfolio } from '@/hooks/use-user-portfolio'
 import { useTradeReplayData } from '@/hooks/use-trade-replay-data'
-import type { ReplayEvent, ReplayChart } from '@/hooks/use-trade-replay-data'
+import type { ReplayEvent, ReplayChart, ReplayTrade } from '@/hooks/use-trade-replay-data'
 import CandlestickChart from './CandlestickChart'
 import UserActionOverlay from './UserActionOverlay'
 import PerformanceSummary from './PerformanceSummary'
 import type { TradeDetails, TradeMarker, PriceLine, DecisionPoint, CandleData, ChartStyle } from '@/lib/types/candlestick'
+import { adjustPriceForSplits } from '@/lib/utils/split-adjust'
 
 /* ------------------------------------------------------------------ */
 /* Safe-string helper: wraps EVERY dynamic value rendered as JSX child */
@@ -175,8 +176,8 @@ export default function TradeReplayPlayer(props: TradeReplayPlayerProps) {
 /* ------------------------------------------------------------------ */
 
 function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
-  /* ── Data from the flat-extraction hook ── */
-  const { meta, events, charts, trade, isLoading: dataLoading, error: dataError } = useTradeReplayData(tradeId)
+  /* ── Data from the flat-extraction hook (raw, pre-split-adjustment) ── */
+  const { meta, events: rawEvents, charts, trade: rawTrade, isLoading: dataLoading, error: dataError } = useTradeReplayData(tradeId)
 
   /* ── Playback state ── */
   const [phase, setPhase] = useState<'intro' | 'replay' | 'done'>('intro')
@@ -196,7 +197,93 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const controlsTimer = useRef<NodeJS.Timeout | null>(null)
   const { trackEvent } = useAnalytics()
 
-  /* ── TradeDetails for CandlestickChart (constructed from flat trade) ── */
+  /* ── Stock data fetch identifiers (derived from raw trade — splits don't affect dates/symbol) ── */
+  const lastExitDate = useMemo(() => {
+    if (!rawTrade?.exits?.length) return rawTrade?.entryDate ?? ''
+    return rawTrade.exits.reduce((latest, exit) => (exit.date > latest ? exit.date : latest), rawTrade.exits[0].date)
+  }, [rawTrade])
+
+  const chartEndDate = useMemo(() => {
+    const d = new Date(lastExitDate || new Date().toISOString())
+    d.setDate(d.getDate() + 14)
+    return d.toISOString()
+  }, [lastExitDate])
+
+  // Daily candles — always fetched, used for playback engine. Also returns split events.
+  const { candles: dailyCandles, splits, isLoading: dailyCandlesLoading, error: dailyCandlesError } = useStockData({
+    symbol: rawTrade?.symbol ?? '',
+    startDate: rawTrade?.entryDate ?? '',
+    endDate: chartEndDate,
+    buffer: 500,
+    interval: '1d',
+    enabled: !!rawTrade?.symbol && !!rawTrade?.entryDate && candlestickView,
+  })
+
+  // Weekly candles — fetched only when weekly view is active
+  const { candles: weeklyCandles, isLoading: weeklyLoading } = useStockData({
+    symbol: rawTrade?.symbol ?? '',
+    startDate: rawTrade?.entryDate ?? '',
+    endDate: chartEndDate,
+    buffer: 1500,
+    interval: '1wk',
+    enabled: !!rawTrade?.symbol && !!rawTrade?.entryDate && candlestickView && chartInterval === '1wk',
+  })
+
+  /* ── Split-adjust trade prices to match the chart (Yahoo returns split-adjusted OHLC) ── */
+  const trade = useMemo<ReplayTrade | null>(() => {
+    if (!rawTrade) return null
+    if (!splits.length) return rawTrade
+    const adj = (p: number, d: string) => adjustPriceForSplits(p, d, splits)
+    return {
+      ...rawTrade,
+      entryPrice: adj(rawTrade.entryPrice, rawTrade.entryDate),
+      stopLoss: adj(rawTrade.stopLoss, rawTrade.entryDate),
+      stops: rawTrade.stops.map((st) => ({ ...st, price: adj(st.price, st.date) })),
+      exits: rawTrade.exits.map((ex) => ({ ...ex, price: adj(ex.price, ex.date) })),
+      adds: rawTrade.adds.map((a) => ({
+        ...a,
+        price: adj(a.price, a.date),
+        stopLoss: adj(a.stopLoss, a.date),
+        stops: a.stops.map((st) => ({ ...st, price: adj(st.price, st.date) })),
+        exits: a.exits.map((ex) => ({ ...ex, price: adj(ex.price, ex.date) })),
+      })),
+    }
+  }, [rawTrade, splits])
+
+  /* ── Split-adjust event prices, then recompute exit P/L from adjusted prices ── */
+  const events = useMemo<ReplayEvent[]>(() => {
+    if (!splits.length || !rawEvents.length) return rawEvents
+    const adj = (p: number, d: string) => adjustPriceForSplits(p, d, splits)
+    const adjusted = rawEvents.map((evt) => ({
+      ...evt,
+      price: adj(evt.price, evt.date),
+      prevStop: adj(evt.prevStop, evt.date),
+      newStop: adj(evt.newStop, evt.date),
+    }))
+
+    // If a split occurred between entry and exit, the stored plPct no longer matches
+    // adjusted prices — recompute from adjusted main-entry price.
+    const mainEntry = adjusted.find((e) => e.type === 'entry')
+    const mainEntryPrice = mainEntry?.price ?? 0
+    const isShort = (rawTrade?.type ?? 'long') === 'short'
+    if (mainEntryPrice > 0) {
+      for (const evt of adjusted) {
+        if (evt.type !== 'exit' || evt.price <= 0) continue
+        let pct = ((evt.price - mainEntryPrice) / mainEntryPrice) * 100
+        if (isShort) pct = -pct
+        const newPlPct = Number(pct.toFixed(2))
+        const normRatio =
+          evt.plPct != null && evt.plPct !== 0 && evt.normPlPct != null
+            ? evt.normPlPct / evt.plPct
+            : 1
+        evt.plPct = newPlPct
+        evt.normPlPct = Number((newPlPct * normRatio).toFixed(2))
+      }
+    }
+    return adjusted
+  }, [rawEvents, splits, rawTrade])
+
+  /* ── TradeDetails for CandlestickChart (constructed from split-adjusted trade) ── */
   const tradeDetails: TradeDetails | undefined = useMemo(() => {
     if (!trade) return undefined
     return {
@@ -209,38 +296,6 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
       tickerSymbol: trade.symbol,
     }
   }, [trade])
-
-  /* ── Stock data for candlestick chart ── */
-  const lastExitDate = useMemo(() => {
-    if (!tradeDetails?.exits?.length) return tradeDetails?.entryDate ?? ''
-    return tradeDetails.exits.reduce((latest, exit) => (exit.date > latest ? exit.date : latest), tradeDetails.exits[0].date)
-  }, [tradeDetails])
-
-  const chartEndDate = useMemo(() => {
-    const d = new Date(lastExitDate || new Date().toISOString())
-    d.setDate(d.getDate() + 14)
-    return d.toISOString()
-  }, [lastExitDate])
-
-  // Daily candles — always fetched, used for playback engine
-  const { candles: dailyCandles, isLoading: dailyCandlesLoading, error: dailyCandlesError } = useStockData({
-    symbol: tradeDetails?.tickerSymbol ?? '',
-    startDate: tradeDetails?.entryDate ?? '',
-    endDate: chartEndDate,
-    buffer: 500,
-    interval: '1d',
-    enabled: !!tradeDetails?.tickerSymbol && !!tradeDetails?.entryDate && candlestickView,
-  })
-
-  // Weekly candles — fetched only when weekly view is active
-  const { candles: weeklyCandles, isLoading: weeklyLoading } = useStockData({
-    symbol: tradeDetails?.tickerSymbol ?? '',
-    startDate: tradeDetails?.entryDate ?? '',
-    endDate: chartEndDate,
-    buffer: 1500,
-    interval: '1wk',
-    enabled: !!tradeDetails?.tickerSymbol && !!tradeDetails?.entryDate && candlestickView && chartInterval === '1wk',
-  })
 
   // Playback always uses daily candles; chart display uses selected interval
   const candles = dailyCandles
@@ -339,6 +394,17 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
       return revealed.has(key)
     })
   }, [visibleEvents, predictions, revealedDecisionKeys, portfolio.hasDeclinedEntry])
+
+  /* ── Auto-scroll Events panel to the latest action when new events arrive ── */
+  const eventsFeedRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = eventsFeedRef.current
+    if (!el) return
+    // Defer to next frame so the new item (animated by framer-motion) is laid out before scrolling.
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    })
+  }, [sidebarEvents.length])
 
   /* ── Live metrics — use sidebarEvents so Leoš's data is hidden until revealed ── */
   const liveMetrics = useMemo(() => {
@@ -1575,7 +1641,7 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
             </div>
 
             {/* ── Events Feed ── */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div ref={eventsFeedRef} className="flex-1 overflow-y-auto p-4 space-y-2">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Events</h3>
 
               <AnimatePresence mode="popLayout">
