@@ -129,7 +129,9 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
         toast.success('Submission updated')
       } else {
         await apiClient.post('/trade-submissions', payload)
-        toast.success('Ticker submitted — Leoš will take a look!')
+        toast.success('+100 pts — ticker submitted!', {
+          description: 'Leoš will take a look. You earn 50 more when it gets reviewed.',
+        })
       }
       onSaved()
     } catch (err) {

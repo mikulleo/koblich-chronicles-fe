@@ -29,7 +29,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { toast } from 'sonner'
 import { useAnalytics } from '@/hooks/use-analytics'
+import { recordReplaySession } from '@/hooks/use-gym-progress'
 import { useStockData } from '@/hooks/use-stock-data'
 import { useUserPortfolio } from '@/hooks/use-user-portfolio'
 import { useTradeReplayData } from '@/hooks/use-trade-replay-data'
@@ -235,6 +237,78 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
   const [reviewOpen, setReviewOpen] = useState(true)
   const controlsTimer = useRef<NodeJS.Timeout | null>(null)
   const { trackEvent } = useAnalytics()
+
+  /* ── Gym progress: study-time tracking + session reporting ── */
+  // Active seconds accumulate only while the tab is visible. The session is
+  // reported to /gym-activity on completion ("Go to Summary") and any leftover
+  // study time is reported once more when the player unmounts.
+  const studySecondsRef = useRef(0)
+  const studyResumeRef = useRef<number | null>(Date.now())
+  const completionReportedRef = useRef(false)
+
+  const takeStudySeconds = useCallback(() => {
+    if (studyResumeRef.current != null) {
+      studySecondsRef.current += (Date.now() - studyResumeRef.current) / 1000
+      studyResumeRef.current = Date.now()
+    }
+    const secs = Math.floor(studySecondsRef.current)
+    studySecondsRef.current = 0
+    return secs
+  }, [])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (studyResumeRef.current != null) {
+          studySecondsRef.current += (Date.now() - studyResumeRef.current) / 1000
+          studyResumeRef.current = null
+        }
+      } else if (studyResumeRef.current == null) {
+        studyResumeRef.current = Date.now()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  // Allow earning the (smaller) repeat-completion reward after a restart
+  useEffect(() => {
+    if (phase === 'intro') completionReportedRef.current = false
+  }, [phase])
+
+  const reportCompletion = useCallback(() => {
+    if (completionReportedRef.current) return
+    completionReportedRef.current = true
+    recordReplaySession({
+      refId: tradeId,
+      source,
+      durationSeconds: takeStudySeconds(),
+      completed: true,
+    }).then((result) => {
+      if (!result) return
+      if (result.leveledUp) {
+        toast.success(`Level up! ${result.progress.level.avatar} ${result.progress.level.title}`, {
+          description: `+${result.pointsAwarded} pts — ${result.progress.totalPoints} pts total`,
+          duration: 6000,
+        })
+      } else if (result.pointsAwarded > 0) {
+        toast.success(`+${result.pointsAwarded} pts — replay complete!`, {
+          description: `${result.progress.totalPoints} pts total`,
+        })
+      }
+    })
+  }, [tradeId, source, takeStudySeconds])
+
+  // Report leftover study time when the player unmounts (close / navigation)
+  useEffect(() => {
+    return () => {
+      const secs = takeStudySeconds()
+      if (secs >= 30) {
+        recordReplaySession({ refId: tradeId, source, durationSeconds: secs, completed: false })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ── Stock data fetch identifiers (derived from raw trade — splits don't affect dates/symbol) ── */
   const lastExitDate = useMemo(() => {
@@ -1730,6 +1804,7 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                               onClick={() => {
                                 setPhase('done')
                                 trackEvent('replay_complete', { ticker: meta?.ticker ?? '' })
+                                reportCompletion()
                               }}
                               className="bg-white text-black hover:bg-gray-200"
                               size="sm"

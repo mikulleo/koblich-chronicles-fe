@@ -17,6 +17,7 @@ import apiClient from '@/lib/api/client'
 import type { Trade, Ticker } from '@/lib/types'
 import TradeReplayPlayer from '@/components/trade-replay/TradeReplayPlayer'
 import SubmissionsSection from '@/components/trading-gym/SubmissionsSection'
+import GymProgressCard from '@/components/trading-gym/GymProgress'
 import { MentalEdge } from '@/components/mental-edge/MentalEdge'
 import { useAnalytics } from '@/hooks/use-analytics'
 import { useAuth } from '@/providers/auth-provider'
@@ -643,6 +644,9 @@ function GymHub({ onSelect, showWelcome }: { onSelect: (section: ActiveSection) 
               Things may not work perfectly yet. For now it&apos;s a <span className="text-yellow-300/80 font-semibold">free trial</span> — explore, test, and share your feedback. This will become a <span className="text-yellow-300/80 font-semibold">paid feature</span> once out of beta.
             </p>
           </div>
+
+          {/* Lifetime training progress — points, level, avatar */}
+          <GymProgressCard />
         </motion.div>
 
         {/* ═══ WORKOUT STATIONS — positioned in 3D space ═══ */}
