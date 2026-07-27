@@ -1,10 +1,24 @@
 import React, { useState, useCallback } from 'react' // Explicitly import React, useState, and useCallback
 import Link from "next/link"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Film, XCircle, CheckCircle, AlertTriangle, PackageOpen } from "lucide-react"
+import { ArrowUpDown, Film, XCircle, CheckCircle, Info, PackageOpen } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import {
+  SizeDisplayUnit,
+  FULL_POSITION_PCT_OF_EQUITY,
+  normalizationToEquityPct,
+  formatPct,
+  positionFractionLabel,
+} from "@/lib/utils/exposure-calculations"
 import {
   Dialog,
   DialogContent,
@@ -41,6 +55,13 @@ export interface Ticker {
     createdAt: string; // ISO date string
     updatedAt?: string; // ISO date string
   }
+
+// Table-level state the trades table passes down via TanStack's table.options.meta,
+// so the Size header toggle and every Size cell agree on the display unit.
+export interface TradesTableMeta {
+  sizeDisplayUnit: SizeDisplayUnit
+  setSizeDisplayUnit: (unit: SizeDisplayUnit) => void
+}
 
 // Define the modified stop type
 export interface ModifiedStop {
@@ -408,35 +429,70 @@ export const columns: ColumnDef<Trade>[] = [
   },
   {
     accessorKey: "normalizationFactor",
-    header: ({ column }) => (
-      <div className="flex flex-col items-center">
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="pr-0"
-        >
-          Size
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+    header: ({ column, table }) => {
+      const meta = table.options.meta as TradesTableMeta | undefined
+      const unit = meta?.sizeDisplayUnit ?? 'equity'
+      return (
+        <div className="flex flex-col items-center">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="pr-0"
+          >
+            Size
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-1 text-xs font-normal text-muted-foreground hover:text-foreground">
+                {unit === 'equity' ? '% of equity' : '% of full position'}
+                <Info className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-80 space-y-3 text-sm font-normal">
+              <p>
+                Sizes are shown as a percentage of total account equity. A{' '}
+                <span className="font-medium">full position = {FULL_POSITION_PCT_OF_EQUITY}% of equity</span>{' '}
+                (e.g. $25k on a $100k account), a half position = {FULL_POSITION_PCT_OF_EQUITY / 2}%, and so on.
+              </p>
+              <p className="text-muted-foreground">
+                Position units instead express size relative to a full position: full = 100%, half = 50%.
+              </p>
+              <div className="flex items-center justify-between border-t pt-3">
+                <Label htmlFor="size-display-unit" className="text-sm">
+                  Show in position units
+                </Label>
+                <Switch
+                  id="size-display-unit"
+                  checked={unit === 'position'}
+                  onCheckedChange={(checked) =>
+                    meta?.setSizeDisplayUnit(checked ? 'position' : 'equity')
+                  }
+                />
               </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              <p>100%, i.e. 'full' position means 25% of total equity. Example: 100% position on $100k account equals $25k.</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-    ),
-    cell: ({ row }) => {
-      const size = row.getValue("normalizationFactor") as number
-      return ( 
-        <div className="flex justify-center">
-          {size ? `${Math.round(size * 100)}%` : ""}
+            </PopoverContent>
+          </Popover>
+        </div>
+      )
+    },
+    cell: ({ row, table }) => {
+      const factor = row.getValue("normalizationFactor") as number
+      if (!factor) {
+        return <div className="flex justify-center"></div>
+      }
+      const meta = table.options.meta as TradesTableMeta | undefined
+      if ((meta?.sizeDisplayUnit ?? 'equity') === 'position') {
+        return (
+          <div className="flex justify-center">{`${Math.round(factor * 100)}%`}</div>
+        )
+      }
+      const fraction = positionFractionLabel(factor)
+      return (
+        <div className="flex items-baseline justify-center gap-1">
+          <span>{formatPct(normalizationToEquityPct(factor))}</span>
+          {fraction && (
+            <span className="text-xs text-muted-foreground">{fraction}</span>
+          )}
         </div>
       )
     },

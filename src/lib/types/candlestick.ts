@@ -121,6 +121,7 @@ export type UserActionPhase =
   | 'entry_price'
   | 'entry_stop'
   | 'entry_reveal'
+  | 'entry_pass_reveal'
   | 'action_prompt'
   | 'sell_amount'
   | 'sell_price'

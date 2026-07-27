@@ -10,12 +10,13 @@ import { cn } from '@/lib/utils'
 import {
   Dumbbell, FlaskConical, TrendingUp, TrendingDown, Calendar, Search,
   Play, Layers, Eye, MousePointerClick, BarChart3, ChevronDown, ChevronUp,
-  ArrowLeft, Brain, Crosshair, Loader2, ShieldCheck,
+  ArrowLeft, Brain, Crosshair, Loader2, ShieldCheck, Inbox, MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import apiClient from '@/lib/api/client'
 import type { Trade, Ticker } from '@/lib/types'
 import TradeReplayPlayer from '@/components/trade-replay/TradeReplayPlayer'
+import SubmissionsSection from '@/components/trading-gym/SubmissionsSection'
 import { MentalEdge } from '@/components/mental-edge/MentalEdge'
 import { useAnalytics } from '@/hooks/use-analytics'
 import { useAuth } from '@/providers/auth-provider'
@@ -36,7 +37,7 @@ interface TradeCard {
   addonCount: number
 }
 
-type ActiveSection = null | 'replay' | 'mindset'
+type ActiveSection = null | 'replay' | 'mindset' | 'submissions'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -69,7 +70,8 @@ function detectAddons(trades: Trade[]): { addonIds: Set<string>; addonCounts: Ma
   const groups = new Map<string, Trade[]>()
   for (const t of trades) {
     const tickerId = typeof t.ticker === 'object' ? (t.ticker as Ticker).id : String(t.ticker)
-    const key = `${tickerId}__${t.type}`
+    // Hypothetical ("didn't trade") entries never merge with real trades as add-ons
+    const key = `${tickerId}__${t.type}__${t.didNotTrade ? 'hypo' : 'real'}`
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key)!.push(t)
   }
@@ -645,9 +647,9 @@ function GymHub({ onSelect, showWelcome }: { onSelect: (section: ActiveSection) 
 
         {/* ═══ WORKOUT STATIONS — positioned in 3D space ═══ */}
         <div className="flex-1 flex items-center justify-center px-4 pb-8">
-          <div className="w-full max-w-5xl" style={{ perspective: '1000px' }}>
+          <div className="w-full max-w-6xl" style={{ perspective: '1000px' }}>
             <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+              className="grid grid-cols-1 md:grid-cols-3 gap-6"
               style={{ transformStyle: 'preserve-3d' }}
               animate={{
                 rotateX: mousePos.y * -1.5,
@@ -763,6 +765,60 @@ function GymHub({ onSelect, showWelcome }: { onSelect: (section: ActiveSection) 
                   </div>
                   <div className="mt-3 flex items-center gap-1.5 text-xs text-cyan-400 font-semibold uppercase tracking-wider opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                     <Play className="h-3.5 w-3.5 fill-cyan-400" /> Walk to Station
+                  </div>
+                </div>
+              </motion.button>
+
+              {/* ── User Submitted Tickers Station ── */}
+              <motion.button
+                initial={{ opacity: 0, y: 60, rotateX: 15 }}
+                animate={{
+                  opacity: entered ? 1 : 0,
+                  y: entered ? 0 : 60,
+                  rotateX: entered ? 0 : 15,
+                }}
+                transition={{ delay: 1.1, duration: 0.8, type: 'spring' }}
+                whileHover={{ z: 40, scale: 1.03, rotateY: 2 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onSelect('submissions')}
+                className="group relative text-left overflow-hidden rounded-2xl h-96 md:h-[28rem] transition-shadow duration-500 hover:shadow-[0_0_60px_rgba(251,191,36,0.15)]"
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <motion.img
+                  src="/gym/gym-dark5.jpg"
+                  alt="Gym locker area"
+                  className="absolute inset-0 w-full h-full object-cover grayscale"
+                  animate={{ scale: 1.12, x: mousePos.x * -6, y: mousePos.y * -4 }}
+                  transition={{ type: 'spring', stiffness: 40, damping: 30 }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20 group-hover:from-black/80 group-hover:via-amber-950/30 transition-all duration-700" />
+                <div className="absolute inset-0 rounded-2xl border border-white/[0.06] group-hover:border-amber-500/30 transition-colors duration-500" />
+                <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ boxShadow: 'inset 0 0 40px rgba(251,191,36,0.1)' }} />
+
+                <div className="absolute top-4 left-4 px-3 py-1 rounded bg-black/50 backdrop-blur-sm border border-amber-500/20">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.25em]">Station 03</span>
+                </div>
+
+                <div className="relative h-full flex flex-col justify-end p-6" style={{ transform: 'translateZ(25px)' }}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2.5 rounded-xl bg-amber-500/20 ring-1 ring-amber-500/30 backdrop-blur-sm group-hover:bg-amber-500/30 group-hover:ring-amber-400/50 transition-all">
+                      <Inbox className="h-6 w-6 text-amber-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-400 transition-colors">Symbol Dropbox</h2>
+                      <p className="text-xs text-white/30 font-semibold uppercase tracking-[0.2em]">User Submitted Tickers</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/45 leading-relaxed mb-4">
+                    {"Submit your own trades — entries, stops, sells. Leoš reviews them and adds his take."}
+                  </p>
+                  <div className="flex items-center gap-4 text-xs text-white/30">
+                    <span className="flex items-center gap-1"><Inbox className="h-3.5 w-3.5 text-amber-400/50" /> Submit</span>
+                    <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5 text-amber-400/50" /> Get Reviewed</span>
+                    <span className="flex items-center gap-1"><Play className="h-3.5 w-3.5 text-amber-400/50" /> Replay</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-400 font-semibold uppercase tracking-wider opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+                    <Play className="h-3.5 w-3.5 fill-amber-400" /> Walk to Station
                   </div>
                 </div>
               </motion.button>
@@ -1201,6 +1257,7 @@ function MentalEdgeSection({ onBack }: { onBack: () => void }) {
 export default function TradingGym() {
   const [activeSection, setActiveSection] = useState<ActiveSection>(null)
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null)
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null)
   const { user, loading } = useAuth()
   const router = useRouter()
   const wasAuthenticated = useRef(!!user)
@@ -1280,6 +1337,21 @@ export default function TradingGym() {
               <MentalEdgeSection onBack={() => setActiveSection(null)} />
             </motion.div>
           )}
+
+          {activeSection === 'submissions' && (
+            <motion.div
+              key="submissions"
+              initial={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <SubmissionsSection
+                onBack={() => setActiveSection(null)}
+                onSelectSubmission={setSelectedSubmissionId}
+              />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -1287,6 +1359,13 @@ export default function TradingGym() {
           (filter/transform on motion.div creates a containing block that breaks fixed) */}
       {selectedTradeId && (
         <TradeReplayPlayer tradeId={selectedTradeId} onClose={() => setSelectedTradeId(null)} />
+      )}
+      {selectedSubmissionId && (
+        <TradeReplayPlayer
+          tradeId={selectedSubmissionId}
+          source="submission"
+          onClose={() => setSelectedSubmissionId(null)}
+        />
       )}
     </div>
   )

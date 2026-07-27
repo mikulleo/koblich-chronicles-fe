@@ -200,8 +200,10 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
           // Use trades passed from parent — already filtered by server
           allTrades = tradesProp;
         } else {
-          // Fallback: fetch trades ourselves
-          const response = await apiClient.get('/trades', { params: { limit: 2000 } });
+          // Fallback: fetch trades ourselves (excluding hypothetical "didn't trade" entries)
+          const response = await apiClient.get('/trades', {
+            params: { limit: 2000, 'where[didNotTrade][not_equals]': 'true' },
+          });
           if (!response.data?.docs) {
             throw new Error("Unexpected response format");
           }

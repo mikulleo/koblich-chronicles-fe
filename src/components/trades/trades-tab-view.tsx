@@ -49,8 +49,8 @@ export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
           <div>
             <h2 className="text-xl font-semibold mb-2">Position Exposure Management</h2>
             <p className="text-muted-foreground text-sm mb-4">
-              Visual representation of current position exposure across organized buckets.
-              Standard target: 400% total exposure = 100% of equity, distributed across 4 buckets (100% each).
+              How much of your equity is deployed across open positions. Bucket 1 represents
+              100% of your equity; the remaining buckets only start filling when trading on margin.
             </p>
           </div>
           {activeTab === "exposure" && <ExposureBuckets />}

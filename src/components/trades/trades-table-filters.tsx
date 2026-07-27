@@ -225,7 +225,7 @@ export function TradeFilters({ data, onFiltersChange, className }: FiltersProps)
 
         {/* Size Range */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Position Size %</Label>
+          <Label className="text-sm font-medium">Size (% of full position)</Label>
           <RangeFilter
             min={sizeMin}
             max={sizeMax}

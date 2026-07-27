@@ -27,9 +27,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Trade } from "./columns"
+import { Trade, TradesTableMeta } from "./columns"
 import { FilterState } from "./trades-table-filters"
 import { isWithinInterval, parseISO } from "date-fns"
+import { SizeDisplayUnit } from "@/lib/utils/exposure-calculations"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -55,6 +56,7 @@ export function DataTable<TData extends Trade, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const [sizeDisplayUnit, setSizeDisplayUnit] = React.useState<SizeDisplayUnit>('equity')
   
 
   // Apply custom filters to data
@@ -179,6 +181,7 @@ export function DataTable<TData extends Trade, TValue>({
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: "includesString",
+    meta: { sizeDisplayUnit, setSizeDisplayUnit } satisfies TradesTableMeta,
     state: {
       sorting,
       columnFilters,

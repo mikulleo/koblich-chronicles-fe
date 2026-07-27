@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FULL_SHARES } from '@/hooks/use-user-portfolio'
 import type { DecisionPoint, TradeLot, UserActionPhase } from '@/lib/types/candlestick'
+import type { EntryContext } from '@/hooks/use-user-portfolio'
 
 interface UserActionOverlayProps {
   phase: UserActionPhase
@@ -16,8 +17,10 @@ interface UserActionOverlayProps {
   userActionSummary: string
   leosEntry?: { price: number; stop: number; positionDesc: string }
   userEntry?: { price: number; stop: number; shares: number }
+  entryContext?: EntryContext
   onConfirmBuy: () => void
   onDeclineEntry: () => void
+  onContinueFromPassReveal: () => void
   onSetEntrySize: (shares: number) => void
   onSetAddSize: (shares: number) => void
   onChooseAction: (action: 'sell' | 'sell_all' | 'add' | 'hold' | 'move_stop') => void
@@ -46,8 +49,10 @@ export default function UserActionOverlay({
   userActionSummary,
   leosEntry,
   userEntry,
+  entryContext = 'real',
   onConfirmBuy,
   onDeclineEntry,
+  onContinueFromPassReveal,
   onSetEntrySize,
   onSetAddSize,
   onChooseAction,
@@ -132,6 +137,12 @@ export default function UserActionOverlay({
         return (
           <div>
             <p className="text-sm text-purple-400 font-medium text-center mb-3">Entry Comparison</p>
+            {entryContext === 'didNotTrade' && (
+              <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-center">
+                <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">{"Leo\u0161 did NOT take this trade"}</p>
+                <p className="text-[10px] text-amber-200/60 mt-0.5">The numbers below show how he would have managed it</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-black/30 rounded-lg p-3">
                 <p className="text-[10px] text-gray-500 uppercase mb-1">Your Entry</p>
@@ -147,8 +158,14 @@ export default function UserActionOverlay({
                 )}
               </div>
               <div className="bg-black/30 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500 uppercase mb-1">{"Leo\u0161's Entry"}</p>
-                {leosEntry && (
+                <p className="text-[10px] text-gray-500 uppercase mb-1">
+                  {entryContext === 'didNotTrade' ? "Leo\u0161's Plan" : "Leo\u0161's Entry"}
+                </p>
+                {entryContext === 'decoy' ? (
+                  <p className="text-sm text-gray-300 leading-snug">
+                    {"Leo\u0161 did "}<span className="font-bold text-white">not</span>{" enter here \u2014 he waited for his setup."}
+                  </p>
+                ) : leosEntry && (
                   <>
                     <p className="text-sm text-white">@ ${leosEntry.price.toFixed(2)}</p>
                     <p className="text-xs text-gray-400">{leosEntry.positionDesc}</p>
@@ -165,6 +182,28 @@ export default function UserActionOverlay({
                 Continue
               </Button>
             </div>
+          </div>
+        )
+
+      case 'entry_pass_reveal':
+        return (
+          <div className="text-center">
+            <p className="text-sm text-purple-400 font-medium mb-3">Entry Comparison</p>
+            <div className="bg-black/30 rounded-lg p-3 mb-3">
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Your Call: Pass</p>
+              {entryContext === 'didNotTrade' ? (
+                <p className="text-sm text-gray-200 leading-snug">
+                  {"Good instinct \u2014 Leo\u0161 passed on this trade too."}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-200 leading-snug">
+                  {"Leo\u0161's call: "}<span className="font-bold text-white">Not yet.</span>{" He didn't buy here either \u2014 keep watching."}
+                </p>
+              )}
+            </div>
+            <Button onClick={onContinueFromPassReveal} className="bg-white/10 hover:bg-white/20 text-white" size="sm">
+              Continue
+            </Button>
           </div>
         )
 

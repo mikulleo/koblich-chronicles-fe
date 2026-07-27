@@ -36,7 +36,7 @@ export default function TradesPage() {
             Exposure Buckets
           </h3>
           <p className="text-sm text-muted-foreground">
-            Visual position exposure management across 4 buckets.
+            See how much of the equity is deployed and if anything spills onto margin.
           </p>
         </div>
         <div className="p-4 border rounded-lg bg-card">

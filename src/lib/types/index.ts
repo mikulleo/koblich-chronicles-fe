@@ -64,6 +64,7 @@ export interface Trade {
     lastUpdated?: string;
   };
   notes?: string;
+  didNotTrade?: boolean;
   riskAmount?: number;
   riskPercent?: number;
   profitLossAmount?: number;

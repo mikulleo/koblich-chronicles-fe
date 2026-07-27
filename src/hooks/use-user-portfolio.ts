@@ -10,6 +10,14 @@ import type {
 
 export const FULL_SHARES = 100
 
+/**
+ * What kind of entry prompt is on screen:
+ * - 'real': Leoš's actual entry candle
+ * - 'decoy': a random pre-entry candle where Leoš did NOT buy (correct answer: Pass)
+ * - 'didNotTrade': the entry of a hypothetical trade Leoš never took
+ */
+export type EntryContext = 'real' | 'decoy' | 'didNotTrade'
+
 interface PortfolioState {
   phase: UserActionPhase
   lots: TradeLot[]
@@ -17,6 +25,7 @@ interface PortfolioState {
   tradeType: 'long' | 'short'
   isActive: boolean
   hasDeclinedEntry: boolean
+  entryContext: EntryContext
   pendingShares: number
   pendingSellPercent: number
   pendingEntryPrice: number | null
@@ -34,6 +43,7 @@ const initialState: PortfolioState = {
   tradeType: 'long',
   isActive: false,
   hasDeclinedEntry: false,
+  entryContext: 'real',
   pendingShares: 0,
   pendingSellPercent: 0,
   pendingEntryPrice: null,
@@ -82,13 +92,13 @@ export function useUserPortfolio() {
 
   // ── Entry flow ──
 
-  const promptEntry = useCallback((tradeType: 'long' | 'short') => {
-    setState(prev => ({ ...prev, phase: 'entry_prompt', tradeType }))
+  const promptEntry = useCallback((tradeType: 'long' | 'short', context: EntryContext = 'real') => {
+    setState(prev => ({ ...prev, phase: 'entry_prompt', tradeType, entryContext: context }))
   }, [])
 
   /** Skip the buy/pass prompt — go straight to sizing (used by "Buy Now") */
   const promptEntrySizing = useCallback((tradeType: 'long' | 'short') => {
-    setState(prev => ({ ...prev, phase: 'entry_sizing', tradeType }))
+    setState(prev => ({ ...prev, phase: 'entry_sizing', tradeType, entryContext: 'real' }))
   }, [])
 
   const confirmBuy = useCallback(() => {
@@ -96,7 +106,25 @@ export function useUserPortfolio() {
   }, [])
 
   const declineEntry = useCallback(() => {
-    setState(prev => ({ ...prev, phase: 'idle', hasDeclinedEntry: true }))
+    setState(prev => {
+      // Decoy: Leoš didn't buy here either — show the pass reveal and keep the
+      // replay armed for the real entry (hasDeclinedEntry must stay false, or
+      // all of Leoš's events would un-hide and the real prompt would never fire).
+      // Didn't-trade: Leoš passed too — reveal that before declining for real.
+      if (prev.entryContext === 'decoy' || prev.entryContext === 'didNotTrade') {
+        return { ...prev, phase: 'entry_pass_reveal' }
+      }
+      return { ...prev, phase: 'idle', hasDeclinedEntry: true }
+    })
+  }, [])
+
+  const continueFromPassReveal = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      phase: 'idle',
+      // On a hypothetical trade the pass was the real entry decision
+      hasDeclinedEntry: prev.entryContext === 'didNotTrade' ? true : prev.hasDeclinedEntry,
+    }))
   }, [])
 
   const setEntrySize = useCallback((shares: number) => {
@@ -455,6 +483,7 @@ export function useUserPortfolio() {
     promptEntrySizing,
     confirmBuy,
     declineEntry,
+    continueFromPassReveal,
     setEntrySize,
     confirmEntryPrice,
     confirmEntryStop,

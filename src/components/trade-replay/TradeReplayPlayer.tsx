@@ -33,7 +33,7 @@ import { useAnalytics } from '@/hooks/use-analytics'
 import { useStockData } from '@/hooks/use-stock-data'
 import { useUserPortfolio } from '@/hooks/use-user-portfolio'
 import { useTradeReplayData } from '@/hooks/use-trade-replay-data'
-import type { ReplayEvent, ReplayChart, ReplayTrade } from '@/hooks/use-trade-replay-data'
+import type { ReplayEvent, ReplayChart, ReplayTrade, ReplaySource } from '@/hooks/use-trade-replay-data'
 import CandlestickChart from './CandlestickChart'
 import UserActionOverlay from './UserActionOverlay'
 import PerformanceSummary from './PerformanceSummary'
@@ -66,6 +66,8 @@ const s = (v: unknown): string => {
 interface TradeReplayPlayerProps {
   tradeId: string
   onClose: () => void
+  /** 'trade' (default) replays Leoš's trades; 'submission' replays a user-submitted trade as a walkthrough */
+  source?: ReplaySource
 }
 
 const CANDLE_SPEED_OPTIONS = [
@@ -77,6 +79,32 @@ const CANDLE_SPEED_OPTIONS = [
 
 /** How many candles before entry to start the replay */
 const PRE_ENTRY_CANDLES = 10
+
+/**
+ * Seeded PRNG (mulberry32) — decoy prompt positions must be stable within a
+ * replay run but re-randomized on every restart, so users can't memorize them.
+ */
+const mulberry32 = (seed: number) => {
+  let a = seed >>> 0
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** Pick `count` distinct items from `pool` using the given rng (partial Fisher–Yates) */
+const pickRandom = <T,>(pool: T[], count: number, rng: () => number): T[] => {
+  const arr = [...pool]
+  const n = Math.min(count, arr.length)
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(rng() * (arr.length - i))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr.slice(0, n)
+}
 
 /* ------------------------------------------------------------------ */
 /* Small UI helpers                                                    */
@@ -175,9 +203,10 @@ export default function TradeReplayPlayer(props: TradeReplayPlayerProps) {
 /* Inner component — all hooks + render                                */
 /* ------------------------------------------------------------------ */
 
-function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
+function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerProps) {
   /* ── Data from the flat-extraction hook (raw, pre-split-adjustment) ── */
-  const { meta, events: rawEvents, charts, trade: rawTrade, isLoading: dataLoading, error: dataError } = useTradeReplayData(tradeId)
+  const { meta, events: rawEvents, charts, trade: rawTrade, submission, isLoading: dataLoading, error: dataError } = useTradeReplayData(tradeId, source)
+  const isSubmission = source === 'submission'
 
   /* ── Playback state ── */
   const [phase, setPhase] = useState<'intro' | 'replay' | 'done'>('intro')
@@ -185,7 +214,9 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const [playing, setPlaying] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(1)
   // paused is now derived from portfolioBusy (see below)
-  const [predictions, setPredictions] = useState(true)  // prediction mode toggle
+  // Submissions replay as a walkthrough — the Think Along guessing game
+  // compares against "Leoš's Call", which is wrong framing for a user's trade
+  const [predictions, setPredictions] = useState(!isSubmission)  // prediction mode toggle
   const [candlestickView, setCandlestickView] = useState(true)
   const [chartInterval, setChartInterval] = useState<'1d' | '1wk'>('1d')
   const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick')
@@ -194,6 +225,14 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const [revealedDecisionKeys, setRevealedDecisionKeys] = useState<string[]>([])
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
   const [showChartNotes, setShowChartNotes] = useState(false)
+  // Seed for decoy prompt placement — new seed per replay run (see restart())
+  const [decoySeed, setDecoySeed] = useState(() => Date.now())
+  // "Leoš entered here" info card — shown when the user already holds a
+  // position (bought at a decoy) as the real entry candle is reached
+  const [showLeosEntryInfo, setShowLeosEntryInfo] = useState(false)
+  const leosEntryInfoShownRef = useRef(false)
+  // "Leoš's Review" sidebar panel (submission mode)
+  const [reviewOpen, setReviewOpen] = useState(true)
   const controlsTimer = useRef<NodeJS.Timeout | null>(null)
   const { trackEvent } = useAnalytics()
 
@@ -325,6 +364,8 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   const currentPromptedEventRef = useRef<ReplayEvent | null>(null)
   const entryPromptedRef = useRef(false)
   const stopCheckedCandlesRef = useRef<Set<number>>(new Set())
+  const promptedDecoyRef = useRef<Set<number>>(new Set())
+  const promptedEntryDecoyRef = useRef<Set<number>>(new Set())
 
   useEffect(() => {
     if (!predictions) {
@@ -332,12 +373,16 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
       promptedDecisionsRef.current.clear()
       entryPromptedRef.current = false
       stopCheckedCandlesRef.current.clear()
+      promptedDecoyRef.current.clear()
+      promptedEntryDecoyRef.current.clear()
+      leosEntryInfoShownRef.current = false
+      setShowLeosEntryInfo(false)
       setRevealedDecisionKeys([])
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [predictions])
 
-  const portfolioBusy = predictions && portfolio.phase !== 'idle'
+  const portfolioBusy = predictions && (portfolio.phase !== 'idle' || showLeosEntryInfo)
 
   /* ── Candle animation state ── */
   const [stopHitAnimating, setStopHitAnimating] = useState(false)
@@ -381,6 +426,43 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
       return evtDate === currentCandleDate && (evt.type === 'stopModified' || evt.type === 'exit' || evt.type === 'add')
     })
   }, [events, currentCandleDate])
+
+  /* ── Decoy prompts: random candles where Leoš did nothing ──
+     Real prompts only ever fire on days Leoš acted, so regulars learned that
+     "prompt = something happened". Decoys make "Hold" (after entry) and
+     "Pass" (before entry) genuinely possible answers. */
+  const eventDaySet = useMemo(
+    () => new Set(events.map((e) => e.date.split('T')[0])),
+    [events],
+  )
+
+  /** 2–4 random post-entry candles (never on a real-event day) → "Hold" decoys */
+  const decoyDecisionIdxs = useMemo((): Set<number> => {
+    if (!candles.length || !events.length) return new Set()
+    const lastEventDate = events[events.length - 1].date.split('T')[0]
+    let lastIdx = candles.findIndex((c) => c.time >= lastEventDate)
+    if (lastIdx < 0) lastIdx = candles.length - 1
+    const candidates: number[] = []
+    for (let i = entryCandleIdx + 1; i < lastIdx; i++) {
+      if (!eventDaySet.has(candles[i].time)) candidates.push(i)
+    }
+    const rng = mulberry32(decoySeed)
+    const count = 2 + Math.floor(rng() * 3) // 2–4
+    return new Set(pickRandom(candidates, count, rng))
+  }, [candles, events, entryCandleIdx, eventDaySet, decoySeed])
+
+  /** 1–2 random pre-entry candles → "Would you buy here?" decoys (answer: Pass) */
+  const decoyEntryIdxs = useMemo((): Set<number> => {
+    if (!candles.length) return new Set()
+    const startIdx = Math.max(0, entryCandleIdx - PRE_ENTRY_CANDLES)
+    // keep ≥1 candle gap before the real entry so decoy and real never collide
+    const candidates: number[] = []
+    for (let i = startIdx + 1; i <= entryCandleIdx - 2; i++) candidates.push(i)
+    if (candidates.length === 0) return new Set()
+    const rng = mulberry32(decoySeed ^ 0x9e3779b9)
+    const count = candidates.length < 3 ? 1 : 1 + Math.floor(rng() * 2) // 1–2
+    return new Set(pickRandom(candidates, count, rng))
+  }, [candles, entryCandleIdx, decoySeed])
 
   /* ── Sidebar events: hide unrevealed decisions when guessing game is on ── */
   const sidebarEvents = useMemo((): ReplayEvent[] => {
@@ -619,6 +701,20 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     []
   )
 
+  /* ── Auto-pause: decoy entry prompts BEFORE the real entry (answer: Pass) ── */
+  useEffect(() => {
+    if (!predictions || !tradeDetails || portfolio.phase !== 'idle') return
+    if (stopHitAnimatingRef.current) return
+    if (portfolio.isActive || portfolio.hasDeclinedEntry) return
+    if (candleIdx < 0 || candleIdx >= entryCandleIdx) return
+    if (!decoyEntryIdxs.has(candleIdx)) return
+    if (promptedEntryDecoyRef.current.has(candleIdx)) return
+    promptedEntryDecoyRef.current.add(candleIdx)
+    setPlaying(false)
+    portfolio.promptEntry(tradeDetails.type as 'long' | 'short', 'decoy')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candleIdx, entryCandleIdx, predictions, portfolio.phase, portfolio.isActive, portfolio.hasDeclinedEntry, decoyEntryIdxs])
+
   /* ── Auto-pause: prompt entry at entry candle ── */
   useEffect(() => {
     if (!predictions || !tradeDetails || portfolio.phase !== 'idle') return
@@ -627,10 +723,33 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     if (candleIdx >= entryCandleIdx && candleIdx >= 0) {
       entryPromptedRef.current = true
       setPlaying(false)
-      portfolio.promptEntry(tradeDetails.type as 'long' | 'short')
+      portfolio.promptEntry(tradeDetails.type as 'long' | 'short', meta?.didNotTrade ? 'didNotTrade' : 'real')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candleIdx, entryCandleIdx, predictions, portfolio.phase, portfolio.isActive, portfolio.hasDeclinedEntry])
+
+  /* ── "Leoš entered here" info card: user bought at a decoy, real entry arrives ── */
+  useEffect(() => {
+    if (!predictions || !tradeDetails) return
+    if (candleIdx < 0 || candleIdx < entryCandleIdx) return
+    if (leosEntryInfoShownRef.current || entryPromptedRef.current) return
+    if (!portfolio.isActive) return
+    leosEntryInfoShownRef.current = true
+    entryPromptedRef.current = true // real entry prompt must never fire after this
+    setPlaying(false)
+    setShowLeosEntryInfo(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candleIdx, entryCandleIdx, predictions, portfolio.isActive])
+
+  const dismissLeosEntryInfo = useCallback(() => {
+    // Reveal Leoš's entry in the sidebar/chart now that it's been shown
+    const entryEvt = events.find((e) => e.type === 'entry')
+    if (entryEvt) {
+      const key = `entry-${entryEvt.date.split('T')[0]}`
+      setRevealedDecisionKeys((prev) => (prev.includes(key) ? prev : [...prev, key]))
+    }
+    setShowLeosEntryInfo(false)
+  }, [events])
 
   /* ── Auto-pause: prompt at decision points one at a time (sequential) ── */
   useEffect(() => {
@@ -654,6 +773,27 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDecisionEvents, candleIdx, predictions, portfolio.phase, portfolio.isActive])
+
+  /* ── Decoy decision prompts: random candles where Leoš did nothing (answer: Hold) ── */
+  useEffect(() => {
+    if (!predictions || !portfolio.isActive || portfolio.phase !== 'idle') return
+    if (stopHitAnimatingRef.current) return // stop-hit takes priority over decoys
+    if (currentDecisionEvents.length > 0) return // real events take priority
+    if (!decoyDecisionIdxs.has(candleIdx)) return
+    if (promptedDecoyRef.current.has(candleIdx)) return
+    promptedDecoyRef.current.add(candleIdx)
+    currentPromptedEventRef.current = null // nothing to reveal in the sidebar
+    setPlaying(false)
+    portfolio.promptDecision({
+      prompt: 'What would you do here?',
+      options: ['buy', 'sell', 'hold', 'tightenStop'],
+      actualDecision: 'hold',
+      actualDecisions: ['hold'],
+      actualPrice: undefined,
+      stepIndex: candleIdx,
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candleIdx, predictions, portfolio.phase, portfolio.isActive, decoyDecisionIdxs, currentDecisionEvents])
 
   /* ── Stop hit detection on each new candle (manual stepping) ── */
   useEffect(() => {
@@ -806,11 +946,14 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
   }, [portfolio, revealCurrentDecisionEvents])
 
   const handlePortfolioEntryRevealContinue = useCallback(() => {
-    // Reveal the entry event in sidebar
-    const entryEvt = events.find((e) => e.type === 'entry')
-    if (entryEvt) {
-      const key = `entry-${entryEvt.date.split('T')[0]}`
-      setRevealedDecisionKeys((prev) => [...prev, key])
+    // Reveal the entry event in sidebar — but not after a decoy entry:
+    // Leoš's real entry hasn't happened yet and must stay hidden.
+    if (portfolio.entryContext !== 'decoy') {
+      const entryEvt = events.find((e) => e.type === 'entry')
+      if (entryEvt) {
+        const key = `entry-${entryEvt.date.split('T')[0]}`
+        setRevealedDecisionKeys((prev) => prev.includes(key) ? prev : [...prev, key])
+      }
     }
     portfolio.continueFromEntryReveal()
   }, [portfolio, events])
@@ -927,6 +1070,11 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
     promptedDecisionsRef.current.clear()
     entryPromptedRef.current = false
     stopCheckedCandlesRef.current.clear()
+    promptedDecoyRef.current.clear()
+    promptedEntryDecoyRef.current.clear()
+    leosEntryInfoShownRef.current = false
+    setShowLeosEntryInfo(false)
+    setDecoySeed(Date.now()) // re-randomize decoy prompt positions each run
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -977,7 +1125,7 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
           onClose()
           break
         case 'p': case 'P':
-          setPredictions((p) => !p)
+          if (!isSubmission) setPredictions((p) => !p)
           break
         case 'r': case 'R':
           restart()
@@ -1068,10 +1216,12 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
               /* ──── INTRO SCREEN ──── */
               <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center px-8">
                 <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.6 }} className="text-center">
-                  <p className="text-sm uppercase tracking-widest text-gray-500 mb-4">Trade Replay</p>
+                  <p className="text-sm uppercase tracking-widest text-gray-500 mb-4">
+                    {isSubmission ? 'User Submitted Trade' : 'Trade Replay'}
+                  </p>
                   <h1 className="text-6xl font-bold text-white mb-3">{s(meta.ticker)}</h1>
                   <p className="text-xl text-gray-400 mb-2">
-                    {s(meta.tradeType).toUpperCase()} &bull; {s(meta.setupType) || 'Swing Trade'}
+                    {s(meta.tradeType).toUpperCase()} &bull; {isSubmission ? 'User Submission' : s(meta.setupType) || 'Swing Trade'}
                   </p>
                   <p className="text-gray-500 mb-10">
                     {s(Number(meta.duration) + 1)} days &bull; {s(events.length)} events
@@ -1087,7 +1237,7 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                   <div className="flex items-center gap-6 text-gray-500 text-sm">
                     <span>Space = Play/Pause</span>
                     <span>Arrows = Step candle</span>
-                    <span>P = Think Along</span>
+                    {!isSubmission && <span>P = Think Along</span>}
                     <span>R = Restart</span>
                     <span>Esc = Close</span>
                   </div>
@@ -1099,6 +1249,17 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="text-center max-w-2xl">
                   <p className="text-sm uppercase tracking-widest text-gray-500 mb-4">Trade Complete</p>
                   <h1 className="text-5xl font-bold text-white mb-8">{s(meta.ticker)}</h1>
+
+                  {meta.didNotTrade && (
+                    <div className="mb-8 rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4">
+                      <p className="text-sm font-bold text-amber-400 uppercase tracking-wider">
+                        {"Hypothetical — Leoš did not take this trade"}
+                      </p>
+                      <p className="text-xs text-amber-200/60 mt-1">
+                        The events and numbers shown are how he would have managed it.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-gray-900 rounded-xl p-5">
@@ -1189,6 +1350,22 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                     <div className="bg-gray-900 rounded-xl p-6 text-left mb-8">
                       <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Trade Notes</p>
                       <p className="text-sm text-gray-300 whitespace-pre-wrap">{s(meta.notes)}</p>
+                    </div>
+                  )}
+
+                  {isSubmission && submission?.leosReview && (
+                    <div className="bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-6 text-left mb-8">
+                      <p className="text-xs text-cyan-400 mb-2 uppercase tracking-wider">{"Leoš's Review"}</p>
+                      {submission.leosReview.wouldTrade && (
+                        <p className="text-sm font-semibold text-white mb-2">
+                          {submission.leosReview.wouldTrade === 'yes'
+                            ? 'Leoš would have traded this setup.'
+                            : 'Leoš would have passed on this setup.'}
+                        </p>
+                      )}
+                      {submission.leosReview.commentary && (
+                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{s(submission.leosReview.commentary)}</p>
+                      )}
                     </div>
                   )}
 
@@ -1432,8 +1609,10 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                           stop: portfolio.lots[0].initialStop,
                           shares: portfolio.lots[0].shares,
                         } : undefined}
+                        entryContext={portfolio.entryContext}
                         onConfirmBuy={portfolio.confirmBuy}
                         onDeclineEntry={portfolio.declineEntry}
+                        onContinueFromPassReveal={portfolio.continueFromPassReveal}
                         onSetEntrySize={portfolio.setEntrySize}
                         onSetAddSize={portfolio.setAddSize}
                         onChooseAction={portfolio.chooseAction}
@@ -1470,6 +1649,43 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
                               Continue
                             </Button>
                             <p className="text-[10px] text-gray-600 mt-3">Press Space to continue</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* ── "Leoš entered here" — user already holds a position from a decoy buy ── */}
+                    <AnimatePresence>
+                      {showLeosEntryInfo && (
+                        <motion.div
+                          key="leos-entry-info"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute bottom-4 left-4 right-4 z-20"
+                        >
+                          <div className="bg-gray-900/95 backdrop-blur-md rounded-xl p-5 border border-green-500/40 max-w-lg mx-auto text-center">
+                            <TrendingUp className="h-5 w-5 text-green-400 mx-auto mb-2" />
+                            <p className="text-white text-base font-medium mb-2">
+                              {meta?.didNotTrade ? "This is where Leoš would have entered" : 'Leoš entered here'}
+                            </p>
+                            {tradeDetails && (
+                              <p className="text-sm text-gray-400 mb-4">
+                                @ ${tradeDetails.entryPrice.toFixed(2)} &bull; Stop ${tradeDetails.initialStopLoss.toFixed(2)}
+                                {(() => {
+                                  const desc = events.find((e) => e.type === 'entry')?.positionDesc
+                                  return desc ? <> &bull; {s(desc)}</> : null
+                                })()}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mb-4">You got in earlier — keep managing your position.</p>
+                            <Button
+                              onClick={dismissLeosEntryInfo}
+                              className="bg-white/10 hover:bg-white/20 text-white"
+                              size="sm"
+                            >
+                              Continue
+                            </Button>
                           </div>
                         </motion.div>
                       )}
@@ -1640,6 +1856,69 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
               })()}
             </div>
 
+            {/* ── Leoš's Review (user submissions) ── */}
+            {isSubmission && submission?.leosReview && (
+              <div className="border-b border-gray-800">
+                <button
+                  onClick={() => setReviewOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-900/60 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-cyan-300 uppercase tracking-wider">{"Leoš's Review"}</span>
+                  {reviewOpen ? <ChevronUp className="h-4 w-4 text-cyan-400" /> : <ChevronDown className="h-4 w-4 text-cyan-400" />}
+                </button>
+                {reviewOpen && (
+                  <div className="px-4 pb-4 space-y-3 max-h-64 overflow-y-auto">
+                    {submission.leosReview.wouldTrade && (
+                      <div className={cn(
+                        'rounded-lg px-3 py-2 text-center text-xs font-bold uppercase tracking-wider',
+                        submission.leosReview.wouldTrade === 'yes'
+                          ? 'bg-green-500/10 border border-green-500/30 text-green-400'
+                          : 'bg-amber-500/10 border border-amber-500/30 text-amber-400',
+                      )}>
+                        {submission.leosReview.wouldTrade === 'yes'
+                          ? 'Leoš would have traded this'
+                          : 'Leoš would have passed'}
+                      </div>
+                    )}
+                    {submission.leosReview.commentary && (
+                      <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">
+                        {s(submission.leosReview.commentary)}
+                      </p>
+                    )}
+                    {submission.leosReview.wouldTrade === 'yes' && submission.leosReview.entryPrice > 0 && (
+                      <div className="bg-gray-900 rounded-lg p-3 space-y-1">
+                        <p className="text-[10px] text-gray-500 uppercase">{"Leoš's plan"}</p>
+                        <p className="text-xs text-gray-300">
+                          Entry <span className="font-mono text-white">${submission.leosReview.entryPrice.toFixed(2)}</span>
+                          {submission.leosReview.initialStopLoss > 0 && (
+                            <> &bull; Stop <span className="font-mono text-yellow-400">${submission.leosReview.initialStopLoss.toFixed(2)}</span></>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                    {submission.leosReview.stops.map((st, i) => (
+                      <div key={`rev-stop-${i}`} className="bg-gray-900 rounded-lg p-3">
+                        <p className="text-[10px] text-yellow-500/80 uppercase mb-0.5">
+                          Stop &rarr; ${st.price.toFixed(2)}
+                          {st.date && <span className="text-gray-600 ml-1">{(() => { try { return format(new Date(st.date), 'MMM dd') } catch { return '' } })()}</span>}
+                        </p>
+                        {st.comment && <p className="text-xs text-gray-400 whitespace-pre-wrap">{s(st.comment)}</p>}
+                      </div>
+                    ))}
+                    {submission.leosReview.exits.map((x, i) => (
+                      <div key={`rev-exit-${i}`} className="bg-gray-900 rounded-lg p-3">
+                        <p className="text-[10px] text-red-400/80 uppercase mb-0.5">
+                          Sell{x.sizePct > 0 ? ` ${x.sizePct}%` : ''} @ ${x.price.toFixed(2)}
+                          {x.date && <span className="text-gray-600 ml-1">{(() => { try { return format(new Date(x.date), 'MMM dd') } catch { return '' } })()}</span>}
+                        </p>
+                        {x.comment && <p className="text-xs text-gray-400 whitespace-pre-wrap">{s(x.comment)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Events Feed ── */}
             <div ref={eventsFeedRef} className="flex-1 overflow-y-auto p-4 space-y-2">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Events</h3>
@@ -1769,18 +2048,20 @@ function ReplayInner({ tradeId, onClose }: TradeReplayPlayerProps) {
               </div>
             )}
 
-            {/* ── Think Along toggle ── */}
-            <div className="p-3 border-t border-gray-800">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPredictions((p) => !p)}
-                className={cn('w-full text-xs', predictions ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-gray-400')}
-              >
-                {predictions ? <EyeOff className="h-3 w-3 mr-2" /> : <Eye className="h-3 w-3 mr-2" />}
-                {predictions ? 'Think Along ON' : 'Think Along'}
-              </Button>
-            </div>
+            {/* ── Think Along toggle (not offered for user submissions) ── */}
+            {!isSubmission && (
+              <div className="p-3 border-t border-gray-800">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPredictions((p) => !p)}
+                  className={cn('w-full text-xs', predictions ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-gray-400')}
+                >
+                  {predictions ? <EyeOff className="h-3 w-3 mr-2" /> : <Eye className="h-3 w-3 mr-2" />}
+                  {predictions ? 'Think Along ON' : 'Think Along'}
+                </Button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>

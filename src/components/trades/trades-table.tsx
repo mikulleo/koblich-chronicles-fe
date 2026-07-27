@@ -29,6 +29,8 @@ export function TradesTable() {
         const params = new URLSearchParams();
         params.append('limit', '1000');
         params.append('depth', '1');
+        // Hypothetical "didn't trade" entries only appear in the Gym, never in the trade log
+        params.append('where[didNotTrade][not_equals]', 'true');
         const data = await cachedFetch<{ docs: Trade[] }>('/trades', params)
 
         if (data && data.docs) {

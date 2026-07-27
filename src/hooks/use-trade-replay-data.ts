@@ -62,6 +62,8 @@ export interface ReplayMeta {
   chartCount: number
   eventCount: number
   notes: string
+  /** True for hypothetical trades Leoš did not actually take */
+  didNotTrade: boolean
 }
 
 export interface ReplayEvent {
@@ -122,11 +124,31 @@ export interface ReplayTrade {
   }>
 }
 
+/** Source of the replay data: Leoš's trades or a user submission */
+export type ReplaySource = 'trade' | 'submission'
+
+/** Review info attached to a user-submitted trade */
+export interface SubmissionInfo {
+  reviewStatus: string
+  makePublic: boolean
+  isOwner: boolean
+  leosReview: {
+    wouldTrade: string
+    entryDate: string
+    entryPrice: number
+    initialStopLoss: number
+    stops: Array<{ date: string; price: number; comment: string }>
+    exits: Array<{ date: string; price: number; sizePct: number; comment: string }>
+    commentary: string
+  } | null
+}
+
 export interface UseTradeReplayDataResult {
   meta: ReplayMeta | null
   events: ReplayEvent[]
   charts: ReplayChart[]
   trade: ReplayTrade | null
+  submission: SubmissionInfo | null
   isLoading: boolean
   error: string | null
 }
@@ -135,11 +157,12 @@ export interface UseTradeReplayDataResult {
 /* Hook                                                                */
 /* ------------------------------------------------------------------ */
 
-export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
+export function useTradeReplayData(tradeId: string, source: ReplaySource = 'trade'): UseTradeReplayDataResult {
   const [meta, setMeta] = useState<ReplayMeta | null>(null)
   const [events, setEvents] = useState<ReplayEvent[]>([])
   const [charts, setCharts] = useState<ReplayChart[]>([])
   const [trade, setTrade] = useState<ReplayTrade | null>(null)
+  const [submission, setSubmission] = useState<SubmissionInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -147,7 +170,10 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
     setIsLoading(true)
     setError(null)
     try {
-      const { data } = await apiClient.get(`/trades/${tradeId}/story`)
+      const storyUrl = source === 'submission'
+        ? `/trade-submissions/${tradeId}/story`
+        : `/trades/${tradeId}/story`
+      const { data } = await apiClient.get(storyUrl)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let d: any = null
@@ -203,6 +229,7 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
         chartCount: num(md.chartCount),
         eventCount: num(md.eventCount),
         notes: str(d.notes),
+        didNotTrade: Boolean(md.didNotTrade ?? tradeRaw?.didNotTrade),
       }
 
       /* ── Extract charts (flat) ── */
@@ -256,11 +283,19 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
         }
 
         // Detect add-on trades: other trades on same ticker that overlap in time
+        // (submissions are standalone — no add-on detection)
         try {
-          const tickerId = typeof tradeRaw.ticker === 'object' ? tradeRaw.ticker?.id : tradeRaw.ticker
+          const tickerId = source === 'submission'
+            ? null
+            : typeof tradeRaw.ticker === 'object' ? tradeRaw.ticker?.id : tradeRaw.ticker
           if (tickerId) {
+            // Real trades only pick up real add-ons; hypothetical ("didn't trade")
+            // trades only pick up hypothetical ones — never mix the two.
+            const addOnFlagFilter = tradeRaw.didNotTrade === true
+              ? { 'where[didNotTrade][equals]': 'true' }
+              : { 'where[didNotTrade][not_equals]': 'true' }
             const { data: allTradesData } = await apiClient.get('/trades', {
-              params: { limit: 100, depth: 0, 'where[ticker][equals]': tickerId },
+              params: { limit: 100, depth: 0, 'where[ticker][equals]': tickerId, ...addOnFlagFilter },
             })
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const allDocs: any[] = allTradesData?.docs ?? []
@@ -604,21 +639,56 @@ export function useTradeReplayData(tradeId: string): UseTradeReplayDataResult {
         }
       }
 
+      /* ── Extract submission review info (flat) ── */
+      let flatSubmission: SubmissionInfo | null = null
+      if (data?.submission) {
+        const sb = data.submission
+        const lr = sb.leosReview
+        flatSubmission = {
+          reviewStatus: str(sb.reviewStatus),
+          makePublic: Boolean(sb.makePublic),
+          isOwner: Boolean(sb.isOwner),
+          leosReview: lr
+            ? {
+                wouldTrade: str(lr.wouldTrade),
+                entryDate: toDate(lr.entryDate),
+                entryPrice: num(lr.entryPrice),
+                initialStopLoss: num(lr.initialStopLoss),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                stops: (lr.stops ?? []).map((st: any) => ({
+                  date: toDate(st.date),
+                  price: num(st.price),
+                  comment: str(st.comment),
+                })),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                exits: (lr.exits ?? []).map((x: any) => ({
+                  date: toDate(x.date),
+                  price: num(x.price),
+                  sizePct: num(x.sizePct),
+                  comment: str(x.comment),
+                })),
+                commentary: str(lr.commentary),
+              }
+            : null,
+        }
+      }
+
       setMeta(flatMeta)
       setEvents(flatEvents)
       setCharts(flatCharts)
       setTrade(flatTrade)
+      setSubmission(flatSubmission)
     } catch (e) {
       console.error('TradeReplayData fetch error:', e)
       setError(e instanceof Error ? e.message : 'Failed to load trade data')
     } finally {
       setIsLoading(false)
     }
-  }, [tradeId])
+  }, [tradeId, source])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  return { meta, events, charts, trade, isLoading, error }
+  return { meta, events, charts, trade, submission, isLoading, error }
 }
