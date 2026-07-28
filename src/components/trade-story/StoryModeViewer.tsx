@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
 
 // Adjusted ChartData interface to allow for Media (image/annotatedImage)
 interface ChartData {
@@ -375,8 +376,8 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
 
   const renderChartImage = (chart: ChartData, isFullScreenMode = false) => {
     const imageUrl = chart.annotatedImage?.url || chart.image.url
-    const containerClass = isFullScreenMode 
-      ? "flex items-center justify-center w-full h-full" 
+    const containerClass = isFullScreenMode
+      ? "relative flex items-center justify-center w-full h-full"
       : "relative max-h-full max-w-full"
     
     return (
@@ -407,6 +408,7 @@ export default function StoryModeViewer({ storyData, onClose }: StoryModeViewerP
             draggable={false}
           />
         </div>
+        <MarketSurgeAttribution size={isFullScreenMode ? 'lg' : 'md'} />
       </div>
     )
   }

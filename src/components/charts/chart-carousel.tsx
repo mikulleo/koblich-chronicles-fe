@@ -13,6 +13,7 @@ import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useAnalytics } from '@/hooks/use-analytics'
 import { ChartMeasurement, Measurement } from './chart-measurement'
+import { MarketSurgeAttribution } from './marketsurge-attribution'
 
 // Updated ChartImage interface to properly include tags
 export interface ChartImage {
@@ -603,9 +604,12 @@ export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: Chart
               {currentIndex + 1}/{charts.length}
             </div>
             
+            {/* MarketSurge attribution — required credit on all MarketSurge charts */}
+            <MarketSurgeAttribution size={fullscreen ? 'lg' : 'md'} />
+
             {/* Measurement active indicator */}
             {isMeasurementActive && (
-              <div className="absolute bottom-2 left-2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium z-10 animate-pulse">
+              <div className="absolute top-14 left-2 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium z-10 animate-pulse">
                 Measurement Mode Active - Click to enter a price point
               </div>
             )}
@@ -652,7 +656,12 @@ export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: Chart
             
             {/* Structured Notes */}
             {renderNotes()}
-            
+
+            {/* Attribution credit */}
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Chart courtesy of MarketSurge. © MarketSurge. All rights reserved.
+            </p>
+
             {/* Keyboard Shortcuts - only in fullscreen */}
             {fullscreen && (
               <div className="text-xs text-muted-foreground text-center mt-2">

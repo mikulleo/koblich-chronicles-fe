@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
 import { toast } from 'sonner'
 import { useAnalytics } from '@/hooks/use-analytics'
 import { recordReplaySession } from '@/hooks/use-gym-progress'
@@ -1853,6 +1854,8 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                         <CandlestickIcon className="h-3 w-3 inline mr-1" />Live Chart
                       </button>
                     )}
+
+                    <MarketSurgeAttribution size="md" />
                   </motion.div>
                 ) : (
                   <div className="text-center">

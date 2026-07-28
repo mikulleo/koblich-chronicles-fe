@@ -28,6 +28,8 @@ import ChartCard from './ChartCard'
 import StoryModeViewer from './StoryModeViewer'
 import Image from 'next/image'
 import { Media, Ticker } from '@/lib/types'
+import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
+import { chartViewerUrl } from '@/lib/charts/chart-image-url'
 
 
 /* animation + gesture libs (Updated for R3F) */
@@ -1290,7 +1292,18 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
             <div className="grid md:grid-cols-2 gap-4">
               <div
                 className="relative aspect-[4/3] cursor-pointer"
-                onClick={() => window.open(selectedChart.annotatedImage?.url || selectedChart.image.url, '_blank')}
+                onClick={() =>
+                  window.open(
+                    chartViewerUrl(
+                      selectedChart.annotatedImage?.url || selectedChart.image.url,
+                      selectedChart.timestamp
+                        ? format(new Date(selectedChart.timestamp), 'MMM dd, yyyy')
+                        : undefined
+                    ),
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                }
               >
                 <Image
                   src={selectedChart.annotatedImage?.url ?? selectedChart.image.url}
@@ -1299,6 +1312,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-contain rounded-lg shadow-lg"
                 />
+                <MarketSurgeAttribution size="sm" />
               </div>
               <div className="space-y-4">
                 <div>
@@ -1367,6 +1381,7 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                           sizes="(max-width: 768px) 100vw, 50vw"
                           className="object-contain rounded-lg shadow-lg"
                         />
+                        <MarketSurgeAttribution size="sm" />
                       </div>
                       <p className="mt-2 text-sm">
                         Date: {format(new Date(c.timestamp), 'MMM dd,yyyy')}

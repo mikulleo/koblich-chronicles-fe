@@ -11,6 +11,8 @@ import {
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { Media } from '@/lib/types'; // Import Media type
+import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
+import { chartViewerUrl } from '@/lib/charts/chart-image-url'
 
 // Shared ChartData interface using Media for images
 interface ChartData {
@@ -85,6 +87,7 @@ export default function ChartCard({ chart, isSelected, onClick, onCompare, isCom
             sizes="250px"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          <MarketSurgeAttribution size="xs" />
         </div>
         
         {/* Quick Actions */}
@@ -95,7 +98,15 @@ export default function ChartCard({ chart, isSelected, onClick, onCompare, isCom
             className="h-6 w-6 p-0"
             onClick={(e) => {
               e.stopPropagation()
-              window.open(chart.annotatedImage?.url || chart.image.url, '_blank')
+              // Open through our viewer so the MarketSurge attribution stays visible
+              window.open(
+                chartViewerUrl(
+                  chart.annotatedImage?.url || chart.image.url,
+                  format(new Date(chart.timestamp), 'MMM dd, yyyy')
+                ),
+                '_blank',
+                'noopener,noreferrer'
+              )
             }}
           >
             <Eye className="h-3 w-3" />
