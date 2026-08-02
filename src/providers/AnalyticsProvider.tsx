@@ -1,125 +1,129 @@
 // src/providers/AnalyticsProvider.tsx
-'use client';
+'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import CookieConsentBanner from '@/components/analytics/CookieConsentBanner';
-import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
-// Define consent type
+import CookieConsentBanner from '@/components/analytics/CookieConsentBanner'
+import GoogleAnalytics from '@/components/analytics/GoogleAnalytics'
+import PageViewTracker from '@/components/analytics/PageViewTracker'
+import {
+  setAnalyticsConsent,
+  setConsentDefaults,
+  setMarketingConsent,
+  type ConsentStatus,
+} from '@/lib/analytics'
+
 type ConsentOptions = {
-  necessary: boolean;
-  analytics: boolean;
-  marketing: boolean;
-};
+  necessary: boolean
+  analytics: boolean
+  marketing: boolean
+}
 
-// Define context type
 type AnalyticsContextType = {
-  analyticsEnabled: boolean;
-  marketingEnabled: boolean;
-  openConsentManager: () => void;
-};
+  analyticsEnabled: boolean
+  marketingEnabled: boolean
+  openConsentManager: () => void
+}
 
-// Create context with default values
 const AnalyticsContext = createContext<AnalyticsContextType>({
   analyticsEnabled: false,
   marketingEnabled: false,
   openConsentManager: () => {},
-});
+})
 
-// Hook for components to access analytics state
-export const useAnalyticsContext = () => useContext(AnalyticsContext);
+export const useAnalyticsContext = () => useContext(AnalyticsContext)
 
-export function AnalyticsProvider({ 
+/**
+ * Google Consent Mode strategy.
+ *
+ * `advanced` (default) loads gtag.js for every visitor with all storage denied
+ * until they opt in. No cookies are written and no identifiers are stored
+ * without consent; Google receives cookieless pings it uses for aggregate
+ * behavioural modelling. Without this, visitors who ignore or decline the
+ * banner are entirely invisible, which typically hides 30–60% of traffic and
+ * makes absolute totals meaningless.
+ *
+ * Set NEXT_PUBLIC_ANALYTICS_CONSENT_MODE=basic to load nothing at all until the
+ * visitor opts in. See docs/analytics.md for the trade-off.
+ */
+const CONSENT_MODE = process.env.NEXT_PUBLIC_ANALYTICS_CONSENT_MODE ?? 'advanced'
+
+export function AnalyticsProvider({
   children,
   gaMeasurementId,
-}: { 
-  children: React.ReactNode;
-  gaMeasurementId?: string;
+}: {
+  children: React.ReactNode
+  gaMeasurementId?: string
 }) {
-  // State to store user consent
   const [consent, setConsent] = useState<ConsentOptions>({
     necessary: true,
     analytics: false,
     marketing: false,
-  });
+  })
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus>('unknown')
 
-  // State to control if provider is ready (prevents flash of content)
-  const [isReady, setIsReady] = useState(false);
-
-  // Handle consent changes
-  const handleConsent = (newConsent: ConsentOptions) => {
-    setConsent(newConsent);
-    
-    // You could add additional logic here like event firing
-    if (newConsent.analytics) {
-      // Set Analytics consent
-      if (window.gtag) {
-        window.gtag('consent', 'update', {
-          analytics_storage: 'granted',
-        });
-      }
-    } else {
-      // Revoke Analytics consent
-      if (window.gtag) {
-        window.gtag('consent', 'update', {
-          analytics_storage: 'denied',
-        });
-      }
-    }
-  };
-
-  // Function to manually open consent manager
-  const openConsentManager = () => {
-    if (typeof window !== 'undefined' && window.openCookieConsent) {
-      window.openCookieConsent();
-    }
-  };
-
-  // Hydration safety - only show after client-side render
+  // Declare all storage denied before gtag.js has a chance to execute.
+  // Effects run ahead of `afterInteractive` scripts, so this ordering holds.
   useEffect(() => {
-    setIsReady(true);
-  }, []);
+    setConsentDefaults()
+  }, [])
 
-  // Skip rendering until client-side
-  if (!isReady) {
-    return <>{children}</>;
-  }
+  const handleConsent = useCallback((newConsent: ConsentOptions) => {
+    setConsent(newConsent)
+    setConsentStatus(newConsent.analytics ? 'granted' : 'denied')
+    setAnalyticsConsent(newConsent.analytics ? 'granted' : 'denied')
+    setMarketingConsent(newConsent.marketing)
+  }, [])
+
+  const openConsentManager = useCallback(() => {
+    if (typeof window !== 'undefined' && window.openCookieConsent) {
+      window.openCookieConsent()
+    }
+  }, [])
+
+  const contextValue = useMemo(
+    () => ({
+      analyticsEnabled: consent.analytics,
+      marketingEnabled: consent.marketing,
+      openConsentManager,
+    }),
+    [consent.analytics, consent.marketing, openConsentManager],
+  )
+
+  const shouldLoadGa =
+    !!gaMeasurementId && (consent.analytics || (CONSENT_MODE === 'advanced' && consentStatus !== 'granted'))
 
   return (
-    <AnalyticsContext.Provider
-      value={{
-        analyticsEnabled: consent.analytics,
-        marketingEnabled: consent.marketing,
-        openConsentManager,
-      }}
-    >
-      {/* Cookie Consent Banner */}
+    // Rendered unconditionally. An earlier version returned bare `children`
+    // until a client-side flag flipped, which changed the tree shape and
+    // remounted the entire app — doubling every mount-time event.
+    <AnalyticsContext.Provider value={contextValue}>
       <CookieConsentBanner onConsent={handleConsent} />
-      
-      {/* Google Analytics - only load if consent given */}
-      {consent.analytics && gaMeasurementId && (
-        <GoogleAnalytics GA_MEASUREMENT_ID={gaMeasurementId} />
-      )}
-      
+
+      {shouldLoadGa && <GoogleAnalytics GA_MEASUREMENT_ID={gaMeasurementId!} />}
+
+      {/* Always mounted: the transport buffers page views until consent
+          resolves, which is what makes entry pages measurable. */}
+      <PageViewTracker />
+
       {children}
     </AnalyticsContext.Provider>
-  );
+  )
 }
 
-// Optional: Higher order component to require analytics consent
+/** Renders a component only when analytics consent has been granted. */
 export function withAnalyticsConsent<P extends object>(
-  Component: React.ComponentType<P>
+  Component: React.ComponentType<P>,
 ): React.FC<P> {
   return function WrappedComponent(props: P) {
-    const { analyticsEnabled } = useAnalyticsContext();
-    
-    // If component should only show when analytics is enabled
+    const { analyticsEnabled } = useAnalyticsContext()
+
     if (!analyticsEnabled) {
-      return null;
+      return null
     }
-    
-    return <Component {...props} />;
-  };
+
+    return <Component {...props} />
+  }
 }
 
-export default AnalyticsProvider;
+export default AnalyticsProvider

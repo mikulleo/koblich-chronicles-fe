@@ -84,14 +84,14 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
       return;
     }
 
-    // Track donation initiated event
-    analytics.trackDonation(formData.amount, formData.currency);
-    analytics.trackEvent('donation_form_submitted', {
+    // GA4 `begin_checkout` — the visitor has committed to an amount and is on
+    // their way to PayPal.
+    analytics.trackDonationCheckoutStarted({
+      amount: formData.amount,
       currency: formData.currency,
-      value: formData.amount,
-      has_name: !!formData.donorName,
-      has_email: !!formData.donorEmail,
-      has_message: !!formData.message,
+      hasName: !!formData.donorName,
+      hasEmail: !!formData.donorEmail,
+      hasMessage: !!formData.message,
     });
 
     // Show PayPal buttons
@@ -110,11 +110,13 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
   const handlePayPalSuccess = async (details: any) => {
     setIsSubmitting(true);
 
-    // Track successful donation
-    analytics.trackEvent('donation_completed', {
-      payment_id: details.id,
+    // Stage the GA4 `purchase` rather than sending it here: the redirect below
+    // replaces the document immediately, which routinely kills an in-flight
+    // beacon. The thank-you page sends it on arrival, deduplicated by order ID.
+    analytics.stagePurchase({
+      transactionId: details.id,
+      amount: formData.amount,
       currency: formData.currency,
-      value: formData.amount,
     });
 
     // Record the donation in backend (best-effort — payment already succeeded at PayPal)
@@ -142,11 +144,20 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
 
   const handlePayPalError = (error: any) => {
     console.error('PayPal error:', error);
+    analytics.trackDonationError({
+      amount: formData.amount,
+      currency: formData.currency,
+      reason: error?.message ? String(error.message) : 'paypal_error',
+    });
     toast.error('There was an error processing your donation. Please try again.');
     setShowPayPalButtons(false);
   };
 
   const handlePayPalCancel = () => {
+    analytics.trackDonationCancelled({
+      amount: formData.amount,
+      currency: formData.currency,
+    });
     toast.info('Donation cancelled');
     setShowPayPalButtons(false);
   };
@@ -178,6 +189,12 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
               onSuccess={handlePayPalSuccess}
               onError={handlePayPalError}
               onCancel={handlePayPalCancel}
+              onReady={() =>
+                analytics.trackDonationPaymentShown({
+                  amount: formData.amount,
+                  currency: formData.currency,
+                })
+              }
             />
           </div>
           
@@ -225,6 +242,11 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
                   onClick={() => {
                     setFormData({ ...formData, amount: val });
                     setCustomMode(false);
+                    analytics.trackDonationAmountSelected({
+                      amount: val,
+                      currency: formData.currency,
+                      isCustom: false,
+                    });
                   }}
                 >
                   {`${val} ${formData.currency}`}
@@ -234,7 +256,14 @@ export function DonationForm({ onSuccess }: DonationFormProps) {
               <Button
                 type="button"
                 variant={customMode ? 'default' : 'outline'}
-                onClick={() => setCustomMode(true)}
+                onClick={() => {
+                  setCustomMode(true);
+                  analytics.trackDonationAmountSelected({
+                    amount: formData.amount,
+                    currency: formData.currency,
+                    isCustom: true,
+                  });
+                }}
               >
                 Custom
               </Button>

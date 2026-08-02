@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -142,6 +142,12 @@ function GymLockedLanding() {
   const [doorsOpen, setDoorsOpen] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const { login, register, forgotPassword } = useAuth()
+  const { trackGymGateView, trackAuthError } = useAnalytics()
+
+  // Top of the gym signup funnel: how many people reach the locked door.
+  useEffect(() => {
+    trackGymGateView()
+  }, [trackGymGateView])
 
   async function handleDoorPush() {
     setError('')
@@ -193,6 +199,8 @@ function GymLockedLanding() {
         ? 'Invalid email or password'
         : 'Registration failed. Please try again.'
       setError(fieldMsg || topMsg || fallback)
+      // Failed sign-ins are the silent killer of a gated funnel — measure them.
+      trackAuthError({ action: mode, reason: fieldMsg || topMsg || fallback })
     } finally {
       setSubmitting(false)
     }
@@ -845,7 +853,7 @@ function TradeReplaySection({ onBack, onSelectTrade }: { onBack: () => void; onS
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [tutorialOpen, setTutorialOpen] = useState(false)
-  const { trackEvent } = useAnalytics()
+  const { trackTradeOpen } = useAnalytics()
 
   useEffect(() => {
     async function fetchTrades() {
@@ -1108,11 +1116,14 @@ function TradeReplaySection({ onBack, onSelectTrade }: { onBack: () => void; onS
                                 whileHover={{ scale: 1.03, y: -4 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => {
-                                  trackEvent('gym_trade_select', {
-                                    trade_id: trade.id,
-                                    ticker: trade.symbol,
-                                    trade_type: trade.type,
-                                  })
+                                  trackTradeOpen(
+                                    {
+                                      tradeId: trade.id,
+                                      ticker: trade.symbol,
+                                      tradeType: trade.type,
+                                    },
+                                    'gym_replay_list',
+                                  )
                                   onSelectTrade(trade.id)
                                 }}
                                 className={cn(
@@ -1263,6 +1274,7 @@ export default function TradingGym() {
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null)
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null)
   const { user, loading } = useAuth()
+  const { trackGymHubView, trackGymSectionOpen } = useAnalytics()
   const router = useRouter()
   const wasAuthenticated = useRef(!!user)
   // Keep the landing mounted until the door-open animation finishes
@@ -1284,6 +1296,22 @@ export default function TradingGym() {
     }
     wasAuthenticated.current = !!user
   }, [user, loading, router, showLanding])
+
+  // The hub is the gym's real landing surface — it is a state change, not a
+  // route change, so it needs its own view event.
+  useEffect(() => {
+    if (loading || showLanding || activeSection !== null) return
+    trackGymHubView()
+  }, [loading, showLanding, activeSection, trackGymHubView])
+
+  /** Section navigation, instrumented. `null` means "back to the hub". */
+  const openSection = useCallback(
+    (section: ActiveSection) => {
+      if (section) trackGymSectionOpen(section)
+      setActiveSection(section)
+    },
+    [trackGymSectionOpen],
+  )
 
   // Full-screen gym entrance for unauthenticated users (or while animation plays)
   if (showLanding) {
@@ -1314,7 +1342,7 @@ export default function TradingGym() {
               exit={{ opacity: 0, scale: 1.1, filter: 'blur(6px)' }}
               transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <GymHub onSelect={setActiveSection} showWelcome={justEntered} />
+              <GymHub onSelect={openSection} showWelcome={justEntered} />
             </motion.div>
           )}
 
@@ -1326,7 +1354,7 @@ export default function TradingGym() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <TradeReplaySection onBack={() => setActiveSection(null)} onSelectTrade={setSelectedTradeId} />
+              <TradeReplaySection onBack={() => openSection(null)} onSelectTrade={setSelectedTradeId} />
             </motion.div>
           )}
 
@@ -1338,7 +1366,7 @@ export default function TradingGym() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <MentalEdgeSection onBack={() => setActiveSection(null)} />
+              <MentalEdgeSection onBack={() => openSection(null)} />
             </motion.div>
           )}
 
@@ -1351,7 +1379,7 @@ export default function TradingGym() {
               transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
               <SubmissionsSection
-                onBack={() => setActiveSection(null)}
+                onBack={() => openSection(null)}
                 onSelectSubmission={setSelectedSubmissionId}
               />
             </motion.div>

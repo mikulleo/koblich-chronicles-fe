@@ -1,104 +1,73 @@
 // src/hooks/use-analytics.ts
-'use client';
+'use client'
 
 /**
- * Custom hook for tracking events in Google Analytics
+ * Component-facing analytics API.
+ *
+ * The returned object is a frozen module-level singleton, so it is
+ * referentially stable across renders. That matters more than it looks:
+ * these functions are used in `useEffect` dependency arrays, and an object
+ * rebuilt on every render silently turns "track once" into "track on every
+ * render" (which is how replay_start came to be over-counted).
  */
-export const useAnalytics = () => {
-  /**
-   * Track a custom event in Google Analytics
-   */
-  const trackEvent = (eventName: string, eventParams?: Record<string, any>) => {
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', eventName, eventParams);
-    }
-  };
 
-  /**
-   * Track user interaction with charts
-   */
-  const trackChartView = (chartId: string, ticker: string) => {
-    trackEvent('chart_view', {
-      chart_id: chartId,
-      ticker: ticker,
-    });
-  };
+import * as analytics from '@/lib/analytics'
 
-  /**
-   * Track tag clicks for analytics
-   */
-  const trackTagClick = (tagName: string) => {
-    trackEvent('tag_click', {
-      tag_name: tagName,
-    });
-  };
+const api = Object.freeze({
+  /** Escape hatch for one-off events. Prefer a named helper below. */
+  trackEvent: analytics.track,
 
-  /**
-   * Track ticker selection
-   */
-  const trackTickerSelect = (ticker: string) => {
-    trackEvent('ticker_select', {
-      ticker: ticker,
-    });
-  };
+  // Journey
+  trackPageView: analytics.trackPageView,
+  trackNavClick: analytics.trackNavClick,
+  trackTabView: analytics.trackTabView,
 
-  /**
-   * Track trade view
-   */
-  const trackTradeView = (tradeId: string, ticker: string, type: 'long' | 'short') => {
-    trackEvent('trade_view', {
-      trade_id: tradeId,
-      ticker: ticker,
-      trade_type: type,
-    });
-  };
+  // Auth
+  trackLogin: analytics.trackLogin,
+  trackSignUp: analytics.trackSignUp,
+  trackLogout: analytics.trackLogout,
+  trackAuthError: analytics.trackAuthError,
 
-  /**
-   * Track statistics filter change
-   */
-  const trackStatsFilter = (filterType: string, value: string) => {
-    trackEvent('stats_filter_change', {
-      filter_type: filterType,
-      filter_value: value,
-    });
-  };
+  // Trading Gym
+  trackGymGateView: analytics.trackGymGateView,
+  trackGymHubView: analytics.trackGymHubView,
+  trackGymSectionOpen: analytics.trackGymSectionOpen,
 
-  /**
-   * Track donation events
-   */
-  const trackDonation = (amount: number, currency: string) => {
-    trackEvent('donation_initiated', {
-      currency: currency,
-      value: amount,
-    });
-  };
+  // Trades, stories, replays
+  trackTradeOpen: analytics.trackTradeOpen,
+  trackTradeView: analytics.trackTradeView,
+  trackStoryEventOpen: analytics.trackStoryEventOpen,
+  trackReplayStart: analytics.trackReplayStart,
+  trackReplayProgress: analytics.trackReplayProgress,
+  trackReplayComplete: analytics.trackReplayComplete,
+  trackReplayExit: analytics.trackReplayExit,
+  trackReplayAction: analytics.trackReplayAction,
 
-  /**
-   * Track trade replay events
-   */
-  const trackReplayStart = (ticker: string) => {
-    trackEvent('replay_start', {
-      ticker: ticker,
-    });
-  };
+  // Charts, tags, tickers
+  trackChartView: analytics.trackChartView,
+  trackTagClick: analytics.trackTagClick,
+  trackTickerSelect: analytics.trackTickerSelect,
+  trackStatsFilter: analytics.trackStatsFilter,
 
-  const trackReplayComplete = (ticker: string) => {
-    trackEvent('replay_complete', {
-      ticker: ticker,
-    });
-  };
+  // Donations
+  trackDonateCtaView: analytics.trackDonateCtaView,
+  trackDonateCtaClick: analytics.trackDonateCtaClick,
+  trackDonationAmountSelected: analytics.trackDonationAmountSelected,
+  trackDonationCheckoutStarted: analytics.trackDonationCheckoutStarted,
+  trackDonationPaymentShown: analytics.trackDonationPaymentShown,
+  trackDonationCancelled: analytics.trackDonationCancelled,
+  trackDonationError: analytics.trackDonationError,
+  trackDonationAbandoned: analytics.trackDonationAbandoned,
+  stagePurchase: analytics.stagePurchase,
+  flushStagedPurchase: analytics.flushStagedPurchase,
 
-  return {
-    trackEvent,
-    trackChartView,
-    trackTagClick,
-    trackTickerSelect,
-    trackTradeView,
-    trackStatsFilter,
-    trackDonation,
-    trackReplayStart,
-    trackReplayComplete,
-  };
-};
+  // Misc
+  trackFileDownload: analytics.trackFileDownload,
+  trackSearch: analytics.trackSearch,
+})
 
-export default useAnalytics;
+export type AnalyticsApi = typeof api
+
+export const useAnalytics = (): AnalyticsApi => api
+
+export default useAnalytics

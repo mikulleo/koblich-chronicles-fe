@@ -8,7 +8,6 @@ import AnalyticsProvider from "@/providers/AnalyticsProvider"
 import { ThemeProvider } from "@/providers/ThemeProviders"
 import { PrefetchInitializer } from "@/components/prefetch-initializer"
 import { AuthProvider } from "@/providers/auth-provider"
-import { GoogleTagManager } from '@next/third-parties/google'
 
 // Load fonts with display: swap for better performance
 const inter = Inter({ 
@@ -38,12 +37,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || '';
-  
+
+  // GA4 is loaded directly via gtag.js inside AnalyticsProvider, which gates it
+  // on consent. Google Tag Manager used to be mounted here as well; it was
+  // removed because a GA4 config tag inside the container double-counts every
+  // page view, and it bypassed the consent gate entirely.
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* Add GTM script here. It fetches the original inline script after hydration. */}
-      {GTM_ID && <GoogleTagManager gtmId={GTM_ID} />}
       <body className={inter.className}>
         <ThemeProvider>
           <AuthProvider>

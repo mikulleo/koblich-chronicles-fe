@@ -7,6 +7,7 @@ import { ListFilter, BarChart3, Target } from "lucide-react";
 import { TradesTable } from "@/components/trades/trades-table";
 import { TradeStatistics } from "@/components/trades/trade-statistics";
 import { ExposureBuckets } from "@/components/trades/exposure-buckets";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 interface TradesTabViewProps {
   defaultTab?: "log" | "statistics" | "exposure";
@@ -14,9 +15,17 @@ interface TradesTabViewProps {
 
 export function TradesTabView({ defaultTab = "log" }: TradesTabViewProps) {
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const { trackTabView } = useAnalytics();
+
+  // These tabs are three distinct products behind one URL, so without this the
+  // exposure and statistics views are invisible in page reports.
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as typeof activeTab);
+    trackTabView({ area: "trades", tab: value });
+  };
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="w-full">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="log" className="flex items-center gap-2">
           <ListFilter className="h-4 w-4" />

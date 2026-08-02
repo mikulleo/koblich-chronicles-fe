@@ -1,5 +1,8 @@
 import React, { useState, useCallback } from 'react' // Explicitly import React, useState, and useCallback
 import Link from "next/link"
+// Imported directly rather than via useAnalytics(): column `cell` renderers
+// return early on some rows, so a hook call here would be conditional.
+import { trackTradeOpen } from "@/lib/analytics"
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, Film, XCircle, CheckCircle, Info, PackageOpen } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -370,12 +373,20 @@ export const columns: ColumnDef<Trade>[] = [
     const hasCharts = trade.relatedCharts && trade.relatedCharts.length > 0
     
     return hasCharts ? (
-      <Button 
-        variant="ghost" 
+      <Button
+        variant="ghost"
         size="sm"
         onClick={(e) => {
           // Prevent the row click from firing
           e.stopPropagation()
+          trackTradeOpen(
+            {
+              tradeId: String(trade.id),
+              ticker: trade.ticker?.symbol,
+              tradeType: trade.type,
+            },
+            'trade_story',
+          )
         }}
         asChild // Render as child to allow Link to apply its behavior
       >

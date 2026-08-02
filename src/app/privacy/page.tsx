@@ -131,7 +131,30 @@ export default function PrivacyPolicyPage() {
           <li><strong>Functional Cookies:</strong> Enable enhanced functionality and personalization</li>
           <li><strong>Security Cookies:</strong> Used for security purposes in the donation process</li>
         </ul>
-        
+
+        <h3>Analytics before you choose</h3>
+        <p>
+          We use Google Analytics 4 with Google Consent Mode. Until you accept analytics cookies,
+          no analytics cookies are placed on your device and no identifiers about you are stored.
+          During that time we still receive anonymous, cookieless signals — such as the page
+          address, page title, referring site and approximate region — which Google uses only to
+          produce aggregate statistics. These signals cannot be linked back to you or to a
+          previous visit.
+        </p>
+        <p>
+          If you accept analytics cookies, Google Analytics stores a pseudonymous identifier so we
+          can measure repeat visits and how features are used. If you are signed in, we also send
+          your internal account identifier so activity can be linked across your own devices. We
+          never send your name, email address or any other directly identifying information to
+          Google Analytics.
+        </p>
+        <p>
+          You can change or withdraw your choice at any time using the{' '}
+          <strong>Cookie settings</strong> link in the site footer. Withdrawing consent stops
+          analytics cookies immediately.
+        </p>
+
+
         <h2>8. Data Security</h2>
         <p>
           We implement appropriate technical and organizational measures to protect your personal information 

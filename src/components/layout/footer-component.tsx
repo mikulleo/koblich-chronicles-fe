@@ -2,6 +2,7 @@
 import React from 'react';
 import PaymentMethodLogos from '@/components/donations/payment-method-logos';
 import Link from 'next/link';
+import { CookieSettingsLink } from '@/components/layout/cookie-settings-link';
 
 export function FooterComponent() {
   return (
@@ -15,6 +16,9 @@ export function FooterComponent() {
               Payment processing provided by PayPal. By using our services, you agree to our{' '}
               <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link> and{' '}
               <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+            </p>
+            <p className="mt-2">
+              <CookieSettingsLink />
             </p>
           </div>
           

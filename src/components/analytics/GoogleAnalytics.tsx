@@ -1,69 +1,38 @@
 // src/components/analytics/GoogleAnalytics.tsx
-'use client';
+'use client'
 
-import { usePathname, useSearchParams } from 'next/navigation';
-import Script from 'next/script';
-import { useEffect } from 'react';
+import Script from 'next/script'
+import { useEffect } from 'react'
+
+import { configure } from '@/lib/analytics'
 
 interface GoogleAnalyticsProps {
-  GA_MEASUREMENT_ID: string;
+  GA_MEASUREMENT_ID: string
 }
 
 /**
- * Loads the GA4 gtag.js script and sends page_view events on route changes.
+ * Loads gtag.js and configures the GA4 property.
  *
- * This component is rendered only when the user has given analytics consent
- * (gated by AnalyticsProvider), so it does not need its own consent state.
+ * Rendered only once analytics consent has been granted (see AnalyticsProvider).
+ *
+ * `configure()` runs in an effect, which is deliberately *earlier* than the
+ * `afterInteractive` script below: it installs the synchronous gtag() shim and
+ * queues `js` / `config` / `consent` commands into `dataLayer`. gtag.js replays
+ * that queue when it executes, so nothing tracked during hydration is lost.
+ * Page views are dispatched by PageViewTracker, not here.
  */
 export default function GoogleAnalytics({ GA_MEASUREMENT_ID }: GoogleAnalyticsProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // Send page_view on every client-side navigation
   useEffect(() => {
-    if (typeof window.gtag !== 'function') return;
-
-    const url = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-
-    window.gtag('event', 'page_view', {
-      page_path: url,
-      page_title: document.title,
-      page_location: window.location.href,
-    });
-  }, [pathname, searchParams]);
+    configure(GA_MEASUREMENT_ID, {
+      debug: process.env.NODE_ENV !== 'production',
+    })
+  }, [GA_MEASUREMENT_ID])
 
   return (
-    <>
-      {/* Load gtag.js */}
-      <Script
-        strategy="afterInteractive"
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-      />
-
-      {/* Initialise dataLayer + gtag config (send_page_view: false so we
-          control page_view events via the useEffect above). */}
-      <Script
-        id="google-analytics-init"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){window.dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GA_MEASUREMENT_ID}', {
-              send_page_view: false
-            });
-          `,
-        }}
-      />
-    </>
-  );
-}
-
-// Augment the global Window so TypeScript knows about gtag / dataLayer
-declare global {
-  interface Window {
-    dataLayer?: any[];
-    gtag?: (...args: any[]) => void;
-  }
+    <Script
+      id="ga-gtag-js"
+      strategy="afterInteractive"
+      src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+    />
+  )
 }

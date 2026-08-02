@@ -13,9 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 import { cachedFetch } from '@/lib/prefetch-cache'
+import { useAnalytics } from '@/hooks/use-analytics'
 
 export function TradesTable() {
   const router = useRouter()
+  const { trackTradeOpen } = useAnalytics()
   const [trades, setTrades] = useState<Trade[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +59,18 @@ export function TradesTable() {
   const handleViewCharts = (trade: Trade) => {
     // Navigate to charts page filtered by this ticker and date
     const tickerId = trade?.ticker?.id
-    
+
+    // Tracked before the early return: a click on a trade with no ticker is
+    // still interest in that trade, and a dead end worth knowing about.
+    trackTradeOpen(
+      {
+        tradeId: String(trade.id),
+        ticker: trade?.ticker?.symbol,
+        tradeType: trade?.type,
+      },
+      'trade_log',
+    )
+
     if (!tickerId) {
       console.warn("Ticker ID not found for trade:", trade)
       return

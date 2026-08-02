@@ -2,8 +2,9 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { flushStagedPurchase } from '@/lib/analytics'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,11 +17,21 @@ export function ThankYouContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const [donationDetails, setDonationDetails] = useState<any>(null)
+  const purchaseFlushed = useRef(false)
+
+  // Send the GA4 `purchase` staged by the donation form just before it
+  // redirected here. Deduplicated by transaction ID inside the transport, so a
+  // page refresh cannot double-count revenue.
+  useEffect(() => {
+    if (purchaseFlushed.current) return
+    purchaseFlushed.current = true
+    flushStagedPurchase(orderId)
+  }, [orderId])
 
   useEffect(() => {
     if (orderId) {
       console.log('Order ID:', orderId)
-      
+
       // Get donation details if needed
       /*
       const fetchDonationDetails = async () => {

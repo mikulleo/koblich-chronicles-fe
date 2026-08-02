@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import apiClient from '@/lib/api/client'
+import { setUser as setAnalyticsUser, trackLogin, trackLogout, trackSignUp } from '@/lib/analytics'
 
 interface User {
   id: string
@@ -39,6 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data } = await apiClient.get('/users/me')
         if (data?.user) {
           setUser(data.user)
+          // Restoring a session is not a login — attach the identity for
+          // cross-session stitching without inflating the login count.
+          setAnalyticsUser(data.user)
         } else {
           localStorage.removeItem('payload-token')
         }
@@ -51,22 +55,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
+  /** Authenticate and store the session. Deliberately untracked so `register`
+   *  can reuse it without emitting a spurious `login` event. */
+  const performLogin = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post('/users/login', { email, password })
     if (data?.token) {
       localStorage.setItem('payload-token', data.token)
     }
     if (data?.user) {
       setUser(data.user)
+      setAnalyticsUser(data.user)
     }
   }, [])
+
+  const login = useCallback(async (email: string, password: string) => {
+    await performLogin(email, password)
+    trackLogin('password')
+  }, [performLogin])
 
   const register = useCallback(async (name: string, email: string, password: string, country: string) => {
     // Create the user account
     await apiClient.post('/users', { name, email, password, country })
     // Then log them in
-    await login(email, password)
-  }, [login])
+    await performLogin(email, password)
+    trackSignUp({ method: 'password', country })
+  }, [performLogin])
 
   const logout = useCallback(async () => {
     try {
@@ -76,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     localStorage.removeItem('payload-token')
     setUser(null)
+    trackLogout()
+    setAnalyticsUser(null)
   }, [])
 
   const deleteAccount = useCallback(async () => {
@@ -83,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await apiClient.delete(`/users/${user.id}`)
     localStorage.removeItem('payload-token')
     setUser(null)
+    setAnalyticsUser(null)
   }, [user])
 
   const forgotPassword = useCallback(async (email: string) => {

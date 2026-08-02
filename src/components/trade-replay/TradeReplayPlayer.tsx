@@ -32,6 +32,7 @@ import Image from 'next/image'
 import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
 import { toast } from 'sonner'
 import { useAnalytics } from '@/hooks/use-analytics'
+import { createMilestoneTracker, type TradeRef } from '@/lib/analytics'
 import { recordReplaySession } from '@/hooks/use-gym-progress'
 import { useStockData } from '@/hooks/use-stock-data'
 import { useUserPortfolio } from '@/hooks/use-user-portfolio'
@@ -237,7 +238,27 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
   // "Leoš's Review" sidebar panel (submission mode)
   const [reviewOpen, setReviewOpen] = useState(true)
   const controlsTimer = useRef<NodeJS.Timeout | null>(null)
-  const { trackEvent } = useAnalytics()
+  const {
+    trackReplayStart,
+    trackReplayProgress,
+    trackReplayComplete,
+    trackReplayExit,
+  } = useAnalytics()
+
+  /* ── Replay engagement tracking ── */
+  // "Opened a replay" and "watched a replay" are very different signals, so
+  // quarter-way milestones are emitted as the visitor advances, and an exit
+  // event records how far they got if they close early.
+  const milestonesRef = useRef(createMilestoneTracker([25, 50, 75]))
+  const replayStartedRef = useRef(false)
+  const replayCompletedRef = useRef(false)
+  /** Kept in a ref so the unmount cleanup can read it without re-subscribing. */
+  const tradeRefForAnalytics = useRef<TradeRef>({ tradeId })
+  tradeRefForAnalytics.current = {
+    tradeId,
+    ticker: meta?.ticker,
+    tradeType: meta?.tradeType,
+  }
 
   /* ── Gym progress: study-time tracking + session reporting ── */
   // Active seconds accumulate only while the tab is visible. The session is
@@ -1164,8 +1185,14 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
     setCandleIdx(startIdx)
     setPlaying(false)
     setShowSetupPrompt(true)
-    trackEvent('replay_start', { ticker: meta?.ticker ?? '' })
-  }, [meta?.ticker, trackEvent, entryCandleIdx])
+
+    milestonesRef.current.reset()
+    replayStartedRef.current = true
+    replayCompletedRef.current = false
+    trackReplayStart(tradeRefForAnalytics.current, source)
+    // `trackReplayStart` is a stable module function, so this callback is not
+    // rebuilt on every render — which previously re-fired replay_start.
+  }, [entryCandleIdx, source, trackReplayStart])
 
   const jumpToCandle = useCallback((index: number) => {
     portfolio.cancelAction()
@@ -1217,6 +1244,35 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
   const isComplete = liveMetrics.tradeCompleted && candleIdx >= candles.length - 1
 
   // No auto-transition to done — user clicks "Go to Summary" button
+
+  /* ── Replay depth ── */
+  // Measured from where playback actually begins (a few candles before entry),
+  // not from candle zero, so 0–100% matches what the visitor works through.
+  const replayStartIdx = Math.max(0, entryCandleIdx - PRE_ENTRY_CANDLES)
+  const replaySpan = candles.length - 1 - replayStartIdx
+  const replayProgress = replaySpan > 0 ? ((candleIdx - replayStartIdx) / replaySpan) * 100 : 0
+
+  useEffect(() => {
+    if (phase !== 'replay' || !replayStartedRef.current) return
+    for (const milestone of milestonesRef.current.crossed(replayProgress)) {
+      trackReplayProgress(tradeRefForAnalytics.current, milestone)
+    }
+  }, [phase, replayProgress, trackReplayProgress])
+
+  // Closing without reaching the summary is the drop-off signal; the furthest
+  // milestone tells us where interest ran out.
+  useEffect(() => {
+    // The tracker instance is created once and never reassigned, so capturing
+    // it here is equivalent to reading the ref in the cleanup — and keeps
+    // react-hooks/exhaustive-deps satisfied.
+    const milestones = milestonesRef.current
+    const tradeRef = tradeRefForAnalytics
+
+    return () => {
+      if (!replayStartedRef.current || replayCompletedRef.current) return
+      trackReplayExit(tradeRef.current, milestones.furthest())
+    }
+  }, [trackReplayExit])
 
   const latestChart = useMemo((): ReplayChart | null => {
     if (!currentCandleDate) return null
@@ -1804,7 +1860,8 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                             <Button
                               onClick={() => {
                                 setPhase('done')
-                                trackEvent('replay_complete', { ticker: meta?.ticker ?? '' })
+                                replayCompletedRef.current = true
+                                trackReplayComplete(tradeRefForAnalytics.current)
                                 reportCompletion()
                               }}
                               className="bg-white text-black hover:bg-gray-200"

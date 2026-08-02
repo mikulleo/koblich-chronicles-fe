@@ -15,6 +15,8 @@ interface PayPalButtonProps {
   onSuccess: (details: any) => void
   onError: (error: any) => void
   onCancel: () => void
+  /** Fired once the PayPal buttons are actually rendered and clickable. */
+  onReady?: () => void
 }
 
 // Track which PayPal SDK script is currently loaded (globally, since only one can exist)
@@ -77,6 +79,7 @@ export default function PayPalButton({
   onSuccess,
   onError,
   onCancel,
+  onReady,
 }: PayPalButtonProps) {
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
   const containerRef = useRef<HTMLDivElement>(null)
@@ -86,9 +89,11 @@ export default function PayPalButton({
   const onSuccessRef = useRef(onSuccess)
   const onErrorRef = useRef(onError)
   const onCancelRef = useRef(onCancel)
+  const onReadyRef = useRef(onReady)
   onSuccessRef.current = onSuccess
   onErrorRef.current = onError
   onCancelRef.current = onCancel
+  onReadyRef.current = onReady
 
   const scriptStatus = usePayPalScript(currency, clientId)
 
@@ -147,13 +152,18 @@ export default function PayPalButton({
 
     buttonsInstanceRef.current = buttons
 
-    buttons.render(containerRef.current).catch((err: any) => {
-      // Ignore render errors if component unmounted (container removed)
-      if (containerRef.current) {
-        console.error('Error rendering PayPal buttons:', err)
-        onErrorRef.current(err)
-      }
-    })
+    buttons
+      .render(containerRef.current)
+      .then(() => {
+        onReadyRef.current?.()
+      })
+      .catch((err: any) => {
+        // Ignore render errors if component unmounted (container removed)
+        if (containerRef.current) {
+          console.error('Error rendering PayPal buttons:', err)
+          onErrorRef.current(err)
+        }
+      })
 
     return () => {
       buttons.close?.()

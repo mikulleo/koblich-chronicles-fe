@@ -11,7 +11,7 @@ import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
 import { PdfExportDialog } from "@/components/exports/pdf-export-dialog"
-import { sendGTMEvent } from '@next/third-parties/google'
+import { trackNavClick } from "@/lib/analytics"
 
 // Animation variants
 const fadeIn = {
@@ -86,11 +86,9 @@ function Feature3DCard({ icon: Icon, title, desc, href, color }: {
             <Link
               href={href}
               onClick={() => {
-                sendGTMEvent({
-                  event: 'feature_card_click',
-                  feature_title: title,
-                  feature_href: href,
-                })
+                // Previously sent via sendGTMEvent, which never fired: GTM was
+                // only configured in development.
+                trackNavClick({ label: title, href, source: 'home_feature_card' })
               }}
             >
               View {title}
@@ -296,7 +294,7 @@ Past performance is not indicative of future results. Markets change constantly,
                 </p>
                 {/* Main donation dialog and PDF export */}
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <DonationDialog />
+                  <DonationDialog placement="home_support_section" />
                   <PdfExportDialog />
                 </div>
 
