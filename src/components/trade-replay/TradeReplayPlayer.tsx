@@ -111,6 +111,28 @@ const pickRandom = <T,>(pool: T[], count: number, rng: () => number): T[] => {
 }
 
 /* ------------------------------------------------------------------ */
+/* Spoiler preference                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The scrubber, the entry tick and the intro event count all read ahead of
+ * playback: even greyed out, they announce how many executions and stop
+ * adjustments are still coming and roughly when. That is a spoiler for anyone
+ * working the trade out for themselves, so it is opt-out and remembered
+ * across replays.
+ */
+const HIDE_SPOILERS_KEY = 'replay-hide-spoilers'
+
+const readHideSpoilers = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(HIDE_SPOILERS_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Small UI helpers                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -221,6 +243,7 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
   // Submissions replay as a walkthrough — the Think Along guessing game
   // compares against "Leoš's Call", which is wrong framing for a user's trade
   const [predictions, setPredictions] = useState(!isSubmission)  // prediction mode toggle
+  const [hideSpoilers, setHideSpoilers] = useState(readHideSpoilers)
   const [candlestickView, setCandlestickView] = useState(true)
   const [chartInterval, setChartInterval] = useState<'1d' | '1wk'>('1d')
   const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick')
@@ -1206,6 +1229,18 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
     setSpeedIdx((prev) => (prev + 1) % CANDLE_SPEED_OPTIONS.length)
   }, [])
 
+  const toggleHideSpoilers = useCallback(() => {
+    setHideSpoilers((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem(HIDE_SPOILERS_KEY, String(next))
+      } catch {
+        // private mode / storage disabled — the preference just won't persist
+      }
+      return next
+    })
+  }, [])
+
   /* ── Keyboard shortcuts ── */
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -1228,6 +1263,9 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
           break
         case 'p': case 'P':
           if (!isSubmission) setPredictions((p) => !p)
+          break
+        case 's': case 'S':
+          toggleHideSpoilers()
           break
         case 'r': case 'R':
           restart()
@@ -1355,7 +1393,8 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                     {s(meta.tradeType).toUpperCase()} &bull; {isSubmission ? 'User Submission' : s(meta.setupType) || 'Swing Trade'}
                   </p>
                   <p className="text-gray-500 mb-10">
-                    {s(Number(meta.duration) + 1)} days &bull; {s(events.length)} events
+                    {s(Number(meta.duration) + 1)} days
+                    {!hideSpoilers && <> &bull; {s(events.length)} events</>}
                   </p>
 
                   <div className="flex gap-4 justify-center mb-10">
@@ -1369,6 +1408,7 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                     <span>Space = Play/Pause</span>
                     <span>Arrows = Step candle</span>
                     {!isSubmission && <span>P = Think Along</span>}
+                    <span>S = {hideSpoilers ? 'Show' : 'Hide'} timeline spoilers</span>
                     <span>R = Restart</span>
                     <span>Esc = Close</span>
                   </div>
@@ -2183,9 +2223,9 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
               </div>
             )}
 
-            {/* ── Think Along toggle (not offered for user submissions) ── */}
-            {!isSubmission && (
-              <div className="p-3 border-t border-gray-800">
+            {/* ── Toggles: Think Along (not offered for user submissions) + spoilers ── */}
+            <div className="p-3 border-t border-gray-800 space-y-1">
+              {!isSubmission && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2195,8 +2235,25 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                   {predictions ? <EyeOff className="h-3 w-3 mr-2" /> : <Eye className="h-3 w-3 mr-2" />}
                   {predictions ? 'Think Along ON' : 'Think Along'}
                 </Button>
-              </div>
-            )}
+              )}
+              {/* Named after what it actually hides — "Hide Spoilers" alone left you
+                  hunting the screen for what changed. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleHideSpoilers}
+                title={`${hideSpoilers ? 'Show' : 'Hide'} the upcoming entries, adds, stop moves and sells on the timeline below (S)`}
+                className={cn('w-full text-xs', hideSpoilers ? 'text-amber-400 hover:text-amber-300' : 'text-gray-500 hover:text-gray-400')}
+              >
+                {hideSpoilers ? <EyeOff className="h-3 w-3 mr-2" /> : <Eye className="h-3 w-3 mr-2" />}
+                {hideSpoilers ? 'Timeline Spoilers Hidden' : 'Hide Timeline Spoilers'}
+              </Button>
+              <p className="px-2 text-[10px] leading-snug text-gray-600">
+                {hideSpoilers
+                  ? 'Upcoming events stay off the bar below until you reach them.'
+                  : 'The bar below marks every upcoming entry, add, stop move and sell.'}
+              </p>
+            </div>
           </motion.div>
         )}
       </div>
@@ -2218,7 +2275,7 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                 transition={{ duration: 0.15 }}
               />
 
-              {candles.length > 0 && entryCandleIdx > 0 && (
+              {candles.length > 0 && entryCandleIdx > 0 && (!hideSpoilers || candleIdx >= entryCandleIdx) && (
                 <div
                   className="absolute w-0.5 h-3 bg-green-500 rounded-full z-10"
                   style={{ left: `${(entryCandleIdx / (candles.length - 1)) * 100}%` }}
@@ -2230,6 +2287,9 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                 const evtDate = evt.date.split('T')[0]
                 const ci = candles.findIndex((c) => c.time >= evtDate)
                 if (ci < 0) return null
+                // Spoilers hidden: a dot appears only once playback has reached it,
+                // so it stays useful for jumping back without previewing what's ahead.
+                if (hideSpoilers && ci > candleIdx) return null
                 const pos = (ci / (candles.length - 1)) * 100
                 return (
                   <button
