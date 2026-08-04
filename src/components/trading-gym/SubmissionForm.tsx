@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, Loader2, X } from 'lucide-react'
@@ -149,7 +150,7 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
   ) =>
     rows.map((row, i) => (
       <div key={`${kind}-${i}`} className="rounded-lg border bg-muted/20 p-3 space-y-2">
-        <div className={cn('grid gap-2', kind === 'exit' ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div className={cn('grid gap-2', kind === 'exit' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2')}>
           <div>
             <label className={labelCls}>Date</label>
             <input type="date" value={row.date} onChange={(e) => updateRow(setter, i, { date: e.target.value })} className={inputCls} />
@@ -180,9 +181,21 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
       </div>
     ))
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-3xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+  if (typeof document === 'undefined') return null
+
+  // Portalled to <body>: the gym renders this section inside a framer-motion
+  // div that animates `filter`/`scale`, and both make an element the containing
+  // block for fixed-position children — anchored there, the overlay sizes
+  // against the tall section instead of the viewport and its footer (with the
+  // submit button) ends up unreachable. Same trap as GymProgress's showcase and
+  // TradeReplayPlayer. `data-theme` rides along because the tokens this form
+  // uses (bg-card, text-foreground) are scoped to the gym root we just escaped.
+  return createPortal(
+    <div
+      data-theme="dark"
+      className="dark fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+    >
+      <div className="w-full max-w-3xl max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden rounded-2xl border bg-card text-foreground shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div>
             <h3 className="text-lg font-bold">{initial ? 'Edit Submission' : 'Submit a Ticker'}</h3>
@@ -196,7 +209,7 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-          <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          <div className="p-6 space-y-5 overflow-y-auto overscroll-contain flex-1">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="col-span-1">
               <label className={labelCls}>Ticker *</label>
@@ -222,7 +235,7 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Entry price *</label>
               <input type="number" step="0.01" min="0" value={entryPrice} onChange={(e) => setEntryPrice(e.target.value)} className={inputCls} placeholder="0.00" />
@@ -320,6 +333,7 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
