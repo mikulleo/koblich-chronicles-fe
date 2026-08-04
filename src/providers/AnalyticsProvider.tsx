@@ -90,8 +90,15 @@ export function AnalyticsProvider({
     [consent.analytics, consent.marketing, openConsentManager],
   )
 
+  // `consentStatus === 'denied'` has to veto loading, not just gate our own
+  // events. gtag.js emits enhanced-measurement hits (scroll, outbound click,
+  // file download, site search) from inside the library, so they never pass
+  // through `track()` and its consent check — leaving the script mounted for
+  // someone who pressed "Reject optional" collected exactly the data the button
+  // says it will not. It cannot unload a library that already executed, but a
+  // returning visitor with a stored rejection now never loads it at all.
   const shouldLoadGa =
-    !!gaMeasurementId && (consent.analytics || (CONSENT_MODE === 'advanced' && consentStatus !== 'granted'))
+    !!gaMeasurementId && consentStatus !== 'denied' && (consent.analytics || CONSENT_MODE === 'advanced')
 
   return (
     // Rendered unconditionally. An earlier version returned bare `children`

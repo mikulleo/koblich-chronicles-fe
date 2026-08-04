@@ -6,6 +6,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-moti
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { trackStoryEventOpen } from '@/lib/analytics'
 import TimelineEvent, {
   EventCardBack,
   EVENT_CARD_HEIGHT,
@@ -40,9 +41,14 @@ const jitter = (i: number) => {
 export default function EventStack({
   events,
   className,
+  tradeId,
+  ticker,
 }: {
   events: TimelineEventLike[]
   className?: string
+  /** Only used for analytics — which timeline cards people actually turn to. */
+  tradeId?: string
+  ticker?: string
 }) {
   const [active, setActive] = useState(0)
   const [dir, setDir] = useState(1)
@@ -73,6 +79,23 @@ export default function EventStack({
   useEffect(() => {
     setActive((i) => Math.min(i, Math.max(total - 1, 0)))
   }, [total])
+
+  /* Which card the visitor turned to. Reported on change rather than on mount —
+     the front card of the deck is displayed, not opened — and guarded by the
+     last reported index so a re-render (or StrictMode's double effect) cannot
+     count the same card twice. */
+  const lastReported = useRef(0)
+  useEffect(() => {
+    if (active === lastReported.current) return
+    lastReported.current = active
+
+    const event = events[active]
+    if (!event || !tradeId) return
+    trackStoryEventOpen({ tradeId, ticker, eventType: event.type })
+    // `events` is only read at the reported index; adding it would re-fire on
+    // every re-fetch that produces a new array identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, tradeId, ticker])
 
   const goTo = useCallback(
     (next: number) => {

@@ -89,6 +89,19 @@ export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: Chart
     }
   }, [currentIndex, currentChart]);
 
+  // Which charts actually get looked at. Keyed on the chart id rather than the
+  // carousel index so re-renders and reordering do not re-count a chart that is
+  // already on screen, and held in a ref because StrictMode runs effect bodies
+  // twice on mount — a dependency array alone counts the first chart twice.
+  const lastViewedChartId = useRef<string | null>(null)
+  useEffect(() => {
+    const id = currentChart?.id
+    if (!id || lastViewedChartId.current === id) return
+    lastViewedChartId.current = id
+    analytics.trackChartView({ chartId: id, ticker: currentChart?.ticker })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChart?.id])
+
   // Handle the measurement complete callback safely
   const handleMeasurementComplete = useCallback((measurement: Measurement) => {
     if (!currentChart) return;

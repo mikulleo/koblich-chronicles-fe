@@ -21,7 +21,7 @@
  * matters: these end up in React effect dependency arrays.
  */
 
-import { track, type AnalyticsParams } from './core'
+import { isTrackingDenied, track, type AnalyticsParams } from './core'
 import { pageSection, pageTemplate } from './paths'
 
 /** Where a trade was opened from — keeps surfaces comparable in one report. */
@@ -53,38 +53,81 @@ export type DonationStep = (typeof DONATION_STEPS)[number]
 
 const SESSION_ENTRY_KEY = 'kc:analytics:entry-recorded'
 
+/** GA4 closes a session after 30 minutes without an event. `is_entrance` has to
+ *  use the same window or it does not mean the same thing as a GA4 landing page. */
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000
+
+/** The last URL we reported, which is the referrer of the next one. */
+let lastPageLocation: string | null = null
+
 /**
  * Dispatch a `page_view`.
  *
- * `is_entrance` marks the first page_view of a browsing session, which makes
- * "exact pages entered" a direct report rather than relying on GA4 inferring a
- * landing page from session ordering.
+ * `is_entrance` marks the first page_view of a session, which makes "exact pages
+ * entered" a direct report rather than relying on GA4 inferring a landing page
+ * from session ordering.
  */
 export function trackPageView(input: {
   pathname: string
   search?: string
   title?: string
 }): void {
+  // Both `claimSessionEntry()` and `lastPageLocation` have side effects, and
+  // they are evaluated before `track()` gets a chance to drop the hit. A page
+  // view discarded for lack of consent would otherwise burn the session's one
+  // entrance marker, so the visitor's real landing page — the next one, once
+  // they accept — would report `is_entrance: false`.
+  if (isTrackingDenied()) return
+
   const { pathname, search, title } = input
   const path = search ? `${pathname}?${search}` : pathname
+  const location = typeof window !== 'undefined' ? window.location.href : path
 
   track('page_view', {
-    page_location: typeof window !== 'undefined' ? window.location.href : path,
+    page_location: location,
     page_title: title ?? (typeof document !== 'undefined' ? document.title : undefined),
-    page_referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
+    page_referrer: pageReferrer(),
     page_template: pageTemplate(pathname),
     page_section: pageSection(pathname),
     is_entrance: claimSessionEntry(),
   })
+
+  lastPageLocation = location
 }
 
-/** True exactly once per browsing session. */
+/**
+ * `document.referrer` is fixed for the lifetime of the document, so on a
+ * client-side navigation it still points at whatever brought the visitor to the
+ * *first* page of the session. Repeating it on every page_view re-asserts an
+ * external referral that did not happen and leaves GA4 with no previous-page
+ * link between in-app views. Once we have sent one page_view, the URL of that
+ * view is the real referrer.
+ */
+function pageReferrer(): string | undefined {
+  if (lastPageLocation) return lastPageLocation
+  if (typeof document === 'undefined') return undefined
+  return document.referrer || undefined
+}
+
+/**
+ * True on the first page_view of a session.
+ *
+ * Stored as a timestamp, not a flag: `sessionStorage` survives for as long as
+ * the tab is open, which is unbounded, while a GA4 session ends after 30 idle
+ * minutes. A visitor who left the tab open over lunch used to come back into a
+ * fresh GA4 session whose landing page was never marked at all.
+ */
 function claimSessionEntry(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    if (window.sessionStorage.getItem(SESSION_ENTRY_KEY)) return false
-    window.sessionStorage.setItem(SESSION_ENTRY_KEY, '1')
-    return true
+    // Older builds stored the literal '1'; Number('1') is far enough in the past
+    // to read as expired, which is the behaviour we want for a stale marker.
+    const previous = Number(window.sessionStorage.getItem(SESSION_ENTRY_KEY))
+    const now = Date.now()
+    const isEntrance = !Number.isFinite(previous) || now - previous > SESSION_TIMEOUT_MS
+
+    window.sessionStorage.setItem(SESSION_ENTRY_KEY, String(now))
+    return isEntrance
   } catch {
     // Private browsing / storage disabled — don't guess.
     return false
@@ -489,8 +532,26 @@ function markSent(transactionId: string): void {
 /* Exports & misc                                                      */
 /* ------------------------------------------------------------------ */
 
-export function trackFileDownload(input: { filename: string; status: string }): void {
-  track('file_download', { file_name: input.filename, download_status: input.status })
+/**
+ * One event for the whole download lifecycle, keyed by `download_status`.
+ *
+ * The alternative — a distinct event name per outcome — spends four of GA4's
+ * event-name slots, needs four separate registrations, and cannot be read as a
+ * funnel, because GA4 compares parameter values within an event far more easily
+ * than it compares event names.
+ */
+export function trackFileDownload(input: {
+  filename: string
+  status: 'started' | 'complete' | 'cancelled' | 'error'
+  bytes?: number
+  reason?: string
+}): void {
+  track('file_download', {
+    file_name: input.filename,
+    download_status: input.status,
+    file_size_bytes: input.bytes,
+    error_reason: input.reason,
+  })
 }
 
 export function trackSearch(input: { term: string; area: string }): void {

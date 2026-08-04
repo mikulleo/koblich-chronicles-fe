@@ -29,6 +29,7 @@ import Image from 'next/image'
 import { Media, Ticker } from '@/lib/types'
 import { MarketSurgeAttribution } from '@/components/charts/marketsurge-attribution'
 import { chartViewerUrl } from '@/lib/charts/chart-image-url'
+import { trackTradeView } from '@/lib/analytics'
 
 
 /* ------------------------------------------------------------------ */
@@ -210,6 +211,8 @@ function GroupedTimelineItem({
   compareCharts,
   showChartSlot,
   showEventSlot,
+  tradeId,
+  ticker,
 }: {
   group: TimelineGroup
   selectedChart: any | null
@@ -218,6 +221,9 @@ function GroupedTimelineItem({
   compareCharts: [any | null, any | null]
   showChartSlot: boolean
   showEventSlot: boolean
+  /** Analytics only — attributes `story_event_open` to a trade. */
+  tradeId: string
+  ticker?: string
 }) {
   const [idx, setIdx] = useState(0)
   const charts = group.charts
@@ -305,7 +311,7 @@ function GroupedTimelineItem({
 
       {showEventSlot && (
         <div style={{ minHeight: EVENT_STACK_HEIGHT }}>
-          <EventStack events={group.events} />
+          <EventStack events={group.events} tradeId={tradeId} ticker={ticker} />
         </div>
       )}
     </div>
@@ -598,6 +604,18 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
     fetchTradeStory()
   }, [fetchTradeStory])
 
+  /* analytics ------------------------------------------------------- */
+  // Emitted once the story has loaded, because that is the first point at which
+  // the ticker is known — the ecommerce item is what makes GA4's Items report
+  // rank stories by ticker instead of by opaque document ID.
+  const viewedTicker = story?.metadata?.ticker?.symbol
+  useEffect(() => {
+    if (!viewedTicker) return
+    trackTradeView({ tradeId, ticker: viewedTicker, tradeType: story?.metadata?.tradeType }, 'story')
+    // Keyed on the ticker so a re-fetch of the same trade does not re-count.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradeId, viewedTicker])
+
   /* compare helpers */
   const toggleCompare = (c: any) => {
     setCompareMode(true)
@@ -778,6 +796,8 @@ export default function TradeStoryTimeline({ tradeId }: TradeStoryTimelineProps)
                     compareCharts={compareCharts}
                     showChartSlot={anyCharts}
                     showEventSlot={anyEvents}
+                    tradeId={tradeId}
+                    ticker={viewedTicker}
                   />
                   {i < groups.length - 1 && (
                     <ArrowRight

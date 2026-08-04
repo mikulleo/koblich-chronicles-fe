@@ -29,26 +29,32 @@ export function PdfExportDialog() {
 
   const handleStartDownload = useCallback(() => {
     setConfirmed(true)
-    analytics.trackEvent('pdf_download_started', { filename: PDF_FILENAME })
+    analytics.trackFileDownload({ filename: PDF_FILENAME, status: 'started' })
     startDownload(PDF_URL, PDF_FILENAME)
   }, [startDownload, analytics])
 
-  // Show toast notifications on completion/error and track analytics
+  // Show toast notifications on completion/error and track analytics.
+  //
+  // One `file_download` event carrying `download_status` rather than four
+  // separate event names: the four names were also undocumented, so nothing in
+  // GA4 was ever configured to read them.
   useEffect(() => {
     if (progress.status === "complete") {
       toast.success("PDF downloaded successfully!")
-      analytics.trackEvent('pdf_download_completed', {
+      analytics.trackFileDownload({
         filename: PDF_FILENAME,
+        status: 'complete',
         bytes: progress.totalBytes,
       })
     } else if (progress.status === "error") {
       toast.error(progress.error || "Download failed")
-      analytics.trackEvent('pdf_download_error', {
+      analytics.trackFileDownload({
         filename: PDF_FILENAME,
-        error: progress.error,
+        status: 'error',
+        reason: progress.error || 'unknown',
       })
     } else if (progress.status === "cancelled") {
-      analytics.trackEvent('pdf_download_cancelled', { filename: PDF_FILENAME })
+      analytics.trackFileDownload({ filename: PDF_FILENAME, status: 'cancelled' })
     }
   }, [progress.status, progress.error, progress.totalBytes, analytics])
 

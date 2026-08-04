@@ -129,10 +129,23 @@ export function setConsentDefaults(): void {
   ensureStub()
 }
 
-/** Wire up the measurement ID. Called once GA is allowed to load. */
+/**
+ * Wire up the measurement ID. Called once GA is allowed to load.
+ *
+ * Refuses outright if consent has already been declined. The provider's own
+ * veto cannot cover this on its own: on the first commit the stored choice has
+ * not been read yet, so `<GoogleAnalytics>` is already mounted and this effect
+ * has already run by the time the resulting re-render could unmount it. The
+ * cookie banner's effect runs before it in that same commit, though, so the
+ * module-level status here is authoritative and available in time.
+ *
+ * Withholding `config` is what actually stops collection: an unconfigured
+ * gtag.js has no stream to report to, so enhanced measurement — which the
+ * library emits by itself, outside `track()` — stays silent too.
+ */
 export function configure(measurementId: string, opts?: { debug?: boolean }): void {
   const gtag = ensureStub()
-  if (!gtag || configured) return
+  if (!gtag || configured || consentStatus === 'denied') return
 
   debugEnabled = opts?.debug ?? false
 
@@ -164,6 +177,8 @@ export function setAnalyticsConsent(status: ConsentStatus): void {
     gtag('consent', 'update', { analytics_storage: 'denied' })
     // Never send what the visitor explicitly declined.
     buffer = []
+    // Withdrawal has to detach the identity too, not merely stop new events.
+    setUser(null)
     // Consent Mode stops gtag *using* cookies but leaves existing ones in
     // place. Withdrawing consent should actually remove them.
     clearAnalyticsCookies()
@@ -278,11 +293,17 @@ export function setUser(user: { id: string; roles?: string[] } | null): void {
   const gtag = ensureStub()
   if (!gtag) return
 
-  if (user) {
-    gtag('set', { user_id: user.id })
+  // Never attach an identity once consent has been declined. `gtag('set')`
+  // installs the id on the tag itself rather than on one hit, so it would ride
+  // along on enhanced-measurement events, which the library emits directly and
+  // `track()` therefore cannot gate.
+  const identity = consentStatus === 'denied' ? null : user
+
+  if (identity) {
+    gtag('set', { user_id: identity.id })
     gtag('set', 'user_properties', {
       logged_in: 'true',
-      account_role: user.roles?.[0] ?? 'user',
+      account_role: identity.roles?.[0] ?? 'user',
     })
   } else {
     gtag('set', { user_id: null })
@@ -291,6 +312,18 @@ export function setUser(user: { id: string; roles?: string[] } | null): void {
       account_role: 'anonymous',
     })
   }
+}
+
+/**
+ * Whether a hit handed to `track()` right now would be discarded outright.
+ *
+ * Distinct from "cannot send yet": an event fired before GA is configured is
+ * buffered and delivered later, so it still counts. Only an explicit denial
+ * throws hits away. Callers whose parameters have side effects — claiming a
+ * once-per-session marker, say — need to know the difference.
+ */
+export function isTrackingDenied(): boolean {
+  return consentStatus === 'denied'
 }
 
 /** Test/debug helper — current transport state. */

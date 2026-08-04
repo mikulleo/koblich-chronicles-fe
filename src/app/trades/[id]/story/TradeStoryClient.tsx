@@ -2,9 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
-import { useEffect } from 'react'
-
-import { useAnalytics } from '@/hooks/use-analytics'
 
 const TradeStoryTimeline = dynamic(
   () => import('@/components/trade-story/TradeStoryTimeline'),
@@ -20,14 +17,9 @@ const TradeStoryTimeline = dynamic(
 )
 
 export default function TradeStoryClient({ tradeId }: { tradeId: string }) {
-  const { trackTradeView } = useAnalytics()
-
-  // The page_view already records the URL; this adds the trade as an ecommerce
-  // item so GA4's item reports rank stories by popularity without any custom
-  // dimension setup.
-  useEffect(() => {
-    trackTradeView({ tradeId }, 'story')
-  }, [tradeId, trackTradeView])
-
+  // `view_item` is emitted by TradeStoryTimeline instead of here: it is the
+  // component that loads the trade, and without the ticker the ecommerce item
+  // falls back to the raw document ID, which makes GA4's Items report a list of
+  // opaque IDs rather than tickers.
   return <TradeStoryTimeline tradeId={tradeId} />
 }
