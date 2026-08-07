@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { CandleData, SplitEvent } from '@/lib/types/candlestick'
+import type { CandleData, SplitEvent, StockMeta } from '@/lib/types/candlestick'
 
 interface UseStockDataOptions {
   symbol: string
@@ -15,6 +15,8 @@ interface UseStockDataOptions {
 interface UseStockDataResult {
   candles: CandleData[]
   splits: SplitEvent[]
+  /** Listing info (currency, exchange) for the fetched symbol — null until loaded */
+  meta: StockMeta | null
   isLoading: boolean
   error: string | null
 }
@@ -29,6 +31,7 @@ export function useStockData({
 }: UseStockDataOptions): UseStockDataResult {
   const [candles, setCandles] = useState<CandleData[]>([])
   const [splits, setSplits] = useState<SplitEvent[]>([])
+  const [meta, setMeta] = useState<StockMeta | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -63,6 +66,7 @@ export function useStockData({
         if (json.error) throw new Error(json.error)
         setCandles(json.data)
         setSplits(Array.isArray(json.splits) ? json.splits : [])
+        setMeta(json.meta ?? null)
         setIsLoading(false)
       })
       .catch((err) => {
@@ -74,5 +78,5 @@ export function useStockData({
     return () => controller.abort()
   }, [symbol, startDate, endDate, buffer, interval, enabled])
 
-  return { candles, splits, isLoading, error }
+  return { candles, splits, meta, isLoading, error }
 }

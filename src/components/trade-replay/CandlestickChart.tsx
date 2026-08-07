@@ -68,6 +68,7 @@ export default function CandlestickChart({
   interval = '1d',
   chartStyle = 'candlestick',
   symbol,
+  currency,
 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -362,8 +363,13 @@ export default function CandlestickChart({
       <div ref={containerRef} className="w-full rounded-lg overflow-hidden" />
       {/* Symbol watermark */}
       {symbol && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex items-baseline gap-1.5">
           <span className="text-gray-600/50 font-mono text-2xl font-bold tracking-wider select-none">{symbol}</span>
+          {currency && (
+            <span className="text-gray-600/40 font-mono text-xs font-semibold tracking-wider select-none">
+              {currency}
+            </span>
+          )}
         </div>
       )}
       {/* MA Legend */}

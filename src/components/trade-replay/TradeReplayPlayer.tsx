@@ -368,23 +368,27 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
   }, [lastExitDate])
 
   // Daily candles — always fetched, used for playback engine. Also returns split events.
-  const { candles: dailyCandles, splits, isLoading: dailyCandlesLoading, error: dailyCandlesError } = useStockData({
-    symbol: rawTrade?.symbol ?? '',
+  // Non-US listings need the exchange-suffixed symbol (CEZ.PR) to resolve; the
+  // plain symbol stays for display.
+  const dataSymbol = rawTrade?.dataSymbol || rawTrade?.symbol || ''
+
+  const { candles: dailyCandles, splits, meta: stockMeta, isLoading: dailyCandlesLoading, error: dailyCandlesError } = useStockData({
+    symbol: dataSymbol,
     startDate: rawTrade?.entryDate ?? '',
     endDate: chartEndDate,
     buffer: 500,
     interval: '1d',
-    enabled: !!rawTrade?.symbol && !!rawTrade?.entryDate && candlestickView,
+    enabled: !!dataSymbol && !!rawTrade?.entryDate && candlestickView,
   })
 
   // Weekly candles — fetched only when weekly view is active
   const { candles: weeklyCandles, isLoading: weeklyLoading } = useStockData({
-    symbol: rawTrade?.symbol ?? '',
+    symbol: dataSymbol,
     startDate: rawTrade?.entryDate ?? '',
     endDate: chartEndDate,
     buffer: 1500,
     interval: '1wk',
-    enabled: !!rawTrade?.symbol && !!rawTrade?.entryDate && candlestickView && chartInterval === '1wk',
+    enabled: !!dataSymbol && !!rawTrade?.entryDate && candlestickView && chartInterval === '1wk',
   })
 
   /* ── Split-adjust trade prices to match the chart (Yahoo returns split-adjusted OHLC) ── */
@@ -1389,6 +1393,15 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                     {isSubmission ? 'User Submitted Trade' : 'Trade Replay'}
                   </p>
                   <h1 className="text-6xl font-bold text-white mb-3">{s(meta.ticker)}</h1>
+                  {stockMeta?.exchange && (
+                    <p className="text-sm text-gray-500 mb-2 font-mono tracking-wide">
+                      {stockMeta.exchange}
+                      {stockMeta.currency && <> &bull; {stockMeta.currency}</>}
+                      {stockMeta.quotedIn && (
+                        <span className="text-gray-600"> (quoted in {stockMeta.quotedIn}, shown in {stockMeta.currency})</span>
+                      )}
+                    </p>
+                  )}
                   <p className="text-xl text-gray-400 mb-2">
                     {s(meta.tradeType).toUpperCase()} &bull; {isSubmission ? 'User Submission' : s(meta.setupType) || 'Swing Trade'}
                   </p>
@@ -1566,6 +1579,7 @@ function ReplayInner({ tradeId, onClose, source = 'trade' }: TradeReplayPlayerPr
                         interval={chartInterval}
                         chartStyle={chartStyle}
                         symbol={tradeDetails?.tickerSymbol}
+                        currency={stockMeta?.currency}
                       />
                     </div>
 

@@ -108,7 +108,13 @@ export interface ReplayTrade {
   entryPrice: number
   stopLoss: number
   type: string
+  /** Display symbol, e.g. CEZ */
   symbol: string
+  /**
+   * Symbol used to fetch chart data. Non-US listings carry an exchange suffix
+   * (CEZ.PR) that the plain symbol does not. Falls back to `symbol`.
+   */
+  dataSymbol: string
   totalShares: number
   stops: Array<{ date: string; price: number; notes: string }>
   exits: Array<{ date: string; price: number; shares: number; reason: string; notes: string }>
@@ -257,6 +263,10 @@ export function useTradeReplayData(tradeId: string, source: ReplaySource = 'trad
       /* ── Extract trade details (flat) ── */
       let flatTrade: ReplayTrade | null = null
       const tickerSymbol = flatMeta.ticker
+      // Set in the admin from the ticker's market; absent on submissions, where the
+      // user picks an already-suffixed symbol.
+      const providerSymbol =
+        str(md.ticker?.providerSymbol) || str(tradeRaw?.ticker?.providerSymbol) || tickerSymbol
       if (tradeRaw && tickerSymbol) {
         flatTrade = {
           entryDate: toDate(tradeRaw.entryDate),
@@ -264,6 +274,7 @@ export function useTradeReplayData(tradeId: string, source: ReplaySource = 'trad
           stopLoss: num(tradeRaw.initialStopLoss),
           type: str(tradeRaw.type),
           symbol: tickerSymbol,
+          dataSymbol: providerSymbol,
           totalShares: num(tradeRaw.shares),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           stops: (tradeRaw.modifiedStops ?? []).map((s: any) => ({

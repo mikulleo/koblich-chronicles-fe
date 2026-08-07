@@ -1,27 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { CandleData, SplitEvent } from '@/lib/types/candlestick'
+import type { CandleData, SplitEvent, StockMeta } from '@/lib/types/candlestick'
+import { getYahooFinance, resolveCurrency } from '@/lib/server/yahoo-finance'
 
 // In-memory cache: key → { data, timestamp }
-const cache = new Map<string, { data: CandleData[]; splits: SplitEvent[]; timestamp: number }>()
+const cache = new Map<
+  string,
+  { data: CandleData[]; splits: SplitEvent[]; meta: StockMeta; timestamp: number }
+>()
 const CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
-
-// Singleton yahoo-finance2 v3 instance (created lazily)
-let yfInstance: any = null
-
-async function getYahooFinance() {
-  if (!yfInstance) {
-    // Suppress the "Unsupported environment" warning from yahoo-finance2
-    const origWarn = console.warn
-    console.warn = (...args: unknown[]) => {
-      if (typeof args[0] === 'string' && args[0].includes('yahoo-finance2')) return
-      origWarn.apply(console, args)
-    }
-    const YahooFinance = (await import('yahoo-finance2')).default
-    yfInstance = new YahooFinance()
-    console.warn = origWarn
-  }
-  return yfInstance
-}
 
 function getCacheKey(symbol: string, startDate: string, endDate: string): string {
   return `${symbol}:${startDate}:${endDate}`
@@ -62,7 +48,7 @@ export async function GET(request: NextRequest) {
   // Check cache
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return NextResponse.json({ data: cached.data, splits: cached.splits })
+    return NextResponse.json({ data: cached.data, splits: cached.splits, meta: cached.meta })
   }
 
   try {
@@ -83,16 +69,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Non-US listings may be quoted in a minor unit (LSE in pence, JSE in cents).
+    // Convert to the major unit so trade prices entered in pounds/rand line up.
+    const { currency, quotedIn, divisor } = resolveCurrency(result?.meta?.currency)
+
     const candles: CandleData[] = quotes
       .filter((item: any) => item.open != null && item.high != null && item.low != null && item.close != null)
       .map((item: any) => ({
         time: item.date instanceof Date
           ? item.date.toISOString().split('T')[0]
           : new Date(item.date).toISOString().split('T')[0],
-        open: item.open,
-        high: item.high,
-        low: item.low,
-        close: item.close,
+        open: item.open / divisor,
+        high: item.high / divisor,
+        low: item.low / divisor,
+        close: item.close / divisor,
         volume: item.volume,
       }))
 
@@ -118,10 +108,17 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
-    // Store in cache
-    cache.set(cacheKey, { data: candles, splits, timestamp: Date.now() })
+    const meta: StockMeta = {
+      symbol: String(result?.meta?.symbol ?? symbol),
+      currency,
+      quotedIn,
+      exchange: String(result?.meta?.fullExchangeName ?? result?.meta?.exchangeName ?? ''),
+    }
 
-    return NextResponse.json({ data: candles, splits })
+    // Store in cache
+    cache.set(cacheKey, { data: candles, splits, meta, timestamp: Date.now() })
+
+    return NextResponse.json({ data: candles, splits, meta })
   } catch (error: any) {
     const msg = error?.message ?? 'Unknown error'
     console.error(`Failed to fetch stock data for ${symbol}:`, msg)

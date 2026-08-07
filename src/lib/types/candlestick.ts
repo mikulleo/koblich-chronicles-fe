@@ -19,6 +19,26 @@ export interface SplitEvent {
   denominator: number
 }
 
+/** Listing info for the fetched symbol, from the data provider */
+export interface StockMeta {
+  /** Symbol as the provider resolved it (may carry an exchange suffix, e.g. SAP.DE) */
+  symbol: string
+  /** Currency the candle prices are expressed in, e.g. USD, EUR, CZK */
+  currency: string
+  /** Set when the provider quoted a minor unit that was converted (e.g. 'GBp' → GBP) */
+  quotedIn: string | null
+  /** Human-readable exchange name, e.g. 'XETRA', 'Prague' */
+  exchange: string
+}
+
+/** A listing returned by the symbol picker */
+export interface SymbolSearchResult {
+  symbol: string
+  name: string
+  exchange: string
+  type: string
+}
+
 export interface TradeMarker {
   time: string
   position: 'aboveBar' | 'belowBar' | 'inBar'
@@ -90,6 +110,8 @@ export interface CandlestickChartProps {
   chartStyle?: ChartStyle
   /** Ticker symbol displayed on the chart */
   symbol?: string
+  /** Currency of the plotted prices, shown next to the symbol watermark */
+  currency?: string
 }
 
 // ── User Portfolio System ──

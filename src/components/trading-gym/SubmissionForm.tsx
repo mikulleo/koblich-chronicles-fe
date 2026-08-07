@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Plus, Trash2, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import apiClient from '@/lib/api/client'
+import TickerSearchInput from './TickerSearchInput'
 import type { TradeSubmissionDoc } from './SubmissionsSection'
 
 interface EventRow {
@@ -213,14 +214,14 @@ export default function SubmissionForm({ initial, onSaved, onCancel }: Submissio
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="col-span-1">
               <label className={labelCls}>Ticker *</label>
-              <input
-                type="text"
+              <TickerSearchInput
                 value={tickerSymbol}
-                onChange={(e) => setTickerSymbol(e.target.value.toUpperCase())}
-                className={cn(inputCls, 'font-mono uppercase')}
-                placeholder="AAPL"
-                maxLength={10}
+                onChange={setTickerSymbol}
+                className={inputCls}
               />
+              <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                Non-US? Search the company name and pick the right exchange.
+              </p>
             </div>
             <div className="col-span-1">
               <label className={labelCls}>Direction *</label>
