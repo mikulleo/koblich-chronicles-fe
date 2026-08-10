@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { LineChart, ListFilter, BarChart3, FileDown, ArrowDown, Dumbbell, ExternalLink } from "lucide-react"
+import { LineChart, ListFilter, BarChart3, Archive, Dumbbell, ExternalLink } from "lucide-react"
 import { FaXTwitter } from 'react-icons/fa6'
 import { motion } from "framer-motion"
 import { DonationDialog } from "@/components/donations/donation-dialog"
-import { PdfExportDialog } from "@/components/exports/pdf-export-dialog"
 import { trackNavClick } from "@/lib/analytics"
 
 // Animation variants
@@ -135,42 +134,6 @@ export default function Home() {
         </section>
       </div>
 
-      {/* PDF Announcement Banner */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        <div className="relative overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-blue-50 p-5 shadow-md">
-          <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-blue-100/50 blur-2xl" />
-          <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-blue-100/50 blur-2xl" />
-          <div className="relative flex flex-col sm:flex-row items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
-              <FileDown className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="flex-1 text-center sm:text-left">
-              <p className="font-semibold text-gray-800">
-                Stock Charts 2025 Analysis is out!
-              </p>
-              <p className="text-sm text-gray-500 mt-0.5">
-                A comprehensive PDF with all annotated charts from 2025 is now available for download.
-              </p>
-            </div>
-            <Button
-              variant="default"
-              size="sm"
-              className="shrink-0"
-              onClick={() => {
-                document.getElementById("connect-support")?.scrollIntoView({ behavior: "smooth" })
-              }}
-            >
-              Get the PDF
-              <ArrowDown className="ml-1.5 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-
       {/* Feature Cards — 3D tilt on hover */}
       <motion.div
         className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mt-4"
@@ -226,7 +189,7 @@ export default function Home() {
                   The goal is to build up <strong>an interactive model-book that grows in near real-time</strong> — no hindsight trading allowed! The entered charts are based primarily on my own trading, but over time I may include other names (such as best performers, or any chart/name that I find interesting) as each proper model-book should have those.
                 </p>
                 <p className="mb-4">
-                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. A PDF export of the annotated charts is already available in the <em>Connect &amp; Support</em> section below.
+                  The ultimate goal is to create an extensive model book that the whole trading community may find useful. The old <em>Stock Charts 2025</em> PDF has been archived now that we&apos;re in Q3 2026 — the charts, trades and statistics on this site are the up-to-date version of it, and they are free to study for as long as this project is alive.
                 </p>
                 <p>
                   Beyond the model-book, the site now also features a <strong>Trading Gym</strong> — an experimental section where you can replay real trades candle-by-candle, test your own decisions, and compare with what actually happened. The Gym also includes <strong>Mental Edge</strong> tools to track your trading psychology, identify emotional traps, and build discipline.
@@ -272,30 +235,76 @@ Past performance is not indicative of future results. Markets change constantly,
           </Card>
         </motion.div>
 
+        {/* Stock Charts 2025 PDF — archived */}
+        <motion.div variants={fadeIn}>
+          <div className="relative overflow-hidden rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-amber-50 p-5 shadow-md">
+            <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-amber-100/50 blur-2xl" />
+            <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-amber-100/50 blur-2xl" />
+            <div className="relative flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <Archive className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <p className="font-semibold text-gray-800">
+                  The Stock Charts 2025 PDF has been archived
+                </p>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  We&apos;re already in Q3 2026, so the 2025 download has come off the site — those setups have had their run.
+                  If you&apos;d still like a copy, just{" "}
+                  <Link
+                    href="https://x.com/mikulkal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
+                  >
+                    drop me a message on X
+                  </Link>{" "}
+                  and I&apos;m sure we can work out a deal — throw a little something into the donation jar below and
+                  it&apos;s on its way to you. Otherwise, the living model book right here is the better place to study —
+                  it keeps growing in near real-time, no hindsight allowed.
+                </p>
+              </div>
+              <Button asChild variant="default" size="sm" className="shrink-0">
+                <Link
+                  href="/charts"
+                  onClick={() => {
+                    trackNavClick({ label: 'Charts', href: '/charts', source: 'home_pdf_archive_banner' })
+                  }}
+                >
+                  Browse the charts
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Connect & Support */}
         <motion.div variants={fadeIn} id="connect-support">
           <Card className="shadow-md shadow-md p-6 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
             <CardContent className="p-6">
               <h2 className="text-xl font-medium mb-4 text-gray-800">Connect &amp; Support</h2>
               <div className="flex items-center gap-2 mb-4">
-                <p className="font-medium">Follow me on:</p>
-                <Link href="https://x.com/mikulkal" target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:text-primary/80 transition-colors">
+                <p className="font-medium text-gray-800">Follow me on:</p>
+                <Link href="https://x.com/mikulkal" target="_blank" rel="noopener noreferrer" className="flex items-center font-medium text-blue-700 hover:text-blue-800 transition-colors">
                   <FaXTwitter className="h-4 w-4 mr-1" />
                   <span>@mikulkal</span>
                 </Link>
-                <small><em>(or reach out in case of any bug reports, complaints, wishes, or praise)</em></small>
+                <small className="text-gray-600"><em>(or reach out in case of any bug reports, complaints, wishes, or praise)</em></small>
               </div>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>
                   Maintaining Koblich Chronicles requires significant time (and as we all know - time = money), plus small hosting and infrastructure costs. If you&apos;re finding value here, your donations can help keep this project alive.
                 </p>
                 <p>
+                  Everything on the site — the model book, the trade logs, the statistics and the Trading Gym — stays free to use. If a single chart in here helps you avoid one bad trade, it has already paid for itself many times over. A donation the size of a coffee keeps the servers running and new charts coming.
+                </p>
+                <p>
                 I may introduce premium features down the road, but for now, I hope these resources give you an edge. If I can contribute to improving your trading by even 0.1%, I&apos;m more than happy — it makes it all worthwhile!
                 </p>
-                {/* Main donation dialog and PDF export */}
+                {/* Main donation dialog */}
                 <div className="mt-4 flex flex-wrap gap-3">
                   <DonationDialog placement="home_support_section" />
-                  <PdfExportDialog />
                 </div>
 
                 {/* Fallback donation options */}
