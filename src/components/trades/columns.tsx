@@ -37,6 +37,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { TradeExitDetails, TradeExit } from "./trade-exit-details"
+import { formatCurrency } from "@/lib/utils/currency"
 
 export interface Tag {
     name: string;
@@ -51,6 +52,8 @@ export interface Ticker {
     name: string;
     description?: string | null;
     sector?: string | null;
+    /** Trading currency of the ticker's exchange, e.g. USD, EUR, CZK. */
+    currency?: string | null;
     profitLoss?: number | null;
     chartsCount?: number | null;
     tradesCount?: number | null;
@@ -96,18 +99,20 @@ export interface Trade {
 }
 
 // Component to render the modified stops modal
-const ModifiedStopsModal = ({ 
-  isOpen, 
-  setIsOpen, 
-  modifiedStops, 
-  tradeType, 
-  initialStop 
-}: { 
-  isOpen: boolean; 
-  setIsOpen: (open: boolean) => void; 
-  modifiedStops: ModifiedStop[]; 
+const ModifiedStopsModal = ({
+  isOpen,
+  setIsOpen,
+  modifiedStops,
+  tradeType,
+  initialStop,
+  currency
+}: {
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+  modifiedStops: ModifiedStop[];
   tradeType: "long" | "short";
   initialStop: number;
+  currency?: string | null;
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -136,10 +141,7 @@ const ModifiedStopsModal = ({
           <div className="grid grid-cols-3 text-sm items-center border-b pb-2">
             <div>Initial</div>
             <div className="font-mono">
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              }).format(initialStop)}
+              {formatCurrency(initialStop, currency)}
             </div>
             <div>—</div>
           </div>
@@ -156,10 +158,7 @@ const ModifiedStopsModal = ({
               <div key={index} className="grid grid-cols-3 text-sm items-center">
                 <div>{format(parseISO(stop.date), "MMM d, yyyy")}</div>
                 <div className="font-mono">
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                  }).format(stop.price)}
+                  {formatCurrency(stop.price, currency)}
                 </div>
                 <div className={isPositiveChange ? "text-green-600" : "text-red-600"}>
                   {percentChange > 0 ? "+" : ""}{percentChange.toFixed(2)}%
@@ -243,9 +242,10 @@ const ModifiedStopsCell = ({ row }: { row: any }) => {
       <ModifiedStopsModal 
         isOpen={isModalOpen} 
         setIsOpen={setIsModalOpen} 
-        modifiedStops={trade.modifiedStops} 
+        modifiedStops={trade.modifiedStops}
         tradeType={trade.type}
         initialStop={trade.initialStopLoss}
+        currency={trade.ticker?.currency}
       />
     </>
   );
@@ -325,6 +325,7 @@ const ExitsCell = ({ row }: { row: any }) => {
         entryPrice={trade.entryPrice}
         profitLossPercent={trade.profitLossPercent}
         tradeType={trade.type}
+        currency={trade.ticker?.currency}
       />
     </>
   );
@@ -428,11 +429,8 @@ export const columns: ColumnDef<Trade>[] = [
     ),
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("entryPrice"))
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(amount)
-      
+      const formatted = formatCurrency(amount, row.original.ticker?.currency)
+
       return (
         <div className="flex justify-center">{formatted}</div>
       )
@@ -521,11 +519,8 @@ export const columns: ColumnDef<Trade>[] = [
     ),
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("initialStopLoss"))
-      const formatted = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(amount)
-      
+      const formatted = formatCurrency(amount, row.original.ticker?.currency)
+
       return (
         <div className="flex justify-center">{formatted}</div>
       )

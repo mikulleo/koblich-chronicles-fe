@@ -16,6 +16,7 @@ import { ChartLine } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
+import { formatCurrency } from "@/lib/utils/currency"
 
 // Define the exit interface
 export interface TradeExit {
@@ -35,6 +36,8 @@ interface TradeExitDetailsProps {
   entryPrice: number
   profitLossPercent?: number
   tradeType: 'long' | 'short'  // Added trade type
+  /** Trading currency of the ticker's exchange — non-US listings aren't in USD */
+  currency?: string | null
 }
 
 const getReasonColor = (reason?: string) => {
@@ -75,6 +78,7 @@ export function TradeExitDetails({
   entryPrice,
   profitLossPercent,
   tradeType,
+  currency,
 }: TradeExitDetailsProps) {
   const router = useRouter()
   
@@ -248,10 +252,7 @@ export function TradeExitDetails({
                       <div>
                         <div className="text-xs text-muted-foreground">Price</div>
                         <div className="font-mono">
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: "USD"
-                          }).format(exit.price)}
+                          {formatCurrency(exit.price, currency)}
                         </div>
                       </div>
                       <div>

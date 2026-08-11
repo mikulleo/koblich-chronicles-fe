@@ -213,13 +213,14 @@ export function TradeFilters({ data, onFiltersChange, className }: FiltersProps)
         {/* Entry Price Range */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Entry Price Range</Label>
+          {/* Bare numbers: the range spans every ticker, so it mixes currencies */}
           <RangeFilter
             min={entryPriceMin}
             max={entryPriceMax}
             step={0.01}
             value={filters.entryPriceRange}
             onValueChange={(value) => updateFilter('entryPriceRange', value as [number, number])}
-            formatValue={(value) => `$${value.toFixed(2)}`}
+            formatValue={(value) => value.toFixed(2)}
           />
         </div>
 
@@ -245,7 +246,7 @@ export function TradeFilters({ data, onFiltersChange, className }: FiltersProps)
             step={0.01}
             value={filters.stopLossRange}
             onValueChange={(value) => updateFilter('stopLossRange', value as [number, number])}
-            formatValue={(value) => `$${value.toFixed(2)}`}
+            formatValue={(value) => value.toFixed(2)}
           />
         </div>
 
