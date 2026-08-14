@@ -263,8 +263,9 @@ export function InsightsDashboard() {
         </div>
       </div>
 
-      {/* AI Insights */}
-      <AIInsightsSection />
+      {/* AI Insights — trends are passed down so the AI's read of a day can be
+          compared against what the trader reported about that same day. */}
+      <AIInsightsSection trends={trends.trends} />
     </div>
   );
 }

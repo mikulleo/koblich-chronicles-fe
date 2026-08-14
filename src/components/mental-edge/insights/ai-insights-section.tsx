@@ -12,7 +12,6 @@ import {
 import { Brain, ChevronDown, TrendingUp, RefreshCw, Trash2, Loader2 } from "lucide-react";
 import {
   ResponsiveContainer,
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -23,7 +22,8 @@ import {
 } from "recharts";
 import { useChartColors, tooltipStyle } from "@/hooks/use-chart-colors";
 import apiClient from "@/lib/api/client";
-import type { MindsetEvaluation } from "@/lib/types";
+import { RecurringPatterns } from "./recurring-patterns";
+import type { CheckInTrendDay, MindsetEvaluation } from "@/lib/types";
 
 interface RemainingInfo {
   date: string;
@@ -32,7 +32,7 @@ interface RemainingInfo {
   remaining: number;
 }
 
-export function AIInsightsSection() {
+export function AIInsightsSection({ trends = [] }: { trends?: CheckInTrendDay[] }) {
   const c = useChartColors();
   const [evaluations, setEvaluations] = useState<MindsetEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,9 @@ export function AIInsightsSection() {
             status: { equals: "completed" },
           },
           sort: "-date",
-          limit: 14,
+          // A single day can hold up to 3 evaluations (regenerations), so fetch
+          // well past the ~14 distinct days the aggregations below want.
+          limit: 40,
         },
       });
       setEvaluations(response.data.docs || []);
@@ -69,7 +71,9 @@ export function AIInsightsSection() {
   useEffect(() => {
     if (evaluations.length === 0) return;
 
-    const dates = [...new Set(evaluations.map((e) => e.date.split("T")[0]))];
+    // Only the evaluations rendered in the list below expose regenerate/delete,
+    // so don't spend a request per date on the ones nobody can act on.
+    const dates = [...new Set(evaluations.slice(0, 7).map((e) => e.date.split("T")[0]))];
     Promise.all(
       dates.map(async (date) => {
         try {
@@ -165,23 +169,24 @@ export function AIInsightsSection() {
     return null;
   }
 
-  // Prepare chart data (chronological order)
-  const chartData = [...evaluations]
-    .reverse()
-    .filter((e) => e.aiAnalysis?.overallScore)
-    .map((e) => ({
-      date: new Date(e.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      score: e.aiAnalysis?.overallScore || 0,
-    }));
-
-  // Aggregate pattern frequency
-  const patternCounts: Record<string, number> = {};
+  // Prepare chart data — one point per day (the newest evaluation for that day),
+  // most recent 14 days, in chronological order.
+  const newestPerDay = new Map<string, MindsetEvaluation>();
   for (const ev of evaluations) {
-    for (const pattern of ev.aiAnalysis?.patternsIdentified || []) {
-      patternCounts[pattern] = (patternCounts[pattern] || 0) + 1;
+    if (!ev.aiAnalysis?.overallScore) continue;
+    const dateKey = ev.date.split("T")[0]!;
+    const existing = newestPerDay.get(dateKey);
+    if (!existing || new Date(ev.createdAt) > new Date(existing.createdAt)) {
+      newestPerDay.set(dateKey, ev);
     }
   }
-  const sortedPatterns = Object.entries(patternCounts).sort((a, b) => b[1] - a[1]);
+  const chartData = [...newestPerDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-14)
+    .map(([, ev]) => ({
+      date: new Date(ev.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      score: ev.aiAnalysis?.overallScore || 0,
+    }));
 
   return (
     <div className="space-y-6">
@@ -256,22 +261,8 @@ export function AIInsightsSection() {
       )}
 
       {/* Aggregated patterns */}
-      {sortedPatterns.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Recurring Patterns</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {sortedPatterns.map(([pattern, count]) => (
-                <Badge key={pattern} variant="outline">
-                  {pattern} ({count}x)
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <RecurringPatterns evaluations={evaluations} trends={trends} />
+
 
       {/* Recent evaluations list */}
       <Card>

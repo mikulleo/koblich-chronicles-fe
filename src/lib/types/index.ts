@@ -334,6 +334,8 @@ export interface MindsetEvaluation {
   aiAnalysis?: {
     coachingFeedback?: string;
     patternsIdentified?: string[];
+    /** Canonical taxonomy codes; absent on evaluations created before pattern tagging. */
+    patternTags?: { code: string; evidence?: string }[];
     actionableInsights?: string[];
     riskAlerts?: string[];
     strengthsHighlighted?: string[];
