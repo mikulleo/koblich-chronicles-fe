@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, Target, RefreshCw, Info, Lock } from 'lucide-react'
+import { AlertCircle, Target, RefreshCw, Info, Lock, Medal } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -32,6 +32,7 @@ interface ExposureTrade {
   status: 'open' | 'partial'
   equityPct: number // remaining size as % of account equity
   fullEquityPct: number // original size as % of account equity
+  breakEvenSecured: boolean
 }
 
 interface BucketSlice {
@@ -56,6 +57,7 @@ interface RawTrade {
   shares?: number
   exits?: Array<{ shares: number }>
   normalizationFactor?: number
+  breakEvenSecured?: boolean
 }
 
 const mapTrade = (trade: RawTrade): ExposureTrade => {
@@ -74,6 +76,7 @@ const mapTrade = (trade: RawTrade): ExposureTrade => {
     status: trade.status,
     equityPct,
     fullEquityPct,
+    breakEvenSecured: trade.breakEvenSecured === true,
   }
 }
 
@@ -328,6 +331,13 @@ export function ExposureBuckets() {
 
   const totalEquityPct = trades.reduce((sum, trade) => sum + trade.equityPct, 0)
   const onMargin = totalEquityPct > 100 + EPSILON
+
+  // Positions tagged break-even secured: booked partials and/or a raised stop mean a
+  // stop-out from here is break-even or better. Reported as a share of exposure rather
+  // than a headcount, since a secured full position retires far more risk than a tail.
+  const securedTrades = trades.filter((trade) => trade.breakEvenSecured)
+  const securedEquityPct = securedTrades.reduce((sum, trade) => sum + trade.equityPct, 0)
+  const securedShareOfExposure = totalEquityPct > EPSILON ? (securedEquityPct / totalEquityPct) * 100 : 0
   const exposureLevel = getExposureLevel(totalEquityPct)
 
   return (
@@ -358,7 +368,7 @@ export function ExposureBuckets() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <div className="text-2xl font-bold">{formatPct(totalEquityPct)}</div>
@@ -394,6 +404,20 @@ export function ExposureBuckets() {
                 <div className="text-sm text-muted-foreground">Active Positions</div>
                 <div className="text-xs text-muted-foreground">
                   {new Set(trades.map(trade => trade.ticker.symbol)).size} unique tickers
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Medal className="h-5 w-5 text-amber-500 [[data-theme=dark]_&]:text-amber-300" />
+                  <div className="text-2xl font-bold text-amber-600 [[data-theme=dark]_&]:text-amber-300">
+                    {securedTrades.length}
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">Break-Even Secured</div>
+                <div className="text-xs text-muted-foreground">
+                  {securedTrades.length === 0
+                    ? 'no positions are risk-free yet'
+                    : `${formatPct(securedShareOfExposure)} of exposure at breakeven or better`}
                 </div>
               </div>
               <div className="space-y-1">

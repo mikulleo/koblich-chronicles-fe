@@ -4,7 +4,7 @@ import Link from "next/link"
 // return early on some rows, so a hook call here would be conditional.
 import { trackTradeOpen } from "@/lib/analytics"
 import { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Film, XCircle, CheckCircle, Info, PackageOpen } from "lucide-react"
+import { ArrowUpDown, Film, XCircle, CheckCircle, Info, PackageOpen, Medal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -88,6 +88,8 @@ export interface Trade {
   initialStopLoss: number
   currentPrice?: number
   status: "open" | "closed" | "partial"
+  /** Live position whose booked partials / raised stop make a stop-out break-even or better. */
+  breakEvenSecured?: boolean
   riskAmount?: number
   riskPercent?: number
   profitLossAmount?: number
@@ -331,6 +333,31 @@ const ExitsCell = ({ row }: { row: any }) => {
   );
 };
 
+// The "gold medal" for a position that can no longer lose: booked partials and/or a
+// raised stop mean a stop-out from here is break-even or better. Deliberately louder
+// than the plain status badge — it marks the discipline, not the outcome.
+// `dark:` is a no-op in this app (theme switches via data-theme), hence the arbitrary variant.
+const BreakEvenMedal = () => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="inline-flex items-center gap-1 rounded-full border border-amber-400/80 bg-gradient-to-b from-amber-100 to-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900 shadow-sm ring-1 ring-inset ring-white/50 whitespace-nowrap cursor-help [[data-theme=dark]_&]:border-amber-400/40 [[data-theme=dark]_&]:from-amber-400/25 [[data-theme=dark]_&]:to-amber-600/20 [[data-theme=dark]_&]:text-amber-200 [[data-theme=dark]_&]:ring-white/10"
+        >
+          <Medal className="h-3 w-3 shrink-0 text-amber-700 [[data-theme=dark]_&]:text-amber-300" />
+          Break-Even
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p>
+          Risk-free position — after booking partials and/or moving the stop, getting stopped
+          out from here is break-even or better.
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)
+
 export const columns: ColumnDef<Trade>[] = [
     {
     accessorKey: "status",
@@ -345,12 +372,18 @@ export const columns: ColumnDef<Trade>[] = [
     ),
     cell: ({ row }) => {
       const status = row.getValue("status") as string
+      // Break-even protection only says something while shares are still on — once the
+      // trade is closed the P/L column already tells the whole story.
+      const isBreakEvenSecured = row.original.breakEvenSecured === true && status !== 'closed'
       return (
-          <Badge 
-            variant={status === 'open' ? 'outline' : status === 'closed' ? 'default' : 'secondary'}
-          >
-            {status.toUpperCase()}
-          </Badge>
+          <div className="flex flex-col items-start gap-1">
+            <Badge
+              variant={status === 'open' ? 'outline' : status === 'closed' ? 'default' : 'secondary'}
+            >
+              {status.toUpperCase()}
+            </Badge>
+            {isBreakEvenSecured && <BreakEvenMedal />}
+          </div>
       )
     },
   },

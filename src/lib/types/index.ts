@@ -65,6 +65,8 @@ export interface Trade {
   };
   notes?: string;
   didNotTrade?: boolean;
+  /** Live position whose booked partials / raised stop make a stop-out break-even or better. */
+  breakEvenSecured?: boolean;
   riskAmount?: number;
   riskPercent?: number;
   profitLossAmount?: number;
