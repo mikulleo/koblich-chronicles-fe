@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +27,14 @@ import {
 import apiClient from "@/lib/api/client";
 import type { CheckInTrends, DeterministicInsights } from "@/lib/types";
 import { AIInsightsSection } from "./ai-insights-section";
+import { InsightsPeriodFilter } from "./insights-period-filter";
+import {
+  isIncompleteCustom,
+  periodLabel,
+  resolveInsightPeriod,
+  type CustomRange,
+  type InsightPeriodId,
+} from "@/lib/mental-edge/insight-period";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -38,68 +46,146 @@ function formatDate(dateStr: string | null): string {
 }
 
 export function InsightsDashboard() {
+  const [period, setPeriod] = useState<InsightPeriodId>("all");
+  const [customRange, setCustomRange] = useState<CustomRange>({});
   const [trends, setTrends] = useState<CheckInTrends | null>(null);
   const [insights, setInsights] = useState<DeterministicInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // A half-picked custom range would silently read as "all time", so hold the
+  // previous window until both ends are chosen.
+  const awaitingCustom = isIncompleteCustom(period, customRange);
+  const { startDate, endDate } = useMemo(
+    () => (awaitingCustom ? {} : resolveInsightPeriod(period, customRange)),
+    [period, customRange, awaitingCustom],
+  );
 
   useEffect(() => {
+    if (awaitingCustom) return;
+
+    let cancelled = false;
+    const range: Record<string, string> = {};
+    if (startDate) range.startDate = startDate;
+    if (endDate) range.endDate = endDate;
+
     const fetchData = async () => {
+      setRefreshing(true);
       try {
         const [trendsRes, insightsRes] = await Promise.all([
-          apiClient.get("/mental-check-ins/trends", { params: { depth: 0 } }),
-          apiClient.get("/mental-check-ins/insights").catch(() => null),
+          apiClient.get("/mental-check-ins/trends", { params: { depth: 0, ...range } }),
+          apiClient.get("/mental-check-ins/insights", { params: range }).catch(() => null),
         ]);
+        if (cancelled) return;
         setTrends(trendsRes.data);
-        if (insightsRes?.data && !insightsRes.data.error) {
-          setInsights(insightsRes.data);
-        }
+        // The endpoint 400s when the window holds fewer than 2 check-ins —
+        // clear stale insights rather than showing the previous period's.
+        setInsights(
+          insightsRes?.data && !insightsRes.data.error ? insightsRes.data : null,
+        );
       } catch {
-        // Silent
+        if (!cancelled) {
+          setTrends(null);
+          setInsights(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     };
     fetchData();
-  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [startDate, endDate, awaitingCustom]);
 
-  if (!trends || trends.totalDays < 2) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p>Need at least 2 days of complete check-ins to generate insights.</p>
-          <p className="text-sm mt-1">Complete your daily pre and post market check-ins.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const periodLabel = insights
-    ? `Based on ${insights.completeDays} complete day${insights.completeDays !== 1 ? "s" : ""}${insights.oldestDate ? ` (${formatDate(insights.oldestDate)} – ${formatDate(insights.latestDate)})` : ""}`
-    : null;
-
-  return (
-    <div className="space-y-6">
+  const header = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 className="text-xl font-semibold mb-2">Insights Dashboard</h2>
         <p className="text-muted-foreground text-sm">
           Deep analysis of your mental state patterns, consistency, and growth areas.
         </p>
-        {periodLabel && (
-          <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
-            <CalendarDays className="h-3 w-3" />
-            {periodLabel}
-          </p>
-        )}
       </div>
+      <InsightsPeriodFilter
+        period={period}
+        customRange={customRange}
+        onPeriodChange={setPeriod}
+        onCustomRangeChange={setCustomRange}
+        busy={refreshing && !loading}
+      />
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (awaitingCustom) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>Pick a start and end date to analyse a custom period.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!trends || trends.totalDays < 2) {
+    const scoped = Boolean(startDate || endDate);
+    return (
+      <div className="space-y-6">
+        {header}
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            {scoped ? (
+              <>
+                <p>
+                  Not enough check-ins in {periodLabel(period).toLowerCase()}
+                  {startDate ? ` (${formatDate(startDate)} – ${formatDate(endDate ?? startDate)})` : ""}.
+                </p>
+                <p className="text-sm mt-1">
+                  At least 2 days are needed — try a wider period.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>Need at least 2 days of complete check-ins to generate insights.</p>
+                <p className="text-sm mt-1">Complete your daily pre and post market check-ins.</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const coverageLabel = insights
+    ? `${periodLabel(period)} · based on ${insights.completeDays} complete day${insights.completeDays !== 1 ? "s" : ""}${insights.oldestDate ? ` (${formatDate(insights.oldestDate)} – ${formatDate(insights.latestDate)})` : ""}`
+    : `${periodLabel(period)} · ${trends.totalDays} day${trends.totalDays !== 1 ? "s" : ""} recorded`;
+
+  return (
+    <div className={`space-y-6 ${refreshing ? "opacity-60 transition-opacity" : ""}`}>
+      {header}
+      <p className="text-xs text-muted-foreground/70 -mt-3 flex items-center gap-1">
+        <CalendarDays className="h-3 w-3" />
+        {coverageLabel}
+      </p>
 
       {/* Browsable Day Review */}
       {trends && <DayEvaluation trends={trends.trends} />}
@@ -110,7 +196,7 @@ export function InsightsDashboard() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="h-3 w-3" />
             <span>
-              These metrics are <strong>rolling averages</strong> across all {insights.completeDays} complete days — not a single day&apos;s value. They update whenever you save a check-in.
+              These metrics are <strong>rolling averages</strong> across the {insights.completeDays} complete days in this period — not a single day&apos;s value. They update whenever you save a check-in.
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -120,7 +206,7 @@ export function InsightsDashboard() {
                 value={insights.metrics.stateConsistency.currentAverage}
                 description={insights.metrics.stateConsistency.description}
                 interpretation={insights.metrics.stateConsistency.currentInterpretation}
-                period={`avg over ${insights.completeDays} days`}
+                period={`avg over ${insights.completeDays} days in period`}
               />
             )}
             {insights.metrics.intentionAdherence.currentAverage !== null && (
@@ -129,7 +215,7 @@ export function InsightsDashboard() {
                 value={`${insights.metrics.intentionAdherence.currentAverage}%`}
                 description={insights.metrics.intentionAdherence.description}
                 interpretation={insights.metrics.intentionAdherence.currentInterpretation}
-                period={`avg over ${insights.completeDays} days`}
+                period={`avg over ${insights.completeDays} days in period`}
               />
             )}
           </div>
@@ -165,7 +251,7 @@ export function InsightsDashboard() {
               Recurring Patterns
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Behaviors that appear in 25%+ of your tracked days
+              Behaviors that appear in 25%+ of your tracked days in this period
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -265,7 +351,7 @@ export function InsightsDashboard() {
 
       {/* AI Insights — trends are passed down so the AI's read of a day can be
           compared against what the trader reported about that same day. */}
-      <AIInsightsSection trends={trends.trends} />
+      <AIInsightsSection trends={trends.trends} startDate={startDate} endDate={endDate} />
     </div>
   );
 }

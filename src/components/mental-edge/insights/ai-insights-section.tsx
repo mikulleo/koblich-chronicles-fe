@@ -32,7 +32,14 @@ interface RemainingInfo {
   remaining: number;
 }
 
-export function AIInsightsSection({ trends = [] }: { trends?: CheckInTrendDay[] }) {
+interface AIInsightsSectionProps {
+  trends?: CheckInTrendDay[];
+  /** Analysis window from the dashboard filter; omitted means all time. */
+  startDate?: string;
+  endDate?: string;
+}
+
+export function AIInsightsSection({ trends = [], startDate, endDate }: AIInsightsSectionProps) {
   const c = useChartColors();
   const [evaluations, setEvaluations] = useState<MindsetEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +50,18 @@ export function AIInsightsSection({ trends = [] }: { trends?: CheckInTrendDay[] 
   const [error, setError] = useState<string | null>(null);
 
   const fetchEvaluations = useCallback(async () => {
+    // Keep the AI section on the same window as the rest of the dashboard.
+    const dateWhere: Record<string, string> = {};
+    if (startDate) dateWhere.greater_than_equal = startDate;
+    // Evaluations can carry a time component, so include the whole end day.
+    if (endDate) dateWhere.less_than_equal = `${endDate}T23:59:59.999Z`;
+
     try {
       const response = await apiClient.get("/mindset-evaluations", {
         params: {
           where: {
             status: { equals: "completed" },
+            ...(Object.keys(dateWhere).length > 0 ? { date: dateWhere } : {}),
           },
           sort: "-date",
           // A single day can hold up to 3 evaluations (regenerations), so fetch
@@ -61,7 +75,7 @@ export function AIInsightsSection({ trends = [] }: { trends?: CheckInTrendDay[] 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     fetchEvaluations();

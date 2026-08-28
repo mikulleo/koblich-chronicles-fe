@@ -166,6 +166,16 @@ export function DayEvaluation({ trends }: DayEvaluationProps) {
 
   const [selectedIndex, setSelectedIndex] = useState(completeDays.length - 1);
 
+  // The parent can swap the analysis window under us, which changes the day
+  // list entirely — snap back to the newest day rather than keeping an index
+  // that now points at a different day (or past the end of the list).
+  const daysKey = `${completeDays.length}|${completeDays[0]?.date ?? ""}|${completeDays[completeDays.length - 1]?.date ?? ""}`;
+  const [seenDaysKey, setSeenDaysKey] = useState(daysKey);
+  if (seenDaysKey !== daysKey) {
+    setSeenDaysKey(daysKey);
+    setSelectedIndex(completeDays.length - 1);
+  }
+
   if (completeDays.length === 0) {
     return null;
   }
