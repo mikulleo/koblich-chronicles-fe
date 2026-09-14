@@ -253,6 +253,26 @@ export interface WeeklySummary {
     traps: string[];
     analysis?: MentalCheckIn['analysis'];
   }[];
+  /** Traps linked on journal entries written this week. */
+  journalTrapCounts: Record<string, number>;
+  /** trapCounts + journalTrapCounts. */
+  combinedTrapCounts: Record<string, number>;
+  journal: {
+    count: number;
+    daysWithEntries: number;
+    typeCounts: Partial<Record<JournalEntryType, number>>;
+    entries: WeeklyJournalEntry[];
+  };
+}
+
+export interface WeeklyJournalEntry {
+  id: string;
+  date: string;
+  entryType: JournalEntryType;
+  title: string;
+  freeContent: string | null;
+  linkedTraps: EmotionalTrap[];
+  answeredPrompts: { prompt: string; response: string }[];
 }
 
 export interface CheckInTrendDay {

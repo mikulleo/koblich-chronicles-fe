@@ -5,11 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, Calendar, Target, AlertTriangle, TrendingUp, Brain, Sparkles, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Target, AlertTriangle, TrendingUp, Brain, Sparkles, Loader2, RefreshCw, Trash2, BookOpen } from "lucide-react";
 import apiClient from "@/lib/api/client";
-import type { WeeklySummary, MindsetEvaluation } from "@/lib/types";
+import type { WeeklySummary, JournalEntryType } from "@/lib/types";
 import { useMindsetEvaluation } from "@/hooks/use-mindset-evaluation";
+
+const JOURNAL_TYPE_LABELS: Record<JournalEntryType, string> = {
+  pre_market_note: "Pre-Market Note",
+  post_market_reflection: "Post-Market Reflection",
+  mistake_review: "Mistake Review",
+  trigger_review: "Trigger Review",
+  weekly_review: "Weekly Review",
+  rule_violation_review: "Rule Violation Review",
+};
+
+const JOURNAL_TYPE_COLORS: Record<JournalEntryType, string> = {
+  pre_market_note: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  post_market_reflection: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  mistake_review: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  trigger_review: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  weekly_review: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  rule_violation_review: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+};
 
 interface RemainingInfo {
   used: number;
@@ -85,12 +102,21 @@ export function WeeklyReview() {
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
+  // The week's journal notes count as data even when no check-in was logged.
+  const journalEntries = summary?.journal?.entries ?? [];
+  const journalCount = summary?.journal?.count ?? journalEntries.length;
+  const hasCheckInData = (summary?.daysLogged ?? 0) > 0;
+  const hasAnyData = hasCheckInData || journalCount > 0;
+  // Traps from check-ins and journal entries alike; falls back to the
+  // check-in-only counts if the backend hasn't got the combined field yet.
+  const trapCounts = summary?.combinedTrapCounts ?? summary?.trapCounts ?? {};
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Weekly Mindset Review</h2>
         <p className="text-muted-foreground text-sm">
-          Aggregated insights from your daily check-ins across the week.
+          Aggregated insights from your daily check-ins and journal notes across the week.
         </p>
       </div>
 
@@ -119,11 +145,13 @@ export function WeeklyReview() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
-      ) : !summary || summary.daysLogged === 0 ? (
+      ) : !summary || !hasAnyData ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <p>No check-in data for this week.</p>
-            <p className="text-sm mt-1">Complete daily check-ins to generate weekly summaries.</p>
+            <p>No check-in or journal data for this week.</p>
+            <p className="text-sm mt-1">
+              Complete daily check-ins or write journal notes to generate weekly summaries.
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -163,17 +191,27 @@ export function WeeklyReview() {
                 </CardContent>
               </Card>
             )}
+            <Card>
+              <CardContent className="py-4 text-center">
+                <BookOpen className="h-5 w-5 mx-auto mb-1 text-indigo-500" />
+                <div className="text-3xl font-bold">{journalCount}</div>
+                <div className="text-xs text-muted-foreground">Journal Notes</div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Traps this week */}
-          {Object.keys(summary.trapCounts).length > 0 && (
+          {/* Traps this week — from check-ins and journal entries */}
+          {Object.keys(trapCounts).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Traps This Week</CardTitle>
+                <CardDescription className="text-xs">
+                  Counted across daily check-ins and journal entries.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(summary.trapCounts)
+                  {Object.entries(trapCounts)
                     .sort((a, b) => b[1] - a[1])
                     .map(([trap, count]) => (
                       <Badge key={trap} variant="destructive">
@@ -186,7 +224,7 @@ export function WeeklyReview() {
           )}
 
           {/* Behaviors this week */}
-          {Object.keys(summary.behaviorCounts).length > 0 && (
+          {hasCheckInData && Object.keys(summary.behaviorCounts).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Negative Behaviors This Week</CardTitle>
@@ -207,7 +245,7 @@ export function WeeklyReview() {
           )}
 
           {/* Drift patterns */}
-          {Object.keys(summary.driftPatterns).length > 0 && (
+          {hasCheckInData && Object.keys(summary.driftPatterns).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Emotional Drift Patterns</CardTitle>
@@ -227,6 +265,7 @@ export function WeeklyReview() {
           )}
 
           {/* Daily breakdown */}
+          {hasCheckInData && (
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Daily Breakdown</CardTitle>
@@ -260,6 +299,69 @@ export function WeeklyReview() {
               </div>
             </CardContent>
           </Card>
+          )}
+
+          {/* Journal notes written this week */}
+          {journalEntries.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Journal Notes This Week ({journalEntries.length})
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Every journal entry dated in this week, not just pre/post-market notes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {journalEntries.map((entry, idx) => (
+                  <div key={entry.id} className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-20 shrink-0">
+                        {new Date(entry.date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <Badge variant="secondary" className={JOURNAL_TYPE_COLORS[entry.entryType]}>
+                        {JOURNAL_TYPE_LABELS[entry.entryType]}
+                      </Badge>
+                      <span className="text-sm font-medium">{entry.title}</span>
+                    </div>
+                    {entry.answeredPrompts.slice(0, 2).map((prompt, i) => (
+                      <div key={i} className="pl-20 text-sm">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          {prompt.prompt}
+                        </div>
+                        <div className="line-clamp-2">{prompt.response}</div>
+                      </div>
+                    ))}
+                    {entry.answeredPrompts.length > 2 && (
+                      <div className="pl-20 text-xs text-muted-foreground">
+                        +{entry.answeredPrompts.length - 2} more responses
+                      </div>
+                    )}
+                    {entry.freeContent && (
+                      <p className="pl-20 text-sm text-muted-foreground line-clamp-3">
+                        {entry.freeContent}
+                      </p>
+                    )}
+                    {entry.linkedTraps.length > 0 && (
+                      <div className="pl-20 flex flex-wrap gap-1">
+                        {entry.linkedTraps.map((trap) => (
+                          <Badge key={trap} variant="outline" className="text-xs">
+                            {trap.replace(/_/g, " ")}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {idx < journalEntries.length - 1 && <Separator />}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {/* AI Weekly Summary */}
           {!weeklyEvaluation ? (
@@ -272,7 +374,8 @@ export function WeeklyReview() {
               </CardHeader>
               <CardContent className="text-center py-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Get an AI-powered analysis of your week&apos;s mental performance.
+                  Get an AI-powered analysis of your week&apos;s mental performance, drawn
+                  from your check-ins, journal notes and discipline log.
                 </p>
                 {weeklyError && (
                   <p className="text-sm text-destructive">{weeklyError}</p>

@@ -38,6 +38,18 @@ const TRAPS: { value: EmotionalTrap; label: string }[] = [
   { value: "impatience", label: "Impatience" },
 ];
 
+function toDateInputValue(value?: string | null): string {
+  if (!value) return "";
+  return value.split("T")[0] ?? "";
+}
+
+function todayInputValue(): string {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 interface JournalEntryFormProps {
   entry?: MindsetJournalEntry | null;
   defaultEntryType?: JournalEntryType;
@@ -48,6 +60,7 @@ interface JournalEntryFormProps {
 export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: JournalEntryFormProps) {
   const [entryType, setEntryType] = useState<JournalEntryType>(entry?.entryType || defaultEntryType || "post_market_reflection");
   const [title, setTitle] = useState(entry?.title || "");
+  const [date, setDate] = useState(() => toDateInputValue(entry?.date) || todayInputValue());
   const [guidedPrompts, setGuidedPrompts] = useState<{ prompt: string; response: string }[]>(
     entry?.guidedPrompts || []
   );
@@ -129,10 +142,14 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
       toast.error("Title is required");
       return;
     }
+    if (!date) {
+      toast.error("Date is required");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
-        date: new Date().toISOString().split("T")[0],
+        date,
         entryType,
         title,
         guidedPrompts,
@@ -161,7 +178,16 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
         <CardTitle>{entry ? "Edit Journal Entry" : "New Journal Entry"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="journal-entry-date">Date</Label>
+            <Input
+              id="journal-entry-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
           <div className="space-y-1">
             <Label>Entry Type</Label>
             <Select
