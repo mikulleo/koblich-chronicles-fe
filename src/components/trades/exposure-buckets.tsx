@@ -35,10 +35,24 @@ interface ExposureTrade {
   breakEvenSecured: boolean
 }
 
+// Every buy of the same ticker is its own trade, but risk-wise they are one
+// exposure: the buckets therefore hold ticker groups, with the individual
+// entries kept around so a stacked position can be broken back down.
+interface TickerGroup {
+  key: string
+  symbol: string
+  trades: ExposureTrade[] // legs, largest remaining first
+  equityPct: number // combined remaining size as % of account equity
+  fullEquityPct: number // combined original size as % of account equity
+  status: 'open' | 'partial' | 'mixed'
+  securedCount: number
+}
+
 interface BucketSlice {
-  trade: ExposureTrade
+  group: TickerGroup
   equityPctInBucket: number
-  spansBuckets: number[] // bucket ids this position occupies (shared per trade)
+  offsetPct: number // how much of the group already sits in lower buckets
+  spansBuckets: number[] // bucket ids this group occupies (shared per group)
 }
 
 interface BucketData {
@@ -80,17 +94,52 @@ const mapTrade = (trade: RawTrade): ExposureTrade => {
   }
 }
 
+/** Collapse multiple buys of the same ticker into one combined exposure */
+const groupByTicker = (trades: ExposureTrade[]): TickerGroup[] => {
+  const groups = new Map<string, TickerGroup>()
+
+  for (const trade of trades) {
+    const key = trade.ticker.id || trade.ticker.symbol
+    const group = groups.get(key)
+    if (group) {
+      group.trades.push(trade)
+      group.equityPct += trade.equityPct
+      group.fullEquityPct += trade.fullEquityPct
+      if (trade.breakEvenSecured) group.securedCount += 1
+    } else {
+      groups.set(key, {
+        key,
+        symbol: trade.ticker.symbol,
+        trades: [trade],
+        equityPct: trade.equityPct,
+        fullEquityPct: trade.fullEquityPct,
+        status: trade.status,
+        securedCount: trade.breakEvenSecured ? 1 : 0,
+      })
+    }
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    group.trades.sort((a, b) => b.equityPct - a.equityPct)
+    const openCount = group.trades.filter((trade) => trade.status === 'open').length
+    return {
+      ...group,
+      status: openCount === group.trades.length ? 'open' : openCount === 0 ? 'partial' : 'mixed',
+    }
+  })
+}
+
 /**
  * Sequential fill: bucket 1 fills first, overflow spills into bucket 2, etc.
  * Heaviest full-size positions anchor bucket 1; partials spill first, then the
  * smallest full positions. A position straddling a bucket boundary spans both.
  */
-const distributeSequentially = (trades: ExposureTrade[]): BucketData[] => {
-  const sorted = [...trades]
-    .filter((trade) => trade.equityPct > EPSILON)
+const distributeSequentially = (groups: TickerGroup[]): BucketData[] => {
+  const sorted = [...groups]
+    .filter((group) => group.equityPct > EPSILON)
     .sort((a, b) => {
-      const aPartial = a.status === 'partial'
-      const bPartial = b.status === 'partial'
+      const aPartial = a.status !== 'open'
+      const bPartial = b.status !== 'open'
       if (aPartial !== bPartial) return aPartial ? 1 : -1
       return b.equityPct - a.equityPct
     })
@@ -102,8 +151,8 @@ const distributeSequentially = (trades: ExposureTrade[]): BucketData[] => {
   }))
 
   let cursor = 0 // running total exposure in % of equity
-  for (const trade of sorted) {
-    let remaining = trade.equityPct
+  for (const group of sorted) {
+    let remaining = group.equityPct
     const spansBuckets: number[] = []
 
     while (remaining > EPSILON) {
@@ -113,7 +162,12 @@ const distributeSequentially = (trades: ExposureTrade[]): BucketData[] => {
       // Past the last bucket there is nowhere left to spill: overfill bucket 4
       const take = bucketIndex === BUCKET_COUNT - 1 ? remaining : Math.min(remaining, room)
 
-      bucket.slices.push({ trade, equityPctInBucket: take, spansBuckets })
+      bucket.slices.push({
+        group,
+        equityPctInBucket: take,
+        offsetPct: group.equityPct - remaining,
+        spansBuckets,
+      })
       bucket.totalEquityPct += take
       spansBuckets.push(bucket.id)
       cursor += take
@@ -126,7 +180,7 @@ const distributeSequentially = (trades: ExposureTrade[]): BucketData[] => {
 
 // --- 3D bucket geometry (SVG viewBox 0 0 360 280, bucket centered at CX,
 // with a right-hand gutter for leader-line labels of thin slices) ---
-const VIEW_W = 360
+const VIEW_W = 430
 const VIEW_H = 280
 const CX = 130
 const TOP_Y = 44 // y of the rim ellipse center
@@ -138,9 +192,18 @@ const INNER_BOTTOM_RX = 56
 const RIM_RY = 15
 const BOTTOM_RY = 11
 const FILL_TOP_Y = 62 // liquid level when the bucket is 100% full
-const INSIDE_LABEL_MIN = 12 // slices thinner than this get an outside label
+const INSIDE_LABEL_MIN = 12 // slabs thinner than this get an outside label
+// A stacked position has to print its individual buys under the ticker, which
+// only fits inside the liquid on a genuinely tall slab.
+const INSIDE_STACK_MIN = 26
+const MIN_STRATUM = 2.5 // thinnest visible gap between two buy boundaries
 const LABEL_X = 248 // where outside labels start
-const LABEL_GAP = 14 // min vertical distance between outside labels
+const LABEL_ROW_H = 13 // height of a one-line (single-buy) outside label
+const LABEL_STACK_H = 24 // height of an outside label that lists its buys
+const LABEL_GAP = 3 // breathing room between two outside labels
+// Locked buckets are drawn at ~a third of the size; this offset pushes them
+// down so their floor lines up with the floor of the full-size buckets.
+const LOCKED_BUCKET_OFFSET_PX = 209
 
 const innerRadiusAt = (y: number) =>
   INNER_TOP_RX + ((INNER_BOTTOM_RX - INNER_TOP_RX) * (y - TOP_Y)) / (BOTTOM_Y - TOP_Y)
@@ -162,6 +225,11 @@ const bandPath = (yTop: number, yBottom: number) => {
   ].join(' ')
 }
 
+const surfaceArcPath = (y: number) => {
+  const r = innerRadiusAt(y)
+  return `M ${CX - r} ${y} A ${r} ${ellipseRyAt(r)} 0 0 0 ${CX + r} ${y}`
+}
+
 const bucketBodyPath = (topRx: number, bottomRx: number) => [
   `M ${CX - topRx} ${TOP_Y}`,
   `A ${topRx} ${RIM_RY} 0 0 0 ${CX + topRx} ${TOP_Y}`,
@@ -174,15 +242,18 @@ interface BandLayout {
   slice: BucketSlice
   yTop: number
   yBottom: number
+  dividers: number[] // y of each boundary between the buys making up this slab
 }
 
 interface LabelLayout {
   band: BandLayout
   inside: boolean
+  showLegsInside: boolean // slab tall enough to print the individual buys in it
   // The band's *visual* center at the bucket's horizontal middle: the elliptical
   // edges bulge downward, so it sits below the geometric midpoint.
   anchorY: number
   labelY: number // where the label text sits (differs from anchorY when stacked outside)
+  height: number // vertical room this label needs when stacked in the gutter
 }
 
 // Bands stack bottom-up in fill order with heights strictly proportional to
@@ -190,46 +261,96 @@ interface LabelLayout {
 const layoutBands = (bucket: BucketData): { bands: BandLayout[]; liquidTopY: number } => {
   const clampScale = bucket.totalEquityPct > 100 ? 100 / bucket.totalEquityPct : 1
 
+  const pctToHeight = (pct: number) => ((pct * clampScale) / 100) * (BOTTOM_Y - FILL_TOP_Y)
+
   const bands: BandLayout[] = []
   let cursor = BOTTOM_Y
   for (const slice of bucket.slices) {
-    const height = ((slice.equityPctInBucket * clampScale) / 100) * (BOTTOM_Y - FILL_TOP_Y)
-    bands.push({ slice, yTop: cursor - height, yBottom: cursor })
+    const height = pctToHeight(slice.equityPctInBucket)
+    const yBottom = cursor
+    const yTop = cursor - height
+
+    // A position built from several buys keeps them visible as strata inside
+    // its slab: one boundary per buy, measured up from the slab's floor.
+    const dividers: number[] = []
+    let consumed = 0
+    let lastY = yBottom
+    for (const trade of slice.group.trades.slice(0, -1)) {
+      consumed += trade.equityPct
+      const y = yBottom - pctToHeight(consumed - slice.offsetPct)
+      if (lastY - y >= MIN_STRATUM && y - yTop >= MIN_STRATUM) {
+        dividers.push(y)
+        lastY = y
+      }
+    }
+
+    bands.push({ slice, yTop, yBottom, dividers })
     cursor -= height
   }
 
   return { bands, liquidTopY: bands.length > 0 ? bands[bands.length - 1].yTop : BOTTOM_Y }
 }
 
-// Slices tall enough get their label centered inside; the rest are labeled in
+// Slabs tall enough get their label centered inside; the rest are labeled in
 // the right-hand gutter, stacked without overlaps and tied back by leader lines.
+// A stacked position always ends up wherever its individual buys still fit.
 const layoutLabels = (bands: BandLayout[]): LabelLayout[] => {
   const labels: LabelLayout[] = bands.map((band) => {
     const bulgeTop = ellipseRyAt(innerRadiusAt(band.yTop))
     const bulgeBottom = ellipseRyAt(innerRadiusAt(band.yBottom))
     const anchorY = (band.yTop + bulgeTop + band.yBottom + bulgeBottom) / 2
+    const stacked = band.slice.group.trades.length > 1
+    const height = band.yBottom - band.yTop
+    const showLegsInside = stacked && height >= INSIDE_STACK_MIN
+
     return {
       band,
-      inside: band.yBottom - band.yTop >= INSIDE_LABEL_MIN,
+      inside: stacked ? showLegsInside : height >= INSIDE_LABEL_MIN,
+      showLegsInside,
       anchorY,
       labelY: anchorY,
+      height: stacked ? LABEL_STACK_H : LABEL_ROW_H,
     }
   })
 
+  // Outside labels are centered on their own labelY, so neighbours have to be
+  // half of each label apart - they are no longer all the same height.
   const outside = labels.filter((label) => !label.inside).sort((a, b) => a.labelY - b.labelY)
+  const spacing = (a: LabelLayout, b: LabelLayout) => (a.height + b.height) / 2 + LABEL_GAP
+
   for (let i = 1; i < outside.length; i++) {
-    if (outside[i].labelY - outside[i - 1].labelY < LABEL_GAP) {
-      outside[i].labelY = outside[i - 1].labelY + LABEL_GAP
-    }
+    const min = outside[i - 1].labelY + spacing(outside[i - 1], outside[i])
+    if (outside[i].labelY < min) outside[i].labelY = min
   }
   // If the stack ran past the bucket floor, push it back up
-  const maxY = BOTTOM_Y + 4
   for (let i = outside.length - 1; i >= 0; i--) {
-    const limit = i === outside.length - 1 ? maxY : outside[i + 1].labelY - LABEL_GAP
+    const limit =
+      i === outside.length - 1
+        ? BOTTOM_Y + 4 - outside[i].height / 2
+        : outside[i + 1].labelY - spacing(outside[i], outside[i + 1])
     if (outside[i].labelY > limit) outside[i].labelY = limit
   }
 
   return labels
+}
+
+// Liquid tint per group status; 'mixed' (some legs trimmed, some untouched)
+// blends the open and partial colours.
+const SURFACE_COLOR: Record<TickerGroup['status'], string> = {
+  open: '#6ee7b7',
+  partial: '#67e8f9',
+  mixed: '#5eead4',
+}
+
+// The shared tooltip renders on `bg-primary`, where muted text and hairline
+// borders are unreadable. Everything in this view uses the popover surface.
+const TOOLTIP_SURFACE =
+  'bg-popover text-popover-foreground border shadow-md [&_svg]:bg-popover [&_svg]:fill-popover'
+
+const DOT_COLOR: Record<TickerGroup['status'], string> = {
+  open: 'bg-emerald-500',
+  partial: 'bg-cyan-500',
+  mixed: 'bg-gradient-to-r from-emerald-500 to-cyan-500',
 }
 
 const getExposureLevel = (totalEquityPct: number) => {
@@ -286,7 +407,7 @@ export function ExposureBuckets() {
       if (response.data && response.data.docs) {
         const tradesData = (response.data.docs as RawTrade[]).map(mapTrade)
         setTrades(tradesData)
-        setBuckets(distributeSequentially(tradesData))
+        setBuckets(distributeSequentially(groupByTicker(tradesData)))
       }
     } catch (err) {
       console.error('Error fetching trades:', err)
@@ -433,14 +554,18 @@ export function ExposureBuckets() {
         </Card>
 
         {/* Buckets */}
-        <div className="flex flex-wrap items-end justify-center gap-10 py-4">
+        <div className="flex flex-wrap items-start justify-center gap-10 py-4">
           {buckets.map((bucket) => {
             const active = bucket.id === 1 || bucket.slices.length > 0
             const overfilled = bucket.totalEquityPct > BUCKET_CAPACITY_PCT + EPSILON
 
             if (!active) {
               return (
-                <div key={bucket.id} className="flex flex-col items-center gap-2 pb-1">
+                <div
+                  key={bucket.id}
+                  className="flex flex-col items-center gap-2 pb-1"
+                  style={{ marginTop: LOCKED_BUCKET_OFFSET_PX }}
+                >
                   <div className="relative">
                     <svg viewBox={`${CX - 110} 0 220 280`} className="h-28 w-[88px] text-muted-foreground/40">
                       <path
@@ -471,6 +596,7 @@ export function ExposureBuckets() {
             }
 
             const { bands, liquidTopY } = layoutBands(bucket)
+            const entryCount = bucket.slices.reduce((sum, slice) => sum + slice.group.trades.length, 0)
             const labels = layoutLabels(bands)
             const topBand = bands[bands.length - 1]
             const surfaceR = topBand ? innerRadiusAt(topBand.yTop) : 0
@@ -478,7 +604,7 @@ export function ExposureBuckets() {
 
             return (
               <div key={bucket.id} className="flex flex-col items-center gap-3">
-                <div className="relative h-[356px] w-[458px] max-w-full">
+                <div className="relative h-[356px] w-[547px] max-w-full">
                   <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="absolute inset-0 h-full w-full">
                     <defs>
                       <linearGradient id={`metal-${bucket.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -505,6 +631,12 @@ export function ExposureBuckets() {
                         <stop offset="55%" stopColor="#06b6d4" />
                         <stop offset="100%" stopColor="#155e75" />
                       </linearGradient>
+                      <linearGradient id={`liquid-mixed-${bucket.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#047857" />
+                        <stop offset="28%" stopColor="#34d399" />
+                        <stop offset="62%" stopColor="#22d3ee" />
+                        <stop offset="100%" stopColor="#155e75" />
+                      </linearGradient>
                       <filter id={`shadow-${bucket.id}`} x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur stdDeviation="5" />
                       </filter>
@@ -528,16 +660,41 @@ export function ExposureBuckets() {
                     {/* Opening: dark interior */}
                     <ellipse cx={CX} cy={TOP_Y} rx={OUTER_TOP_RX} ry={RIM_RY} fill={`url(#inner-${bucket.id})`} />
 
-                    {/* Liquid bands (bottom-up fill order) */}
+                    {/* Liquid slabs, one per ticker (bottom-up fill order) */}
                     {bands.map(({ slice, yTop, yBottom }, index) => (
                       <path
-                        key={`${slice.trade.id}-band-${index}`}
+                        key={`${slice.group.key}-band-${index}`}
                         d={bandPath(yTop, yBottom)}
-                        fill={`url(#liquid-${slice.trade.status === 'open' ? 'open' : 'partial'}-${bucket.id})`}
-                        stroke="rgba(255,255,255,0.28)"
+                        fill={`url(#liquid-${slice.group.status}-${bucket.id})`}
+                        stroke="rgba(255,255,255,0.14)"
                         strokeWidth="1"
                       />
                     ))}
+
+                    {/* Where one ticker's slab ends and the next begins */}
+                    {bands.slice(1).map(({ slice, yBottom }, index) => (
+                      <path
+                        key={`${slice.group.key}-edge-${index}`}
+                        d={surfaceArcPath(yBottom)}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.65)"
+                        strokeWidth="1.4"
+                      />
+                    ))}
+
+                    {/* Dashed strata: where one buy ends and the next begins */}
+                    {bands.map(({ slice, dividers }) =>
+                      dividers.map((y) => (
+                        <path
+                          key={`${slice.group.key}-div-${y}`}
+                          d={surfaceArcPath(y)}
+                          fill="none"
+                          stroke="rgba(255,255,255,0.4)"
+                          strokeWidth="0.9"
+                          strokeDasharray="3 3"
+                        />
+                      ))
+                    )}
 
                     {/* Liquid surface */}
                     {topBand && (
@@ -546,7 +703,7 @@ export function ExposureBuckets() {
                         cy={topBand.yTop}
                         rx={surfaceR}
                         ry={ellipseRyAt(surfaceR)}
-                        fill={topBand.slice.trade.status === 'open' ? '#6ee7b7' : '#67e8f9'}
+                        fill={SURFACE_COLOR[topBand.slice.group.status]}
                         stroke="rgba(255,255,255,0.5)"
                         strokeWidth="1"
                       />
@@ -557,7 +714,7 @@ export function ExposureBuckets() {
                       const edgeX = CX + innerRadiusAt(anchorY) - 8
                       return (
                         <g
-                          key={`${band.slice.trade.id}-leader-${band.yTop}`}
+                          key={`${band.slice.group.key}-leader-${band.yTop}`}
                           className="stroke-muted-foreground/60"
                           fill="none"
                           strokeWidth="1"
@@ -608,70 +765,144 @@ export function ExposureBuckets() {
                     </div>
                   )}
 
-                  {/* Position labels: inside their slice when it is tall enough,
-                      otherwise out in the gutter at the end of a leader line */}
-                  {labels.map(({ band: { slice }, inside, anchorY, labelY }, index) => (
-                    <Tooltip key={`${slice.trade.id}-label-${index}`}>
-                      <TooltipTrigger asChild>
-                        {inside ? (
-                          <div
-                            className="absolute flex cursor-default items-center justify-center gap-1 text-[10px] font-bold text-white transition-transform hover:scale-105"
-                            style={{
-                              left: `${((CX - 80) / VIEW_W) * 100}%`,
-                              width: `${(160 / VIEW_W) * 100}%`,
-                              top: `${(anchorY / VIEW_H) * 100}%`,
-                              transform: 'translateY(-50%)',
-                              textShadow: '0 1px 2px rgba(0,0,0,0.45)',
-                            }}
-                          >
-                            <span className="max-w-[80px] truncate">{slice.trade.ticker.symbol}</span>
-                            <span className="font-normal opacity-90">{formatPct(slice.equityPctInBucket)}</span>
-                            {slice.spansBuckets.length > 1 && (
-                              <span className="rounded-full bg-purple-500 px-1 text-[8px] leading-3 shadow">M</span>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            className="absolute flex cursor-default items-center gap-1.5 text-[10px] font-medium text-foreground transition-transform hover:scale-105"
-                            style={{
-                              left: `${(LABEL_X / VIEW_W) * 100}%`,
-                              top: `${(labelY / VIEW_H) * 100}%`,
-                              transform: 'translateY(-50%)',
-                            }}
-                          >
-                            <span
-                              className={`h-2 w-2 shrink-0 rounded-full ${
-                                slice.trade.status === 'open' ? 'bg-emerald-500' : 'bg-cyan-500'
-                              }`}
-                            />
-                            <span className="max-w-[64px] truncate font-bold">{slice.trade.ticker.symbol}</span>
-                            <span className="text-muted-foreground">{formatPct(slice.equityPctInBucket)}</span>
-                            {slice.spansBuckets.length > 1 && (
-                              <span className="rounded-full bg-purple-500 px-1 text-[8px] leading-3 text-white shadow">M</span>
-                            )}
-                          </div>
-                        )}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-sm">
-                          <div className="font-medium">{slice.trade.ticker.symbol}</div>
-                          <div>Status: {slice.trade.status.toUpperCase()}</div>
-                          <div>Size: {formatPct(slice.trade.equityPct)} of equity</div>
-                          <div className="text-muted-foreground">
-                            = {formatPct(equityPctToPositionPct(slice.trade.equityPct))} of a full position
-                          </div>
-                          {slice.trade.status === 'partial' && (
-                            <div className="text-muted-foreground">
-                              originally {formatPct(slice.trade.fullEquityPct)} of equity
+                  {/* Position labels: a ticker's combined size, with the buys
+                      it was built from listed underneath - inside the slab when
+                      it is tall enough, otherwise out in the gutter */}
+                  {labels.map(({ band: { slice }, inside, showLegsInside, anchorY, labelY }, index) => {
+                    const group = slice.group
+                    const stacked = group.trades.length > 1
+                    const legs = group.trades.map((trade) => formatPct(trade.equityPct))
+
+                    return (
+                      <Tooltip key={`${group.key}-label-${index}`}>
+                        <TooltipTrigger asChild>
+                          {inside ? (
+                            <div
+                              className="absolute flex cursor-default flex-col items-center leading-tight text-white transition-transform hover:scale-105"
+                              style={{
+                                left: `${((CX - 80) / VIEW_W) * 100}%`,
+                                width: `${(160 / VIEW_W) * 100}%`,
+                                top: `${(anchorY / VIEW_H) * 100}%`,
+                                transform: 'translateY(-50%)',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.45)',
+                              }}
+                            >
+                              {/* A slab is striped by its own buy boundaries, so the
+                                  label needs a scrim to stay legible on top of them */}
+                              <div className="flex flex-col items-center rounded-[3px] bg-black/45 px-1.5 py-[1px] leading-tight">
+                              <div className="flex items-center gap-1 text-[10px] font-bold">
+                                <span className="max-w-[80px] truncate">{group.symbol}</span>
+                                <span className="font-normal opacity-90">
+                                  {formatPct(slice.equityPctInBucket)}
+                                </span>
+                                {slice.spansBuckets.length > 1 && (
+                                  <span className="rounded-full bg-purple-500 px-1 text-[8px] leading-3 shadow">M</span>
+                                )}
+                              </div>
+                              {showLegsInside && (
+                                <div className="flex items-center gap-[3px] text-[8px] font-medium text-white/85">
+                                  {legs.map((leg, legIndex) => (
+                                    <React.Fragment key={legIndex}>
+                                      {legIndex > 0 && <span className="opacity-50">+</span>}
+                                      <span>{leg}</span>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="absolute flex cursor-default flex-col gap-px text-[10px] transition-transform hover:scale-105"
+                              style={{
+                                left: `${(LABEL_X / VIEW_W) * 100}%`,
+                                top: `${(labelY / VIEW_H) * 100}%`,
+                                transform: 'translateY(-50%)',
+                              }}
+                            >
+                              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${DOT_COLOR[group.status]}`} />
+                                <span className="max-w-[64px] truncate font-bold">{group.symbol}</span>
+                                <span className="text-muted-foreground">
+                                  {formatPct(slice.equityPctInBucket)}
+                                </span>
+                                {slice.spansBuckets.length > 1 && (
+                                  <span className="rounded-full bg-purple-500 px-1 text-[8px] leading-3 text-white shadow">M</span>
+                                )}
+                              </div>
+                              {stacked && (
+                                <div className="flex items-center gap-1 pl-[3px] text-[9px] text-muted-foreground">
+                                  <span className="mb-[3px] h-[7px] w-[5px] shrink-0 rounded-bl-[2px] border-b border-l border-muted-foreground/50" />
+                                  {legs.map((leg, legIndex) => (
+                                    <React.Fragment key={legIndex}>
+                                      {legIndex > 0 && <span className="opacity-50">+</span>}
+                                      <span>{leg}</span>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
-                          {slice.spansBuckets.length > 1 && (
-                            <div>Spans buckets: {slice.spansBuckets.join(', ')}</div>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                        </TooltipTrigger>
+                        <TooltipContent className={TOOLTIP_SURFACE}>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium">{group.symbol}</span>
+                              {group.securedCount === group.trades.length && (
+                                <Medal className="h-3.5 w-3.5 text-amber-500" />
+                              )}
+                            </div>
+                            <div>
+                              {stacked ? 'Combined size: ' : 'Size: '}
+                              {formatPct(group.equityPct)} of equity
+                            </div>
+                            <div className="text-muted-foreground">
+                              = {formatPct(equityPctToPositionPct(group.equityPct))} of a full position
+                            </div>
+
+                            {stacked ? (
+                              <div className="space-y-0.5 border-t pt-1.5">
+                                <div className="text-xs text-muted-foreground">
+                                  Built from {group.trades.length} buys:
+                                </div>
+                                {group.trades.map((trade) => (
+                                  <div key={trade.id} className="flex items-center gap-1.5 text-xs">
+                                    <span className="font-medium tabular-nums">{formatPct(trade.equityPct)}</span>
+                                    <span className="text-muted-foreground">
+                                      {trade.status === 'partial'
+                                        ? `partial · from ${formatPct(trade.fullEquityPct)}`
+                                        : 'open'}
+                                    </span>
+                                    {trade.breakEvenSecured && (
+                                      <Medal className="h-3 w-3 shrink-0 text-amber-500" />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <>
+                                <div>Status: {group.status.toUpperCase()}</div>
+                                {group.status === 'partial' && (
+                                  <div className="text-muted-foreground">
+                                    originally {formatPct(group.fullEquityPct)} of equity
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {slice.spansBuckets.length > 1 && (
+                              <div className="border-t pt-1.5">
+                                <div>Spans buckets: {slice.spansBuckets.join(', ')}</div>
+                                <div className="text-muted-foreground">
+                                  {formatPct(slice.equityPctInBucket)} of it sits in bucket {bucket.id}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })}
                 </div>
 
                 <div className="text-center">
@@ -681,6 +912,7 @@ export function ExposureBuckets() {
                   </p>
                   <Badge variant="outline" className="mt-1">
                     {bucket.slices.length} position{bucket.slices.length !== 1 ? 's' : ''}
+                    {entryCount !== bucket.slices.length && ` · ${entryCount} buys`}
                   </Badge>
                 </div>
               </div>
@@ -704,12 +936,24 @@ export function ExposureBuckets() {
                 <span className="text-sm">Partial positions (partly exited)</span>
               </div>
               <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
+                <span className="text-sm">Mixed: some buys open, some partly exited</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0">
+                  <rect x="0" y="1" width="16" height="14" rx="2" className="fill-emerald-500" />
+                  <path d="M 0 6 H 16 M 0 10.5 H 16" stroke="white" strokeWidth="1.2" strokeDasharray="3 2.5" />
+                </svg>
+                <span className="text-sm">Dashed strata: the separate buys inside one position</span>
+              </div>
+              <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                 <span className="text-sm">Spans two buckets (M)</span>
               </div>
               <div className="text-xs text-muted-foreground pt-2 border-t">
                 Each bucket holds 100% of the equity. Bucket 1 fills first. The other buckets only fill once trading on margin -
-                partial and smallest positions spill over first.
+                partial and smallest positions spill over first. Multiple buys of the same ticker pour into one slab sized by
+                their combined exposure, split by dashed lines and labelled with the individual buys that built it.
               </div>
             </CardContent>
           </Card>
