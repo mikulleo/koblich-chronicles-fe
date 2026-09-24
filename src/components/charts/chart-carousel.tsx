@@ -13,7 +13,7 @@ import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useAnalytics } from '@/hooks/use-analytics'
 import { ChartMeasurement, Measurement } from './chart-measurement'
-import { MarketSurgeAttribution } from './marketsurge-attribution'
+import { MarketSurgeAttribution, MARKETSURGE_SIGNUP_URL } from './marketsurge-attribution'
 
 // Updated ChartImage interface to properly include tags
 export interface ChartImage {
@@ -618,7 +618,17 @@ export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: Chart
             </div>
             
             {/* MarketSurge attribution — required credit on all MarketSurge charts */}
-            <MarketSurgeAttribution size={fullscreen ? 'lg' : 'md'} />
+            <MarketSurgeAttribution
+              size={fullscreen ? 'lg' : 'md'}
+              // Not clickable while measuring, so price-point clicks can't open a tab.
+              signupHref={isMeasurementActive ? undefined : MARKETSURGE_SIGNUP_URL}
+              onSignupClick={() =>
+                analytics.trackEvent('marketsurge_signup_click', {
+                  location: fullscreen ? 'chart_logo_fullscreen' : 'chart_logo',
+                  ticker: currentChart?.ticker,
+                })
+              }
+            />
 
             {/* Measurement active indicator */}
             {isMeasurementActive && (
@@ -672,7 +682,7 @@ export function ChartCarousel({ charts, onChartClick, onMeasurementSave }: Chart
 
             {/* Attribution credit */}
             <p className="text-[11px] text-muted-foreground mt-2">
-              Chart courtesy of MarketSurge. © MarketSurge. All rights reserved.
+              Chart courtesy of MarketSurge. © MarketSurge. All rights reserved. #IBDpartner
             </p>
 
             {/* Keyboard Shortcuts - only in fullscreen */}

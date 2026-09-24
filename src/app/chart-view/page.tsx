@@ -47,7 +47,7 @@ export default async function ChartViewPage({ searchParams }: ChartViewPageProps
 
       <p className="text-xs text-muted-foreground">
         Chart courtesy of MarketSurge. © MarketSurge. All rights reserved. Used with
-        attribution; not for reproduction without permission.
+        attribution; not for reproduction without permission. #IBDpartner
       </p>
     </div>
   )

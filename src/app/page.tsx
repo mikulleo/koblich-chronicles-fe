@@ -171,6 +171,9 @@ export default function Home() {
               For those who don&apos;t know me – my name is Leos Mikulka – I&apos;m primarily a Swing trader/shorter-term trader heavily influenced by the CANSLIM methodology and some of the brightest minds revolving around this style. I have learned a lot from the Investors Business Daily, gotten a solid foundation from Mark Minervini and been fine-tuned in my style by Leif Soreide. All of these factors helped me place third in the 2024 United States Investing Championship.
             </p>
             <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
+              I&apos;m an Investor&apos;s Business Daily partner (#IBDpartner), sharing my own market analysis and trading insights using MarketSurge charts and data.
+            </p>
+            <p className="mb-4 text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
               Personally, I&apos;ve always been an avid athlete – currently playing ice-hockey as a goalie and competed as a football player (cornerback) for the national team, having a chance to play across multiple European countries and grabbing some championship rings in the Czech Republic and United Kingdom.
             </p>
             <p className="text-md text-gray-700" style={{ fontFamily: "'Manrope', 'Inter'" }}>
