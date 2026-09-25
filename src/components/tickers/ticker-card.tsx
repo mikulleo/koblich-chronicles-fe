@@ -29,6 +29,7 @@ const TickerCard: React.FC<TickerCardProps> = ({ ticker, onShowCharts, onShowTra
     analytics.trackTickerSelect(ticker.symbol);
     analytics.trackEvent('ticker_charts_view', {
       ticker_id: ticker.id,
+      ticker: ticker.symbol,
       ticker_symbol: ticker.symbol,
       charts_count: ticker.chartsCount,
       sector: ticker.sector || 'unknown',
@@ -43,6 +44,7 @@ const TickerCard: React.FC<TickerCardProps> = ({ ticker, onShowCharts, onShowTra
     // Track ticker selection for trades view
     analytics.trackEvent('ticker_trades_view', {
       ticker_id: ticker.id,
+      ticker: ticker.symbol,
       ticker_symbol: ticker.symbol,
       trades_count: ticker.tradesCount,
       sector: ticker.sector || 'unknown',
@@ -93,7 +95,7 @@ const TickerCard: React.FC<TickerCardProps> = ({ ticker, onShowCharts, onShowTra
           variant="outline" 
           size="sm" 
           className="flex-1 min-w-[110px]"
-          onClick={() => onShowCharts(ticker.id.toString())}
+          onClick={handleShowCharts}
         >
           Show Charts
         </Button>
@@ -103,7 +105,7 @@ const TickerCard: React.FC<TickerCardProps> = ({ ticker, onShowCharts, onShowTra
             variant="default" 
             size="sm" 
             className="flex-1 min-w-[110px]"
-            onClick={() => onShowTrades(ticker)}
+            onClick={handleShowTrades}
           >
             <ListFilter className="h-3 w-3 mr-1" />
             Show Trades
