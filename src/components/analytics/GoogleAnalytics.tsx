@@ -24,7 +24,7 @@ interface GoogleAnalyticsProps {
 export default function GoogleAnalytics({ GA_MEASUREMENT_ID }: GoogleAnalyticsProps) {
   useEffect(() => {
     configure(GA_MEASUREMENT_ID, {
-      debug: process.env.NODE_ENV !== 'production',
+      debug: process.env.NODE_ENV !== 'production' || isDebugRequested(),
     })
   }, [GA_MEASUREMENT_ID])
 
@@ -35,4 +35,27 @@ export default function GoogleAnalytics({ GA_MEASUREMENT_ID }: GoogleAnalyticsPr
       src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
     />
   )
+}
+
+const DEBUG_KEY = 'kc:analytics:debug'
+
+/**
+ * `?debug_mode=1` opts this tab into GA4 DebugView on production; `?debug_mode=0`
+ * opts back out. gtag.js does not read the URL itself, so without this there is
+ * no way to see production hits in DebugView short of the GA Debugger extension.
+ * Remembered for the tab, because the query string is gone after one navigation
+ * and a reload would otherwise silently drop out of debug.
+ *
+ * Debug hits are excluded from standard reports once the "Developer traffic"
+ * data filter is active, so checking the live site does not pollute its numbers.
+ */
+function isDebugRequested(): boolean {
+  try {
+    const param = new URLSearchParams(window.location.search).get('debug_mode')
+    if (param === '1' || param === 'true') window.sessionStorage.setItem(DEBUG_KEY, '1')
+    if (param === '0' || param === 'false') window.sessionStorage.removeItem(DEBUG_KEY)
+    return window.sessionStorage.getItem(DEBUG_KEY) === '1'
+  } catch {
+    return false
+  }
 }
