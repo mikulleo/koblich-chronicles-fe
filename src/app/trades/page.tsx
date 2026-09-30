@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Metadata } from "next";
 import { ListFilter, Target, BarChart3, Loader2 } from "lucide-react";
 import { TradesTabView } from "@/components/trades/trades-tab-view";
+import { BlueDotPromo } from "@/components/trades/blue-dot-promo";
 
 export const metadata: Metadata = {
   title: "Trades | Koblich Chronicles",
@@ -18,6 +19,8 @@ export default function TradesPage() {
           Comprehensive trading management with trade logs, position exposure visualization, and performance analytics.
         </p>
       </div>
+
+      <BlueDotPromo />
 
       {/* Feature Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
