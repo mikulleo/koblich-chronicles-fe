@@ -75,6 +75,7 @@ export function invalidateCache(prefix?: string) {
 /**
  * Prefetch only the most critical data:
  *   Phase 1: Current month stats (the default view on Statistics tab)
+ *            + the yearly/monthly time-period table
  *
  * Trades list is fetched on-demand by TradesTable via cachedFetch,
  * so we don't need to eagerly load all trades on boot.
@@ -91,4 +92,7 @@ export function prefetchAll() {
   monthParams.append("startDate", startDate);
   monthParams.append("endDate", endDate);
   cachedFetch("/trades/stats", monthParams);
+
+  // Yearly + monthly table ("By Time Period") — a single precomputed response
+  cachedFetch("/trades/stats/periods");
 }

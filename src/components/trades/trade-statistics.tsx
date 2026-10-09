@@ -64,11 +64,12 @@ export interface StatsMetadata {
   tickerFilter: boolean;
 }
 
-// Trade interface for P/L calculation
-interface Trade {
-  profitLossPercent: number;
+// Per-trade rows returned by /trades/stats (the exact trades behind the stats)
+export interface StatsTrade {
+  id: string | number;
+  profitLossPercent: number | null;
   normalizedMetrics?: {
-    profitLossPercent: number;
+    profitLossPercent: number | null;
   };
   status: 'open' | 'partial' | 'closed';
 }
@@ -89,11 +90,9 @@ export function TradeStatistics() {
   // State for statistics data
   const [stats, setStats] = useState<TradeStats | null>(null);
   const [metadata, setMetadata] = useState<StatsMetadata | null>(null);
-  const [trades, setTrades] = useState<any[]>([]);
+  const [trades, setTrades] = useState<StatsTrade[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [tradesLoading, setTradesLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [tradesError, setTradesError] = useState<string | null>(null);
 
 
   // State for filters
@@ -119,7 +118,7 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
 // ────────────────────────────────────────────────────────────────────────────────
 
   // Function to calculate total P/L percentage as simple sum
-  const calculateTotalProfitLossPercent = (trades: Trade[]) => {
+  const calculateTotalProfitLossPercent = (trades: StatsTrade[]) => {
     // Filter trades to only include closed and partial (same as backend filter)
     const relevantTrades = trades.filter(trade => 
       trade.status === 'closed' || trade.status === 'partial'
@@ -180,7 +179,7 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
     return params;
   };
 
-  // Fetch stats independently (uses prefetch cache — instant if already loaded)
+  // Fetch stats + the trades behind them (uses prefetch cache — instant if already loaded)
   useEffect(() => {
     let cancelled = false;
     const fetchStats = async () => {
@@ -188,11 +187,12 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
         setStatsLoading(true);
         setStatsError(null);
         const params = buildQueryParams();
-        const data = await cachedFetch<{ stats: TradeStats; metadata: StatsMetadata }>("/trades/stats", params);
+        const data = await cachedFetch<{ stats: TradeStats; metadata: StatsMetadata; trades: StatsTrade[] }>("/trades/stats", params);
         if (cancelled) return;
         if (data) {
           setStats(data.stats);
           setMetadata(data.metadata);
+          setTrades(data.trades ?? []);
         } else {
           throw new Error("Unexpected response format");
         }
@@ -205,33 +205,6 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
       }
     };
     fetchStats();
-    return () => { cancelled = true; };
-  }, [filters]);
-
-  // Fetch trades independently (uses prefetch cache — instant if already loaded)
-  useEffect(() => {
-    let cancelled = false;
-    const fetchTrades = async () => {
-      try {
-        setTradesLoading(true);
-        setTradesError(null);
-        const params = buildQueryParams();
-        const data = await cachedFetch<{ docs: any[] }>("/trades", params);
-        if (cancelled) return;
-        if (data) {
-          setTrades(data.docs);
-        } else {
-          throw new Error("Unexpected response format");
-        }
-      } catch (error) {
-        if (cancelled) return;
-        console.error("Error fetching trades:", error);
-        setTradesError("Failed to load trade data.");
-      } finally {
-        if (!cancelled) setTradesLoading(false);
-      }
-    };
-    fetchTrades();
     return () => { cancelled = true; };
   }, [filters]);
 
@@ -266,7 +239,7 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
   );
 
   const displayStats = enhancedStats || stats;
-  const hasStatsError = statsError && tradesError;
+  const hasStatsError = Boolean(statsError);
 
   return (
     <div className="space-y-6">
@@ -276,7 +249,7 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
         onFilterChange={handleFilterChange}
       />
 
-      {/* Full error only if both requests failed */}
+      {/* Error */}
       {hasStatsError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -317,7 +290,7 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
       />
 
       {/* Trade Distribution Histogram */}
-      {tradesLoading ? (
+      {statsLoading ? (
         <SectionLoader label="Loading trade distribution..." />
       ) : trades.length > 0 ? (
         <StatisticsHistogram

@@ -17,22 +17,15 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import apiClient from "@/lib/api/client";
 import { useChartColors } from "@/hooks/use-chart-colors";
 import { StatsFilters } from "./trade-statistics";
 
 interface Trade {
-  id: string;
-  profitLossPercent: number;
+  id: string | number;
+  profitLossPercent: number | null;
   status: string;
-  entryDate: string;
-  exits?: Array<{
-    date: string;
-    price: number;
-    shares: number;
-  }>;
   normalizedMetrics?: {
-    profitLossPercent: number;
+    profitLossPercent: number | null;
   };
 }
 
@@ -55,10 +48,10 @@ interface TradeDataSummary {
 interface StatisticsHistogramProps {
   filters: StatsFilters;
   viewMode: "standard" | "normalized";
-  trades?: Trade[];
+  trades: Trade[];
 }
 
-export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: StatisticsHistogramProps) {
+export function StatisticsHistogram({ filters, viewMode, trades }: StatisticsHistogramProps) {
   const chartColors = useChartColors();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,115 +96,15 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
     return buckets;
   };
 
-  // Helper function to get completion date for a trade
-  const getTradeCompletionDate = (trade: Trade): Date => {
-    // For open trades, use entry date
-    if (trade.status === 'open') {
-      return new Date(trade.entryDate);
-    }
-    
-    // For closed and partial trades, use the last exit date
-    if (trade.exits && trade.exits.length > 0) {
-      // Find the most recent exit date
-      const lastExitDate = trade.exits.reduce((latest: string, exit: any) => {
-        const exitDate = new Date(exit.date);
-        const latestDate = new Date(latest);
-        return exitDate > latestDate ? exit.date : latest;
-      }, trade.exits[0].date);
-      
-      return new Date(lastExitDate);
-    }
-    
-    // Fallback to entry date if no exits
-    return new Date(trade.entryDate);
-  };
-
-  // Helper function to filter trades by completion date AND status
-  const filterTrades = (trades: Trade[], filters: StatsFilters) => {
-    return trades.filter(trade => {
-      // Apply status filter first
-      if (filters.statusFilter === "closed-only") {
-        if (trade.status !== "closed") {
-          return false;
-        }
-      } else {
-        // Default: include both closed and partial trades
-        if (!["closed", "partial"].includes(trade.status)) {
-          return false;
-        }
-      }
-
-      // Then apply date filtering
-      const completionDate = getTradeCompletionDate(trade);
-      
-      // Get the target date range based on filters
-      let targetStartDate: Date | undefined;
-      let targetEndDate: Date | undefined;
-      
-      if (filters.timePeriod === "custom" && filters.startDate && filters.endDate) {
-        targetStartDate = new Date(filters.startDate);
-        targetEndDate = new Date(filters.endDate);
-        targetEndDate.setHours(23, 59, 59, 999); // End of day
-      } else if (filters.timePeriod !== "all") {
-        const today = new Date();
-        
-        if (filters.timePeriod === "year") {
-          // This year: January 1st of current year to TODAY
-          targetStartDate = new Date(today.getFullYear(), 0, 1);
-          targetEndDate = new Date(today);
-          targetEndDate.setHours(23, 59, 59, 999);
-        } else if (filters.timePeriod === "month") {
-          // This month: 1st day of current month to TODAY
-          targetStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
-          targetEndDate = new Date(today);
-          targetEndDate.setHours(23, 59, 59, 999);
-        } else if (filters.timePeriod === "week") {
-          // This week: Monday of current week to TODAY
-          const day = today.getDay();
-          const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-          targetStartDate = new Date(today.getFullYear(), today.getMonth(), diff);
-          targetEndDate = new Date(today);
-          targetEndDate.setHours(23, 59, 59, 999);
-        }
-      }
-      
-      // Apply date filtering
-      if (targetStartDate && completionDate < targetStartDate) {
-        return false;
-      }
-      
-      if (targetEndDate && completionDate > targetEndDate) {
-        return false;
-      }
-      
-      return true;
-    });
-  };
-
   useEffect(() => {
     const processTradeData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        let allTrades: Trade[];
-
-        if (tradesProp) {
-          // Use trades passed from parent — already filtered by server
-          allTrades = tradesProp;
-        } else {
-          // Fallback: fetch trades ourselves (excluding hypothetical "didn't trade" entries)
-          const response = await apiClient.get('/trades', {
-            params: { limit: 2000, 'where[didNotTrade][not_equals]': 'true' },
-          });
-          if (!response.data?.docs) {
-            throw new Error("Unexpected response format");
-          }
-          allTrades = response.data.docs;
-        }
-
-        // Apply client-side filtering (status + date by completion date)
-        const filteredTrades = filterTrades(allTrades, filters);
+        // Trades come from /trades/stats — already filtered by status, date and ticker
+        // exactly like the stats themselves
+        const filteredTrades = trades;
           
           // Create buckets and populate with filtered trade data
           const buckets = createBuckets();
@@ -222,7 +115,7 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
             let hasValidPLData = false;
             
             // Try to get P/L data based on view mode
-            if (viewMode === "normalized" && trade.normalizedMetrics?.profitLossPercent !== undefined) {
+            if (viewMode === "normalized" && trade.normalizedMetrics?.profitLossPercent != null) {
               profitLossPercent = trade.normalizedMetrics.profitLossPercent;
               hasValidPLData = !isNaN(profitLossPercent);
             } else if (trade.profitLossPercent !== null && trade.profitLossPercent !== undefined) {
@@ -248,7 +141,7 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
           
           // Calculate summary data - using filtered trades
           const tradesWithPLData = filteredTrades.filter(trade => {
-            if (viewMode === "normalized" && trade.normalizedMetrics?.profitLossPercent !== undefined) {
+            if (viewMode === "normalized" && trade.normalizedMetrics?.profitLossPercent != null) {
               return !isNaN(trade.normalizedMetrics.profitLossPercent);
             }
             return trade.profitLossPercent !== null && 
@@ -273,7 +166,7 @@ export function StatisticsHistogram({ filters, viewMode, trades: tradesProp }: S
     };
 
     processTradeData();
-  }, [filters, viewMode, tradesProp]);
+  }, [viewMode, trades]);
 
   // Custom tooltip for the histogram
   const CustomTooltip = ({ active, payload, label }: any) => {
