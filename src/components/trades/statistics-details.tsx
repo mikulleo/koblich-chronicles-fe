@@ -255,11 +255,11 @@ export function StatisticsDetails({ stats, metadata, viewMode }: StatisticsDetai
                           </TooltipProvider>
                         </div>
                       </TableCell>
-                      <TableCell className={getColorClass(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio, 1)}>
+                      <TableCell className={getColorClass(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio, 0)}>
                         {formatRatio(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        Average profit/loss relative to initial risk.
+                        Average profit/loss relative to initial risk. Values above 0 mean you make money on average.
                       </TableCell>
                     </TableRow>
                     <TableRow>

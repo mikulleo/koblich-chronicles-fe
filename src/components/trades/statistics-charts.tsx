@@ -132,37 +132,59 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
     "Max Loss %": colors.maxLoss
   };
 
-  // Strategy metrics for radar chart - with safety checks
+  // Strategy metrics for radar chart.
+  // Every axis is scored 0-100 with break-even at 50, so the dashed break-even ring is
+  // directly comparable across axes: outside the ring = good, inside = bad.
+  // Ratios (Win/Loss, Profit Factor) use a log2 scale so 0.5x and 2x sit equally far from 1.0.
+  const toScore = (value: number) => (Number.isNaN(value) ? 0 : Math.min(100, Math.max(0, value)));
+  const logRatioScore = (ratio: number) => toScore(50 + 25 * Math.log2(Math.max(ratio, 0)));
+
+  const winRate = stats.battingAverage;
+  const winLossRatio = isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio;
+  const averageRRatio = isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio;
+  const profitFactor = isNormalized ? stats.normalized.profitFactor : stats.profitFactor;
+  const expectancy = isNormalized ? stats.normalized.expectancy : stats.expectancy;
+
   const strategyMetrics = [
     {
       metric: "Win Rate",
-      value: Math.min(100, Math.max(0, stats.battingAverage)),
-      fullMark: 100,
-      description: "Percentage of winning trades"
+      value: toScore(winRate),
+      breakEven: 50,
+      actual: `${winRate.toFixed(1)}%`,
+      breakEvenLabel: "50%",
+      description: "Percentage of winning trades. Plotted as-is (edge = 100%)"
     },
     {
       metric: "Win/Loss",
-      value: Math.min(100, Math.max(0, (isNormalized ? stats.normalized.winLossRatio : stats.winLossRatio) * 25)),
-      fullMark: 100,
-      description: "Ratio of avg win% to avg loss%"
+      value: logRatioScore(winLossRatio),
+      breakEven: 50,
+      actual: winLossRatio.toFixed(2),
+      breakEvenLabel: "1.00",
+      description: "Avg win% ÷ avg loss%. Log scale: ring = 1.0, 2.0 halfway to edge, edge = 4.0"
     },
     {
       metric: "R-Ratio",
-      value: Math.min(100, Math.max(0, (isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio) * 25)),
-      fullMark: 100,
-      description: "Profit relative to initial risk"
+      value: toScore(50 + 25 * averageRRatio),
+      breakEven: 50,
+      actual: `${averageRRatio >= 0 ? "+" : ""}${averageRRatio.toFixed(2)}R`,
+      breakEvenLabel: "0R",
+      description: "Average R per trade. Ring = 0R, each 1R = a quarter of the axis, edge = +2R"
     },
     {
       metric: "Profit Factor",
-      value: Math.min(100, Math.max(0, (isNormalized ? stats.normalized.profitFactor : stats.profitFactor) * 20)),
-      fullMark: 100,
-      description: "Gross profit ÷ gross loss"
+      value: logRatioScore(profitFactor),
+      breakEven: 50,
+      actual: Number.isFinite(profitFactor) ? profitFactor.toFixed(2) : "∞",
+      breakEvenLabel: "1.00",
+      description: "Gross profit ÷ gross loss. Log scale: ring = 1.0, 2.0 halfway to edge, edge = 4.0"
     },
     {
       metric: "Expectancy",
-      value: Math.min(100, Math.max(0, (isNormalized ? stats.normalized.expectancy : stats.expectancy) * 20 + 50)),
-      fullMark: 100,
-      description: "Expected P/L per trade"
+      value: toScore(50 + 20 * expectancy),
+      breakEven: 50,
+      actual: `${expectancy >= 0 ? "+" : ""}${expectancy.toFixed(2)}%`,
+      breakEvenLabel: "0%",
+      description: "Expected P/L per trade. Ring = 0%, edge = +2.5%"
     },
   ];
 
@@ -315,7 +337,7 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
               <div className="bg-muted/30 p-4 rounded-md">
                 <h3 className="text-sm font-medium mb-2">Strategy Radar Chart Explanation</h3>
                 <p className="text-sm text-muted-foreground mb-2">
-                  This radar chart shows how your trading strategy performs across five key metrics. Each axis represents a different aspect of performance, with higher values (farther from center) being better.
+                  This radar chart shows how your trading strategy performs across five key metrics. The dashed ring marks break-even on every axis (50% win rate, 1.0 ratio, 0R, 0% expectancy) &mdash; anything outside the ring is working for you, anything inside is working against you. Values beyond the edge are capped there; hover for the actual numbers.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
                   {strategyMetrics.map((metric, index) => (
@@ -323,11 +345,6 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                       <span className="font-medium min-w-24">{metric.metric}:</span>
                       <span>
                         {metric.description}.
-                        {metric.metric === "Win Rate" && ` Actual percentage shown.`}
-                        {metric.metric === "Win/Loss" && ` Values multiplied by 25 for visibility.`}
-                        {metric.metric === "R-Ratio" && ` Values multiplied by 25 for visibility.`}
-                        {metric.metric === "Profit Factor" && ` Values multiplied by 20 for visibility.`}
-                        {metric.metric === "Expectancy" && ` Values shifted and scaled for visibility.`}
                       </span>
                     </div>
                   ))}
@@ -339,7 +356,7 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={strategyMetrics}>
                     <PolarGrid stroke={chartColors.grid} />
                     <PolarAngleAxis dataKey="metric" tick={{ fill: chartColors.text }} />
-                    <PolarRadiusAxis domain={[0, 100]} tick={{ fill: chartColors.text }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
                     <Radar
                       name="Strategy Performance"
                       dataKey="value"
@@ -347,29 +364,22 @@ export function StatisticsCharts({ stats, metadata, viewMode }: StatisticsCharts
                       fill={colors.radar.fill}
                       fillOpacity={0.4}
                     />
+                    <Radar
+                      name="Break-even"
+                      dataKey="breakEven"
+                      stroke={chartColors.text}
+                      strokeDasharray="4 4"
+                      fill="none"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
                     <RechartsTooltip
                       contentStyle={ttStyle}
-                      formatter={(value: any, name: string, props: any) => {
-                        const metric = props.payload.metric;
-                        let displayValue = value;
-                        let unit = "";
-                        
-                        // Format based on metric
-                        if (metric === "Win Rate") {
-                          unit = "%";
-                        } else if (metric === "Win/Loss") {
-                          displayValue = (displayValue / 25).toFixed(2);
-                        } else if (metric === "R-Ratio") {
-                          displayValue = (displayValue / 25).toFixed(2);
-                        } else if (metric === "Profit Factor") {
-                          displayValue = (displayValue / 20).toFixed(2);
-                        } else if (metric === "Expectancy") {
-                          displayValue = ((displayValue - 50) / 20).toFixed(2);
-                          unit = "%";
-                        }
-                        
-                        return [`${displayValue}${unit}`, "Actual Value"];
-                      }}
+                      formatter={(_value: any, name: string, props: any) =>
+                        name === "Break-even"
+                          ? [props.payload.breakEvenLabel, "Break-even"]
+                          : [props.payload.actual, "Actual Value"]
+                      }
                     />
                   </RadarChart>
                 </ResponsiveContainer>

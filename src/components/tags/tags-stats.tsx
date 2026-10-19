@@ -163,7 +163,9 @@ function PerformanceBadge({ value, type }: { value: number; type: 'winRate' | 'r
     color = value >= 50 ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20';
     icon = value >= 50 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
   } else if (type === 'rRatio') {
-    color = value >= 1 ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20';
+    color = value > 0 ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+            value < 0 ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+            'bg-gray-500/10 text-gray-500 border-gray-500/20';
     icon = <Target className="h-3 w-3" />;
   } else {
     color = value > 0 ? 'bg-green-500/10 text-green-600 border-green-500/20' :

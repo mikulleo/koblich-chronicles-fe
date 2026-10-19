@@ -358,6 +358,24 @@ const BreakEvenMedal = () => (
   </TooltipProvider>
 )
 
+// Days held: entry date to last exit for closed trades, entry date to today for open/partial trades
+export const getDaysHeld = (trade: Trade): number => {
+  const entryDate = new Date(trade.entryDate)
+  let endDate: Date
+
+  if (trade.status === 'closed' && trade.exits && trade.exits.length > 0) {
+    endDate = trade.exits.reduce((latest, exit) => {
+      const exitDate = new Date(exit.date)
+      return exitDate > latest ? exitDate : latest
+    }, new Date(0))
+  } else {
+    endDate = new Date()
+  }
+
+  const diffTime = Math.abs(endDate.getTime() - entryDate.getTime())
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 0
+}
+
 export const columns: ColumnDef<Trade>[] = [
     {
     accessorKey: "status",
@@ -664,6 +682,8 @@ export const columns: ColumnDef<Trade>[] = [
   */
   {
     id: "daysHeld",
+    // accessorFn is what makes TanStack treat the column as sortable
+    accessorFn: (trade) => getDaysHeld(trade),
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -673,53 +693,9 @@ export const columns: ColumnDef<Trade>[] = [
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
-    cell: ({ row }) => {
-      const trade = row.original
-      
-      // For closed trades: entry date to last exit
-      // For partial/open trades: entry date to today
-      const entryDate = new Date(trade.entryDate)
-      let endDate: Date
-      
-      if (trade.status === 'closed' && trade.exits && trade.exits.length > 0) {
-        // Find the date of the last exit for closed trades
-        endDate = trade.exits.reduce((latest, exit) => {
-          const exitDate = new Date(exit.date)
-          return exitDate > latest ? exitDate : latest
-        }, new Date(0))
-      } else {
-        // Use today's date for open or partially closed trades
-        endDate = new Date()
-      }
-      
-      // Calculate days held
-      const diffTime = Math.abs(endDate.getTime() - entryDate.getTime())
-      const daysHeld = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-      return (<div className="flex justify-center">{daysHeld || 0}</div>)
-    },
-    sortingFn: (rowA, rowB) => {
-      // Custom sorting function for days held
-      const getEndDate = (trade: Trade) => {
-        if (trade.status === 'closed' && trade.exits && trade.exits.length > 0) {
-          return trade.exits.reduce((latest, exit) => {
-            const exitDate = new Date(exit.date)
-            return exitDate > latest ? exitDate : latest
-          }, new Date(0))
-        }
-        return new Date()
-      }
-      
-      const entryDateA = new Date(rowA.original.entryDate)
-      const entryDateB = new Date(rowB.original.entryDate)
-      const endDateA = getEndDate(rowA.original)
-      const endDateB = getEndDate(rowB.original)
-      
-      const daysHeldA = Math.ceil(Math.abs(endDateA.getTime() - entryDateA.getTime()) / (1000 * 60 * 60 * 24))
-      const daysHeldB = Math.ceil(Math.abs(endDateB.getTime() - entryDateB.getTime()) / (1000 * 60 * 60 * 24))
-      
-      return daysHeldA - daysHeldB
-    }
+    cell: ({ row }) => (
+      <div className="flex justify-center">{row.getValue<number>("daysHeld")}</div>
+    ),
   },
   {
     accessorKey: "type",

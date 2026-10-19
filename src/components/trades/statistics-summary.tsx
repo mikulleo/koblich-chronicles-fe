@@ -169,9 +169,9 @@ export function StatisticsSummary({ stats, metadata, viewMode }: StatisticsSumma
         <StatisticsCard
           title="Average R-Ratio"
           value={formatRatio(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio)}
-          info="Average reward-to-risk ratio across all trades. Formula: Average(Profit/Loss ÷ Initial Risk)"
-          positive={(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio) > 1}
-          negative={(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio) < 1}
+          info="Average reward-to-risk ratio across all trades. Formula: Average(Profit/Loss ÷ Initial Risk). Above 0 = profitable on average."
+          positive={(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio) > 0}
+          negative={(isNormalized ? stats.normalized.averageRRatio : stats.averageRRatio) < 0}
         />
         
         {/* Trade Count */}

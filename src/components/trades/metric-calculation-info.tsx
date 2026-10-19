@@ -81,7 +81,7 @@ export function MetricCalculationsInfo() {
                   If your initial risk was $100 and you made $150, your R-Ratio would be 1.5R. If you lost $50, your R-Ratio would be -0.5R.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  The Average R-Ratio is the mean of all your individual trade R-Ratios. Values greater than 1.0 mean that, on average, you're making more than you're risking.
+                  The Average R-Ratio is the mean of all your individual trade R-Ratios &mdash; effectively your expectancy expressed in R. Any value above 0 means you make money on average: +1R and -1R average to 0R (break-even), while +2R and -1R average to +0.5R (you earn half your risk per trade). Values below 0 mean you lose money on average.
                 </p>
               </div>
             </AccordionContent>

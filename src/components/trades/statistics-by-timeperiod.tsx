@@ -220,7 +220,7 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                       viewMode === "normalized"
                         ? yearData.stats.normalized.averageRRatio
                         : yearData.stats.averageRRatio,
-                      1
+                      0
                     )}>
                       {formatRatio(
                         viewMode === "normalized"
@@ -290,7 +290,7 @@ export function StatisticsByTimeperiod({ viewMode, statusFilter, selectedYear }:
                                 viewMode === "normalized"
                                   ? monthData.stats.normalized.averageRRatio
                                   : monthData.stats.averageRRatio,
-                                1
+                                0
                               )}>
                                 {formatRatio(
                                   viewMode === "normalized"

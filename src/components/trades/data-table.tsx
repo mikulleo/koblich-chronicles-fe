@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Trade, TradesTableMeta } from "./columns"
+import { Trade, TradesTableMeta, getDaysHeld } from "./columns"
 import { FilterState } from "./trades-table-filters"
 import { isWithinInterval, parseISO } from "date-fns"
 import { SizeDisplayUnit } from "@/lib/utils/exposure-calculations"
@@ -137,24 +137,7 @@ export function DataTable<TData extends Trade, TValue>({
       }
 
       // Days held filter
-      const calculateDaysHeld = (trade: Trade): number => {
-        const entryDate = new Date(trade.entryDate)
-        let endDate: Date
-        
-        if (trade.status === 'closed' && trade.exits && trade.exits.length > 0) {
-          endDate = trade.exits.reduce((latest, exit) => {
-            const exitDate = new Date(exit.date)
-            return exitDate > latest ? exitDate : latest
-          }, new Date(0))
-        } else {
-          endDate = new Date()
-        }
-        
-        const diffTime = Math.abs(endDate.getTime() - entryDate.getTime())
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      }
-
-      const daysHeld = calculateDaysHeld(trade)
+      const daysHeld = getDaysHeld(trade)
       if (daysHeld < filters.daysHeldRange[0] || daysHeld > filters.daysHeldRange[1]) {
         return false
       }
