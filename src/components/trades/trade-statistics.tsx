@@ -8,6 +8,7 @@ import { StatisticsDetails } from "./statistics-details";
 import { StatisticsCharts } from "./statistics-charts";
 import { StatisticsByTimeperiod } from "./statistics-by-timeperiod";
 import { StatisticsHistogram } from "./statistics-histogram"; // Add this import
+import { StatisticsAdvanced } from "./statistics-advanced";
 import { MetricCalculationsInfo } from "./metric-calculation-info";
 import { cachedFetch, invalidateCache } from "@/lib/prefetch-cache";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -65,9 +66,18 @@ export interface StatsMetadata {
 }
 
 // Per-trade rows returned by /trades/stats (the exact trades behind the stats)
+// The statistics page is public — these rows never carry dollar amounts.
 export interface StatsTrade {
   id: string | number;
   profitLossPercent: number | null;
+  // Optional: older API versions only return the P/L % fields
+  rRatio?: number | null;
+  daysHeld?: number | null;
+  entryDate?: string | null;
+  /** ISO date of the last exit (when the result was realized) */
+  closeDate?: string;
+  /** Position size ÷ target position size (1 = one full position) */
+  normalizationFactor?: number | null;
   normalizedMetrics?: {
     profitLossPercent: number | null;
   };
@@ -297,6 +307,17 @@ const parseLocalEndDate = (isoDate: string) => new Date(`${isoDate}T23:59:59.999
           filters={filters}
           viewMode={filters.viewMode}
           trades={trades}
+        />
+      ) : null}
+
+      {/* Advanced statistics: R analytics, sizing, distributions (no $ values) */}
+      {statsLoading ? (
+        <SectionLoader label="Loading advanced statistics..." />
+      ) : trades.length > 0 && metadata ? (
+        <StatisticsAdvanced
+          trades={trades}
+          metadata={metadata}
+          viewMode={filters.viewMode}
         />
       ) : null}
 
