@@ -17,6 +17,14 @@ import {
 import apiClient from "@/lib/api/client";
 import { toast } from "sonner";
 import type { MindsetJournalEntry, JournalEntryType, EmotionalTrap } from "@/lib/types";
+import { useAuth } from "@/providers/auth-provider";
+import { ActionJournalFields } from "@/components/mental-edge/action-journal/action-journal-fields";
+import {
+  actionJournalToGuidedPrompts,
+  hasActionJournalContent,
+  isActionJournalUser,
+  normalizeActionJournal,
+} from "@/lib/mental-edge/action-journal";
 
 const ENTRY_TYPES: { value: JournalEntryType; label: string }[] = [
   { value: "pre_market_note", label: "Pre-Market Note" },
@@ -26,6 +34,9 @@ const ENTRY_TYPES: { value: JournalEntryType; label: string }[] = [
   { value: "weekly_review", label: "Weekly Review" },
   { value: "rule_violation_review", label: "Rule Violation Review" },
 ];
+
+// Only offered to Action Journal users (see lib/mental-edge/action-journal.ts).
+const COACHING_SESSION_TYPE = { value: "coaching_session_summary" as const, label: "Coaching Session Summary" };
 
 const TRAPS: { value: EmotionalTrap; label: string }[] = [
   { value: "overtrading", label: "Overtrading" },
@@ -58,6 +69,12 @@ interface JournalEntryFormProps {
 }
 
 export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: JournalEntryFormProps) {
+  const { user } = useAuth();
+  const actionJournalEnabled = isActionJournalUser(user);
+  const entryTypes =
+    actionJournalEnabled || entry?.entryType === COACHING_SESSION_TYPE.value
+      ? [...ENTRY_TYPES, COACHING_SESSION_TYPE]
+      : ENTRY_TYPES;
   const [entryType, setEntryType] = useState<JournalEntryType>(entry?.entryType || defaultEntryType || "post_market_reflection");
   const [title, setTitle] = useState(entry?.title || "");
   const [date, setDate] = useState(() => toDateInputValue(entry?.date) || todayInputValue());
@@ -68,6 +85,14 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
   const [linkedTraps, setLinkedTraps] = useState<EmotionalTrap[]>(entry?.linkedTraps || []);
   const [submitting, setSubmitting] = useState(false);
   const [promptsLoaded, setPromptsLoaded] = useState(!!entry);
+  const [actionJournal, setActionJournal] = useState(() => normalizeActionJournal(entry?.actionJournal));
+
+  // 3-3-1 for post-market reflections. Existing entries written with the old
+  // prompts keep them, so editing can't drop their answers.
+  const useActionJournal =
+    actionJournalEnabled &&
+    entryType === "post_market_reflection" &&
+    (!entry || !!entry.actionJournal);
 
   // When creating new and entry type changes, fetch prompts from backend
   useEffect(() => {
@@ -111,6 +136,11 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
         "What emotional traps did I fall into most?",
         "What is my #1 focus for next week?",
       ],
+      coaching_session_summary: [
+        "What landed in the session?",
+        "What am I working on?",
+        "What did I commit to?",
+      ],
       rule_violation_review: [
         "Which rule did I violate?",
         "What was the context (market, personal state)?",
@@ -146,13 +176,18 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
       toast.error("Date is required");
       return;
     }
+    if (useActionJournal && !hasActionJournalContent(actionJournal)) {
+      toast.error("Add at least one item to your 3-3-1");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
         date,
         entryType,
         title,
-        guidedPrompts,
+        guidedPrompts: useActionJournal ? actionJournalToGuidedPrompts(actionJournal) : guidedPrompts,
+        ...(useActionJournal ? { actionJournal } : {}),
         freeContent: freeContent || undefined,
         linkedTraps: linkedTraps.length > 0 ? linkedTraps : undefined,
       };
@@ -199,7 +234,7 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTRY_TYPES.map((type) => (
+                {entryTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>
@@ -217,8 +252,17 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
           </div>
         </div>
 
+        {/* 3-3-1 Action Journal (replaces the guided prompts) */}
+        {useActionJournal && (
+          <ActionJournalFields
+            value={actionJournal}
+            onChange={setActionJournal}
+            date={date || todayInputValue()}
+          />
+        )}
+
         {/* Guided Prompts */}
-        {promptsLoaded && guidedPrompts.length > 0 && (
+        {!useActionJournal && promptsLoaded && guidedPrompts.length > 0 && (
           <div className="space-y-4">
             <Label className="text-sm font-semibold">Guided Prompts</Label>
             {guidedPrompts.map((prompt, index) => (

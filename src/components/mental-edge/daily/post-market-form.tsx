@@ -10,7 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { RatingSlider } from "./rating-slider";
 import { Moon, Check } from "lucide-react";
-import type { EmotionalTrap } from "@/lib/types";
+import type { EmotionalTrap, MentalCheckIn } from "@/lib/types";
+import { ActionJournalFields } from "@/components/mental-edge/action-journal/action-journal-fields";
+import {
+  actionJournalToReflections,
+  normalizeActionJournal,
+} from "@/lib/mental-edge/action-journal";
+
+type Reflections = NonNullable<NonNullable<MentalCheckIn["postMarket"]>["reflections"]>;
 
 const EMOTIONAL_TRAPS: { value: EmotionalTrap; label: string }[] = [
   { value: "overtrading", label: "Overtrading" },
@@ -27,19 +34,23 @@ interface PostMarketFormProps {
   initialData?: {
     ratings?: Record<string, number>;
     behaviors?: Record<string, boolean>;
-    reflections?: Record<string, string>;
+    reflections?: Reflections;
     actualTraps?: EmotionalTrap[];
   };
   onSubmit: (data: {
     completedAt: string;
     ratings: Record<string, number>;
     behaviors: Record<string, boolean>;
-    reflections: Record<string, string>;
+    reflections: Reflections;
     actualTraps: EmotionalTrap[];
   }) => void;
   isSubmitting?: boolean;
   isCompleted?: boolean;
   preMarketCompleted?: boolean;
+  /** Check-in date (YYYY-MM-DD) — used for the "last action step" reminder. */
+  date: string;
+  /** Show the 3-3-1 Action Journal instead of the free-text reflections. */
+  actionJournalEnabled?: boolean;
 }
 
 export function PostMarketForm({
@@ -48,6 +59,8 @@ export function PostMarketForm({
   isSubmitting,
   isCompleted,
   preMarketCompleted,
+  date,
+  actionJournalEnabled,
 }: PostMarketFormProps) {
   const [ratings, setRatings] = useState({
     planAdherence: initialData?.ratings?.planAdherence ?? 3,
@@ -68,6 +81,16 @@ export function PostMarketForm({
     emotionalHighlight: initialData?.reflections?.emotionalHighlight ?? "",
   });
   const [actualTraps, setActualTraps] = useState<EmotionalTrap[]>(initialData?.actualTraps || []);
+  const [actionJournal, setActionJournal] = useState(() =>
+    normalizeActionJournal(initialData?.reflections?.actionJournal)
+  );
+
+  // A review written with the old free-text form (before 3-3-1 was enabled)
+  // stays on that form, so saving can't blank out its reflections.
+  const hasLegacyReflections =
+    !initialData?.reflections?.actionJournal &&
+    !!(initialData?.reflections?.whatWentWell?.trim() || initialData?.reflections?.whatWentPoorly?.trim());
+  const useActionJournal = !!actionJournalEnabled && !hasLegacyReflections;
 
   const toggleTrap = (trap: EmotionalTrap) => {
     setActualTraps((prev) =>
@@ -80,7 +103,9 @@ export function PostMarketForm({
       completedAt: new Date().toISOString(),
       ratings,
       behaviors,
-      reflections,
+      reflections: useActionJournal
+        ? { ...reflections, ...actionJournalToReflections(actionJournal), actionJournal }
+        : reflections,
       actualTraps,
     });
   };
@@ -196,6 +221,12 @@ export function PostMarketForm({
         <Separator />
 
         {/* Reflections */}
+        {useActionJournal ? (
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">3-3-1 Action Journal</h3>
+            <ActionJournalFields value={actionJournal} onChange={setActionJournal} date={date} />
+          </div>
+        ) : (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Reflections</h3>
           {[
@@ -218,6 +249,7 @@ export function PostMarketForm({
             </div>
           ))}
         </div>
+        )}
 
         <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full">
           {isSubmitting ? "Saving..." : isCompleted ? "Update Post-Market Review" : "Complete Post-Market Review"}

@@ -131,7 +131,19 @@ export type Intention = 'avoid_forcing' | 'stay_patient' | 'stick_to_plan' | 'ma
 export type EmotionalTrap = 'overtrading' | 'fomo_entries' | 'revenge_trading' | 'moving_stops' | 'oversizing' | 'not_taking_setups' | 'chasing' | 'impatience';
 export type RiskPredictionOutcome = 'accurate' | 'inaccurate' | 'worry_not_fulfilled' | 'emotionally_set' | 'blind_spot';
 export type RuleCategory = 'risk_management' | 'entry_rules' | 'exit_rules' | 'position_sizing' | 'emotional' | 'routine';
-export type JournalEntryType = 'pre_market_note' | 'post_market_reflection' | 'mistake_review' | 'trigger_review' | 'weekly_review' | 'rule_violation_review';
+export type JournalEntryType = 'pre_market_note' | 'post_market_reflection' | 'mistake_review' | 'trigger_review' | 'weekly_review' | 'rule_violation_review' | 'coaching_session_summary';
+export type ActionJournalPillar = 'self_state' | 'process' | 'market';
+export interface ActionJournalItem {
+  text: string;
+  pillar: ActionJournalPillar | null;
+}
+/** 3-3-1 Action Journal: 3 did well, 3 for improvement, 1 action step (+ context). */
+export interface ActionJournalData {
+  didWell: ActionJournalItem[];
+  improvement: ActionJournalItem[];
+  actionStep: string;
+  context: string;
+}
 export type ViolationMentalState = 'frustrated' | 'overconfident' | 'fearful' | 'impatient' | 'revenge_trading' | 'fomo' | 'bored' | 'tired';
 
 export interface MentalCheckIn {
@@ -160,6 +172,7 @@ export interface MentalCheckIn {
       lessonsLearned?: string;
       tomorrowFocus?: string;
       emotionalHighlight?: string;
+      actionJournal?: ActionJournalData | null;
     };
     actualTraps?: EmotionalTrap[];
   };
@@ -185,6 +198,7 @@ export interface MindsetJournalEntry {
     response: string;
   }[];
   freeContent?: string;
+  actionJournal?: ActionJournalData | null;
   linkedTraps?: EmotionalTrap[];
   linkedDate?: string;
   createdAt: string;

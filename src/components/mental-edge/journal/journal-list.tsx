@@ -16,6 +16,8 @@ import { JournalEntryForm } from "./journal-entry-form";
 import apiClient from "@/lib/api/client";
 import { toast } from "sonner";
 import type { MindsetJournalEntry, JournalEntryType } from "@/lib/types";
+import { useAuth } from "@/providers/auth-provider";
+import { isActionJournalUser } from "@/lib/mental-edge/action-journal";
 
 const ENTRY_TYPES: { value: JournalEntryType | "all"; label: string }[] = [
   { value: "all", label: "All Types" },
@@ -28,6 +30,10 @@ const ENTRY_TYPES: { value: JournalEntryType | "all"; label: string }[] = [
 ];
 
 export function JournalList() {
+  const { user } = useAuth();
+  const entryTypes = isActionJournalUser(user)
+    ? [...ENTRY_TYPES, { value: "coaching_session_summary" as const, label: "Coaching Session Summary" }]
+    : ENTRY_TYPES;
   const [entries, setEntries] = useState<MindsetJournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<JournalEntryType | "all">("all");
@@ -109,7 +115,7 @@ export function JournalList() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ENTRY_TYPES.map((type) => (
+                {entryTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>

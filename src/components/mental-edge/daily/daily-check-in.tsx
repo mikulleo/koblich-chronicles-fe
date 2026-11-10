@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { CalendarDays, TrendingUp, TrendingDown, Minus, AlertTriangle, Target, ChevronLeft, ChevronRight, Lightbulb, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import apiClient from "@/lib/api/client";
+import { useAuth } from "@/providers/auth-provider";
+import { isActionJournalUser } from "@/lib/mental-edge/action-journal";
 import { toast } from "sonner";
 import type { MentalCheckIn } from "@/lib/types";
 import { AICoachingCard } from "./ai-coaching-card";
@@ -41,6 +43,7 @@ function snapToWeekday(dateStr: string): string {
 }
 
 export function DailyCheckIn() {
+  const { user } = useAuth();
   const [checkIn, setCheckIn] = useState<MentalCheckIn | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -106,7 +109,7 @@ export function DailyCheckIn() {
     completedAt: string;
     ratings: Record<string, number>;
     behaviors: Record<string, boolean>;
-    reflections: Record<string, string>;
+    reflections: NonNullable<NonNullable<MentalCheckIn["postMarket"]>["reflections"]>;
     actualTraps: string[];
   }) => {
     if (!checkIn) return;
@@ -340,6 +343,8 @@ export function DailyCheckIn() {
           isSubmitting={submitting}
           isCompleted={postMarketCompleted}
           preMarketCompleted={preMarketCompleted}
+          date={selectedDate}
+          actionJournalEnabled={isActionJournalUser(user)}
         />
       </div>
     </div>
