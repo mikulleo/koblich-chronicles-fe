@@ -32,7 +32,11 @@ const ENTRY_TYPES: { value: JournalEntryType | "all"; label: string }[] = [
 export function JournalList() {
   const { user } = useAuth();
   const entryTypes = isActionJournalUser(user)
-    ? [...ENTRY_TYPES, { value: "coaching_session_summary" as const, label: "Coaching Session Summary" }]
+    ? [
+        ...ENTRY_TYPES,
+        { value: "coaching_session_summary" as const, label: "Coaching Session Summary" },
+        { value: "gratitude" as const, label: "Gratitude" },
+      ]
     : ENTRY_TYPES;
   const [entries, setEntries] = useState<MindsetJournalEntry[]>([]);
   const [loading, setLoading] = useState(true);

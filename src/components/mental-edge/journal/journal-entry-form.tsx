@@ -37,6 +37,8 @@ const ENTRY_TYPES: { value: JournalEntryType; label: string }[] = [
 
 // Only offered to Action Journal users (see lib/mental-edge/action-journal.ts).
 const COACHING_SESSION_TYPE = { value: "coaching_session_summary" as const, label: "Coaching Session Summary" };
+const GRATITUDE_TYPE = { value: "gratitude" as const, label: "Gratitude" };
+const PERSONAL_TYPES = [COACHING_SESSION_TYPE, GRATITUDE_TYPE];
 
 const TRAPS: { value: EmotionalTrap; label: string }[] = [
   { value: "overtrading", label: "Overtrading" },
@@ -72,8 +74,8 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
   const { user } = useAuth();
   const actionJournalEnabled = isActionJournalUser(user);
   const entryTypes =
-    actionJournalEnabled || entry?.entryType === COACHING_SESSION_TYPE.value
-      ? [...ENTRY_TYPES, COACHING_SESSION_TYPE]
+    actionJournalEnabled || PERSONAL_TYPES.some((t) => t.value === entry?.entryType)
+      ? [...ENTRY_TYPES, ...PERSONAL_TYPES]
       : ENTRY_TYPES;
   const [entryType, setEntryType] = useState<JournalEntryType>(entry?.entryType || defaultEntryType || "post_market_reflection");
   const [title, setTitle] = useState(entry?.title || "");
@@ -140,6 +142,14 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
         "What landed in the session?",
         "What am I working on?",
         "What did I commit to?",
+      ],
+      // Keep in sync with the BE copy in hooks/populateJournalPrompts.ts.
+      gratitude: [
+        "3 things I am grateful for today (be specific, not general)",
+        "A person I am grateful for: what did they do, and what difference did it make?",
+        "3 good things that happened, and why did each one happen? What was my part in it?",
+        "A setback, loss or mistake I can be grateful for: what is it teaching me?",
+        "Something I usually take for granted: what would my life or trading look like without it?",
       ],
       rule_violation_review: [
         "Which rule did I violate?",
@@ -265,6 +275,15 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
         {!useActionJournal && promptsLoaded && guidedPrompts.length > 0 && (
           <div className="space-y-4">
             <Label className="text-sm font-semibold">Guided Prompts</Label>
+            {entryType === "gratitude" && (
+              <p className="text-xs text-muted-foreground">
+                Specific beats general, people beat things, and asking <em>why</em> a good thing
+                happened is what makes it stick. Drawn from Robert Emmons (<em>Thanks!</em>), Martin
+                Seligman&apos;s &ldquo;Three Good Things&rdquo; (<em>Flourish</em>), <em>The Five Minute
+                Journal</em> and the Stoic &ldquo;obstacle is the way&rdquo; reframe. A few minutes, a
+                few times a week, works better than a daily chore.
+              </p>
+            )}
             {guidedPrompts.map((prompt, index) => (
               <div key={index} className="space-y-1">
                 <Label className="text-sm text-muted-foreground">{prompt.prompt}</Label>
@@ -291,7 +310,7 @@ export function JournalEntryForm({ entry, defaultEntryType, onSave, onCancel }: 
         </div>
 
         {/* Linked traps — only for entry types where they're relevant */}
-        {entryType !== "pre_market_note" && (
+        {entryType !== "pre_market_note" && entryType !== "gratitude" && (
           <div className="space-y-2">
             <Label>Related Emotional Traps</Label>
             <div className="flex flex-wrap gap-2">

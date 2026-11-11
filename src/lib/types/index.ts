@@ -131,7 +131,7 @@ export type Intention = 'avoid_forcing' | 'stay_patient' | 'stick_to_plan' | 'ma
 export type EmotionalTrap = 'overtrading' | 'fomo_entries' | 'revenge_trading' | 'moving_stops' | 'oversizing' | 'not_taking_setups' | 'chasing' | 'impatience';
 export type RiskPredictionOutcome = 'accurate' | 'inaccurate' | 'worry_not_fulfilled' | 'emotionally_set' | 'blind_spot';
 export type RuleCategory = 'risk_management' | 'entry_rules' | 'exit_rules' | 'position_sizing' | 'emotional' | 'routine';
-export type JournalEntryType = 'pre_market_note' | 'post_market_reflection' | 'mistake_review' | 'trigger_review' | 'weekly_review' | 'rule_violation_review' | 'coaching_session_summary';
+export type JournalEntryType = 'pre_market_note' | 'post_market_reflection' | 'mistake_review' | 'trigger_review' | 'weekly_review' | 'rule_violation_review' | 'coaching_session_summary' | 'gratitude';
 export type ActionJournalPillar = 'self_state' | 'process' | 'market';
 export interface ActionJournalItem {
   text: string;

@@ -18,6 +18,7 @@ const JOURNAL_TYPE_LABELS: Record<JournalEntryType, string> = {
   weekly_review: "Weekly Review",
   rule_violation_review: "Rule Violation Review",
   coaching_session_summary: "Coaching Session Summary",
+  gratitude: "Gratitude",
 };
 
 const JOURNAL_TYPE_COLORS: Record<JournalEntryType, string> = {
@@ -28,6 +29,7 @@ const JOURNAL_TYPE_COLORS: Record<JournalEntryType, string> = {
   weekly_review: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   rule_violation_review: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   coaching_session_summary: "bg-teal-100 text-teal-800 [[data-theme=dark]_&]:bg-teal-900/30 [[data-theme=dark]_&]:text-teal-400",
+  gratitude: "bg-amber-100 text-amber-800 [[data-theme=dark]_&]:bg-amber-900/30 [[data-theme=dark]_&]:text-amber-400",
 };
 
 interface RemainingInfo {

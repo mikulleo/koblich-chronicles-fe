@@ -28,6 +28,9 @@ import apiClient from "@/lib/api/client";
 import type { CheckInTrends, DeterministicInsights } from "@/lib/types";
 import { AIInsightsSection } from "./ai-insights-section";
 import { InsightsPeriodFilter } from "./insights-period-filter";
+import { CoachingPrepCard } from "./coaching-prep-card";
+import { useAuth } from "@/providers/auth-provider";
+import { isActionJournalUser } from "@/lib/mental-edge/action-journal";
 import {
   isIncompleteCustom,
   periodLabel,
@@ -46,6 +49,8 @@ function formatDate(dateStr: string | null): string {
 }
 
 export function InsightsDashboard() {
+  const { user } = useAuth();
+  const coachingPrepEnabled = isActionJournalUser(user);
   const [period, setPeriod] = useState<InsightPeriodId>("all");
   const [customRange, setCustomRange] = useState<CustomRange>({});
   const [trends, setTrends] = useState<CheckInTrends | null>(null);
@@ -186,6 +191,11 @@ export function InsightsDashboard() {
         <CalendarDays className="h-3 w-3" />
         {coverageLabel}
       </p>
+
+      {/* One coaching brief for the whole period (Action Journal users) */}
+      {coachingPrepEnabled && (
+        <CoachingPrepCard startDate={startDate} endDate={endDate} periodLabel={periodLabel(period)} />
+      )}
 
       {/* Browsable Day Review */}
       {trends && <DayEvaluation trends={trends.trends} />}
