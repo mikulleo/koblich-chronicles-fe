@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { RatingSlider } from "./rating-slider";
 import { Sun, Check } from "lucide-react";
-import type { ContextFlag, Intention, EmotionalTrap } from "@/lib/types";
+import type { ContextFlag, Intention, EmotionalTrap, ThreePsData } from "@/lib/types";
+import { THREE_PS, normalizeThreePs } from "@/lib/mental-edge/three-ps";
 
 const CONTEXT_FLAGS: { value: ContextFlag; label: string }[] = [
   { value: "recent_loss", label: "Recent Loss" },
@@ -52,6 +55,8 @@ interface PreMarketFormProps {
     contextFlags?: ContextFlag[];
     intentions?: Intention[];
     biggestRisk?: EmotionalTrap;
+    notes?: string | null;
+    threePs?: ThreePsData | null;
   };
   onSubmit: (data: {
     completedAt: string;
@@ -59,12 +64,16 @@ interface PreMarketFormProps {
     contextFlags: ContextFlag[];
     intentions: Intention[];
     biggestRisk: EmotionalTrap | null;
+    notes: string;
+    threePs?: ThreePsData;
   }) => void;
   isSubmitting?: boolean;
   isCompleted?: boolean;
+  /** Show the 3Ps (Purpose / Presence / Process) alignment section. */
+  threePsEnabled?: boolean;
 }
 
-export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted }: PreMarketFormProps) {
+export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted, threePsEnabled }: PreMarketFormProps) {
   const [ratings, setRatings] = useState({
     focus: initialData?.ratings?.focus ?? 3,
     patience: initialData?.ratings?.patience ?? 3,
@@ -76,6 +85,8 @@ export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted
   const [contextFlags, setContextFlags] = useState<ContextFlag[]>(initialData?.contextFlags || []);
   const [intentions, setIntentions] = useState<Intention[]>(initialData?.intentions || []);
   const [biggestRisk, setBiggestRisk] = useState<EmotionalTrap | null>(initialData?.biggestRisk || null);
+  const [notes, setNotes] = useState(initialData?.notes ?? "");
+  const [threePs, setThreePs] = useState<ThreePsData>(() => normalizeThreePs(initialData?.threePs));
 
   const toggleFlag = (flag: ContextFlag) => {
     setContextFlags((prev) =>
@@ -96,6 +107,9 @@ export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted
       contextFlags,
       intentions,
       biggestRisk,
+      notes,
+      // Omitted (not nulled) when disabled so it never wipes stored data.
+      ...(threePsEnabled ? { threePs } : {}),
     });
   };
 
@@ -116,6 +130,39 @@ export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted
             <Check className="h-4 w-4" />
             Pre-market check-in completed
           </div>
+        )}
+
+        {/* 3Ps Alignment (Steven Goldstein) */}
+        {threePsEnabled && (
+          <>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">3Ps Alignment</h3>
+                <p className="text-xs text-muted-foreground mt-1">Purpose · Presence · Process — set your anchor before the open.</p>
+              </div>
+              {THREE_PS.map((p) => (
+                <div key={p.key} className="space-y-2">
+                  <RatingSlider
+                    label={p.label}
+                    description={p.question}
+                    value={threePs[p.key].rating ?? 3}
+                    onChange={(v) => setThreePs((t) => ({ ...t, [p.key]: { ...t[p.key], rating: v } }))}
+                    labels={p.labels}
+                  />
+                  <Textarea
+                    value={threePs[p.key].note}
+                    onChange={(e) => setThreePs((t) => ({ ...t, [p.key]: { ...t[p.key], note: e.target.value } }))}
+                    placeholder={p.placeholder}
+                    rows={2}
+                    maxLength={1000}
+                    aria-label={`${p.label} note`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <Separator />
+          </>
         )}
 
         {/* Positive Ratings */}
@@ -229,6 +276,23 @@ export function PreMarketForm({ initialData, onSubmit, isSubmitting, isCompleted
               </Badge>
             ))}
           </div>
+        </div>
+
+        <Separator />
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <Label htmlFor="pre-market-notes" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Notes
+          </Label>
+          <Textarea
+            id="pre-market-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Game plan, watchlist thoughts, anything on your mind before the open…"
+            rows={4}
+            maxLength={5000}
+          />
         </div>
 
         <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full">

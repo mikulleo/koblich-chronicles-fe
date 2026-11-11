@@ -83,6 +83,8 @@ export function DailyCheckIn() {
     contextFlags: string[];
     intentions: string[];
     biggestRisk: string | null;
+    notes: string;
+    threePs?: NonNullable<MentalCheckIn["preMarket"]>["threePs"];
   }) => {
     setSubmitting(true);
     try {
@@ -336,6 +338,7 @@ export function DailyCheckIn() {
           onSubmit={handlePreMarketSubmit}
           isSubmitting={submitting}
           isCompleted={preMarketCompleted}
+          threePsEnabled={isActionJournalUser(user)}
         />
         <PostMarketForm
           initialData={checkIn?.postMarket}

@@ -144,6 +144,13 @@ export interface ActionJournalData {
   actionStep: string;
   context: string;
 }
+/** Pre-market 3Ps alignment (Steven Goldstein): Purpose, Presence, Process. */
+export type ThreePKey = 'purpose' | 'presence' | 'process';
+export interface ThreePEntry {
+  rating: number | null;
+  note: string;
+}
+export type ThreePsData = Record<ThreePKey, ThreePEntry>;
 export type ViolationMentalState = 'frustrated' | 'overconfident' | 'fearful' | 'impatient' | 'revenge_trading' | 'fomo' | 'bored' | 'tired';
 
 export interface MentalCheckIn {
@@ -156,6 +163,8 @@ export interface MentalCheckIn {
     contextFlags?: ContextFlag[];
     intentions?: Intention[];
     biggestRisk?: EmotionalTrap;
+    notes?: string | null;
+    threePs?: ThreePsData | null;
   };
   postMarket?: {
     completedAt?: string;
